@@ -3,6 +3,12 @@
 This guide explains the contributor workflow for the generated
 Peregrine Web project.
 
+The [technical design](peregrine-design.md) describes the proposed framework;
+[ADR 001](adr-001-resource-aware-lifecycle.md) remains proposed. Consult the
+[repository layout](repository-layout.md) for file ownership and the
+[potential roadmap](roadmap.md) for delivery sequencing. The current library
+is a generated stub, so these proposals are not available APIs.
+
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.
