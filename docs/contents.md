@@ -15,6 +15,17 @@ documentation set.
   spelling, structure, Markdown, Architecture Decision Record (ADR), Request
   for Comments (RFC), and roadmap conventions used by this documentation set.
 
+## Product direction and design
+
+- [Terms of reference](terms-of-reference.md) defines the intended users,
+  goals, scope, assumptions, and unresolved decisions from the source papers.
+- [Technical design](peregrine-design.md) proposes the resource, lifecycle,
+  body, transport, and verification contracts.
+- [Potential GIST roadmap](roadmap.md) links Goals, Ideas, Steps, and Tasks to
+  review-sized delivery slices and observable success criteria.
+- [ADR 001: Resource-aware lifecycle](adr-001-resource-aware-lifecycle.md)
+  records the proposed choice to own the inner middleware pipeline.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
