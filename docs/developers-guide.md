@@ -9,6 +9,12 @@ The [technical design](peregrine-design.md) describes the proposed framework;
 [potential roadmap](roadmap.md) for delivery sequencing. The current library
 is a generated stub, so these proposals are not available APIs.
 
+The [compiler ownership experiment](polonius-ownership-experiment.md) records
+explicit four-way compiler probes. Its flags are experimental; this proposal
+does not change the repository's build settings or consumer requirements.
+Implementation must validate downstream and analyser compatibility before
+[ADR 002](adr-002-compiler-ownership-experiment.md) can be accepted.
+
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.

@@ -25,6 +25,15 @@ documentation set.
   review-sized delivery slices and observable success criteria.
 - [ADR 001: Resource-aware lifecycle](adr-001-resource-aware-lifecycle.md)
   records the proposed choice to own the inner middleware pipeline.
+- [Compiler ownership experiment](polonius-ownership-experiment.md) compares
+  old-checker-compatible and exclusive Polonius/new-solver designs with code
+  examples, measured acceptance, and adoption criteria.
+- [ADR 002: Compiler ownership experiment](adr-002-compiler-ownership-experiment.md)
+  records the proposed experiment and the conditions for a compiler commitment.
+- [Compiler probe evidence](compiler-probe-evidence.md): complete isolated
+  compiler fixtures and recorded outcomes.
+- [Polonius ownership design review](polonius-design-review.md): six-perspective
+  findings, pre-mortem, and adoption conditions.
 
 ## Rust reference material
 

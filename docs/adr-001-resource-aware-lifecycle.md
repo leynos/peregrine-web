@@ -54,10 +54,13 @@ therefore tolerate absent request state. Cancellation and panics do not receive
 an asynchronous cleanup guarantee.
 
 Keep Hyper and Tokio at the serving boundary. Preserve an outer adapter point
-for Tower; such an adapter must not replace resource-aware processing. Start
-with boxed `Send` futures for dynamic async dispatch, measuring their cost. The
-detailed proposed contracts, including error precedence and the commitment
-boundary for streamed responses, are in the technical design.
+for Tower; such an adapter must not replace resource-aware processing. Use boxed
+`Send` futures as the dynamic-dispatch baseline, measuring their cost.
+[ADR 002](adr-002-compiler-ownership-experiment.md) compares narrower phase
+views and typed endpoint composition before selecting the public ownership and
+compiler contract. Both variants retain these lifecycle rules. The detailed
+proposed contracts, including error precedence and the commitment boundary for
+streamed responses, are in the technical design.
 
 ## Known risks and limitations
 

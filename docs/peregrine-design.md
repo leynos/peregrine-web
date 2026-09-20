@@ -1,13 +1,15 @@
 # Peregrine Web technical design
 
-- Status: proposed v0.1; describes a target, not implemented functionality.
+- Status: proposed v0.2; describes a target, not implemented functionality.
 - Date: 2026-09-20.
 - Audience: library implementers, API reviewers, and service maintainers.
 - Scope: a resource-oriented HTTP framework with an explicit middleware engine.
 - Authority: [terms of reference](terms-of-reference.md) establishes goals;
   [ADR 001](adr-001-resource-aware-lifecycle.md) records the proposed core
   choice.
-- Delivery: [potential GIST roadmap](roadmap.md).
+- Delivery: [potential GIST roadmap](roadmap.md), including the key
+  [compiler/ownership experiment](polonius-ownership-experiment.md) and
+  [ADR 002](adr-002-compiler-ownership-experiment.md).
 
 ## 1. Problem, evidence, and design boundaries
 
@@ -18,7 +20,8 @@ framework-owned lifecycle. This preserves the central requirements of the
 project brief and the accompanying architectural paper.[^1]
 
 The repository currently contains a library stub and no runtime dependencies.
-Every interface below is a proposed contract. No benchmark result, compiler
+Every interface below is a proposed contract. The compiler experiment records
+measured acceptance of isolated examples; no framework benchmark, deployment
 compatibility claim, or runnable framework example is implied.
 
 The initial delivery target is a single `peregrine-web` library, in-process
@@ -71,9 +74,11 @@ mutate this registry. Resources own their application dependencies; the
 framework does not provide a dependency-injection container.
 
 The pipeline borrows resources and middleware from immutable application state.
-It owns one context, passed sequentially as `&mut Context`. No global context
-lock is needed. Resource implementations remain responsible for synchronizing
-their own shared mutable state and avoiding blocking work on runtime threads.
+The baseline owns one context, passed sequentially as `&mut Context`. The
+experiment in §3.1 instead loans narrower phase views from the same request
+owner. Neither model requires a global context lock. Resource implementations
+remain responsible for synchronizing their own shared mutable state and
+avoiding blocking work on runtime threads.
 
 The diagram shows normal progression and the exits into response processing.
 
@@ -143,22 +148,66 @@ calling `complete()` still records a failure and overrides the success draft.
 Pre-routing middleware may rewrite the effective URI through an explicit
 operation. Preserve the original URI for diagnostics. Freeze the effective
 method and route target before resource policy runs; resource and response
-hooks cannot change the dispatch destination. Parameters are copied into owned
-strings before borrowing the context mutably again. This avoids borrowing the
-URI inside the context across later mutations.
+hooks cannot change the dispatch destination. In the baseline, parameters are
+copied into owned strings before borrowing the context mutably again. This
+avoids borrowing the URI inside the context across later mutations.
 
 Request metadata survives body consumption. Typed extensions store application
 state such as authenticated identity; absent identity is a normal condition
 that policy must handle. No environment reads occur inside the pipeline.
 Applications resolve configuration at startup and inject it.
 
+### 3.1. Experimental compiler and ownership direction
+
+**Key GIST idea:** a pure Polonius-plus-new-solver implementation may make
+borrowing helpers and resource-aware middleware easier to express without
+sacrificing entity-first ergonomics. [Roadmap phase 2](roadmap.md) tests this
+before later slices commit to a public ownership model. The detailed
+[experiment specification](polonius-ownership-experiment.md) contains paired
+code examples, measured compiler results, attribution controls, and acceptance
+criteria. [ADR 002](adr-002-compiler-ownership-experiment.md) records the
+proposed compiler posture; adoption remains undecided.
+
+The exclusive candidate targets a pinned compiler with
+`-Zpolonius=next -Znext-solver=globally`. It carries no old-checker
+compatibility implementation. It can still own data, share resources through
+`Arc`, and erase types at heterogeneous boundaries. The comparator uses the
+same compiler with both mechanisms disabled explicitly; that comparator alone
+does not establish support for a stable compiler release.
+
+Both candidates may use phase-specific views: immutable request metadata and
+frozen routing information, separate mutable body and response capabilities,
+and explicit `Continue`/`Respond` hook outcomes. The engine owns transitions,
+failures, and response unwinding. Resource methods and policy stay on the
+resource object; a typed endpoint adapter retains that object before erasing
+its invocation boundary for router storage. Request-local borrows may survive
+an awaited hook but cannot escape into response streams or detached tasks
+without suitable ownership.
+
+Initial four-way probes demonstrate a Polonius-specific benefit for returning
+cached borrows before fallible miss initialization. They demonstrate no
+solver-specific benefit. Split-field async responders work in all four
+configurations; native async dyn dispatch and overlapping mutable borrows fail
+in all four. Thus compiler exclusivity is a falsifiable idea, not a
+prerequisite for Rust-like ownership or an allocation-free dispatch promise.
+
+The experiment must compare the best compatible APIs, preserve the lifecycle in
+§§5–10, and measure runtime, compile-time, and consumer-tooling costs
+separately. Select one maintained direction through roadmap task 2.2.3. If only
+ownership partitioning improves ergonomics, retain that design without claiming
+Polonius or solver necessity. The following sections specify the invariant
+contracts and baseline API shapes; the experiment may refine the latter but
+must not silently weaken the former.
+
 ## 4. Resources, method metadata, and policy
 
-`Resource` is a dyn-compatible, `Send + Sync` contract. It supplies responders
-for GET, POST, PUT, DELETE, PATCH, HEAD, and OPTIONS. Responders receive
-`&self` and `&mut Context` and return a semantic result. Initial async dispatch
-uses `async-trait`; there is no custom routing macro or assumed future language
-feature. Default responders return `MethodNotAllowed`.
+In the baseline, `Resource` is a dyn-compatible, `Send + Sync` contract. It
+supplies responders for GET, POST, PUT, DELETE, PATCH, HEAD, and OPTIONS.
+Responders receive `&self` and `&mut Context` and return a semantic result.
+Initial async dispatch uses `async-trait`; there is no custom routing macro or
+assumed future language feature. Section 3.1 also evaluates generic resource
+authoring with a separate erased invocation adapter, without assuming native
+async dyn compatibility. Default responders return `MethodNotAllowed`.
 
 A synchronous `supported_methods()` declaration belongs to the resource.
 Registration captures it once and rejects duplicate or unsupported method
@@ -244,7 +293,7 @@ deferred.[^6]
 
 ## 6. Middleware lifecycle and completion
 
-The middleware contract has three hooks: `process_request(ctx)`,
+The baseline middleware contract has three hooks: `process_request(ctx)`,
 `process_resource(ctx, resource)`, and `process_response(ctx)`. Each takes a
 shared middleware reference and returns a semantic result. Default hooks
 succeed without changing state. Response hooks inspect route information
@@ -254,7 +303,7 @@ The pipeline applies these rules:
 
 1. Create context and run request hooks in registration order.
 2. On completion or failure, stop forward processing and enter the response
-   phase. Otherwise resolve the route and copy parameters.
+   phase. Otherwise resolve the route and establish immutable parameters.
 3. On a route match, run resource hooks in registration order with the selected
    resource. Recheck completion or failure after each hook.
 4. If forward processing remains active, dispatch one responder.
@@ -425,6 +474,11 @@ backpressure, and cancellation behaviour that in-process tests cannot prove.
 
 _Table 4: Named invariants, verification methods, and their boundaries._
 
+The compiler experiment adds a four-way flag matrix, explicit diagnostic
+expectations, and semantic parity checks. Compiler acceptance cannot establish
+authorization correctness, runtime efficiency, or cancellation cleanup. See
+[experimental evidence](polonius-ownership-experiment.md#2-compiler-evidence-and-reproduction).
+
 Use `rstest` and `rstest-bdd` within delivery tasks to express representative
 outcomes. Focus `insta` snapshots on stable error envelopes and lifecycle
 traces, normalize generated identifiers, and pair snapshots with semantic
@@ -465,15 +519,18 @@ adapter.
 
 The current library has no framework API to migrate. Stabilization requires
 agreement on terms-of-reference Q1–Q6, a compiled public API example, and
-acceptance or replacement of ADR 001. Keep generated public documentation and
-[users' guide](users-guide.md) synchronized with each delivered slice; do not
-present proposed APIs there as already available.
+acceptance or replacement of ADRs 001 and 002. Roadmap task 2.2.3 selects the
+compiler/ownership direction before API stabilization. Keep generated public
+documentation and [users' guide](users-guide.md) synchronized with each
+delivered slice; do not present proposed APIs there as already available.
 
 Defer HTTP/2, native TLS, WebSockets, arbitrary extension methods, a supported
-Tower adapter, optional local-thread execution, borrowed parameter
-optimization, and registration macros. Each needs a demonstrated user need and
-a compatibility review. Database tooling, identity-provider implementation, and
-Python source compatibility remain non-goals rather than deferred promises.
+Tower adapter, optional local-thread execution, and registration macros.
+Borrowed parameter representation is now evaluated within the bounded §3.1
+experiment rather than deferred without evidence. Each needs a demonstrated
+user need and a compatibility review. Database tooling, identity-provider
+implementation, and Python source compatibility remain non-goals rather than
+deferred promises.
 
 ## 13. References
 
