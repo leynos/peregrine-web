@@ -35,6 +35,11 @@ documentation set.
 - [Polonius ownership design review](polonius-design-review.md): six-perspective
   findings, pre-mortem, and adoption conditions.
 
+- [Actix v2a middleware case study](actix-v2a-middleware-case-study.md) compares
+  implemented and proposed extensions, including where middleware adds friction.
+- [ADR 003: HTTP integration boundaries](adr-003-http-integration-boundaries.md)
+  records proposed typed-input, request-fact, rendering, and service boundaries.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)

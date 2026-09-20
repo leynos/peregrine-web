@@ -1,6 +1,6 @@
 # Peregrine Web technical design
 
-- Status: proposed v0.2; describes a target, not implemented functionality.
+- Status: proposed v0.3; describes a target, not implemented functionality.
 - Date: 2026-09-20.
 - Audience: library implementers, API reviewers, and service maintainers.
 - Scope: a resource-oriented HTTP framework with an explicit middleware engine.
@@ -123,6 +123,13 @@ Implementation should group modules by feature under the existing
 and repeat the equivalence check before adding helpers. Extract another crate
 only when an independently useful boundary has been demonstrated.
 
+The [actix-v2a case study](actix-v2a-middleware-case-study.md) tests these
+boundaries against existing extensions and proposed mutation contracts.
+[ADR 003](adr-003-http-integration-boundaries.md) records the resulting HTTP
+integration refinements: typed helpers for inputs, engine-owned presentation,
+and application-owned durable effects. Its examples are proposed contracts, not
+evidence that the runtime already exists.
+
 ## 3. Application and context contracts
 
 `PeregrineApp::handle` accepts an HTTP request whose body can be adapted to the
@@ -199,6 +206,34 @@ Polonius or solver necessity. The following sections specify the invariant
 contracts and baseline API shapes; the experiment may refine the latter but
 must not silently weaken the former.
 
+### 3.2. Typed inputs and immutable request facts
+
+Prefer synchronous typed parsers on borrowed metadata over middleware that
+populates a hidden bag of required inputs. Required and optional header parsing
+are distinct operations; both retain all occurrences until duplicate checks
+finish. Empty-value semantics belong to each parser: an empty SSE replay cursor
+can mean absent, while an empty UUID idempotency key is invalid. Metadata
+parsing never consumes a body. Domain validation and normalized-intent hashing
+remain explicit resource/application operations.
+
+Resources may call these helpers directly. An optional typed responder adapter
+may prepare inputs and convert returned values into a response draft at the
+existing dispatch boundary, after resource policy. It introduces no extra
+lifecycle phase, parser registry, or implicit extraction order. The ownership
+prototype must validate its lifetime, `Send`, and error-conversion contracts.
+Actix already supports typed extractors; this refinement prevents Peregrine's
+context model from losing that clarity.
+
+Initialize read-only `RequestFacts` before request hooks with correlation and
+an injected start time. Validate or generate the correlation identifier using
+application configuration; invalid-input rejection still gets a locally
+generated identifier and a pending failure, then skips forward hooks. Freeze
+optional route facts after routing. Keep authentication separate. Hooks and
+rendering receive restricted views; arbitrary extension mutation cannot replace
+the engine's correlation value. Retain the small facts needed by the timeout
+supervisor without extending request-local body borrows. Pre-context
+parser/connection errors and panics have no correlation guarantee.
+
 ## 4. Resources, method metadata, and policy
 
 In the baseline, `Resource` is a dyn-compatible, `Send + Sync` contract. It
@@ -246,6 +281,41 @@ JSON response. Policy rejection still reaches response hooks.
 The policy vocabulary and enforcement registration API require the Q3 spike
 before acceptance. Rate-limit and audit classifications are extension
 candidates; they do not imply built-in policy engines.
+
+### 4.1. Illustration: protected mutation with explicit inputs
+
+The case study's material benefit is the common policy checkpoint around an
+ordinary service call. A billing resource owns its invoice service and declares
+method-sensitive write policy. The engine authorizes that actual resource
+before parsing operation inputs or dispatching a mutation. Actix can express
+the same pattern with resource data and registration helpers; Peregrine makes
+this order part of its contract.
+
+This proposed typed-adapter example keeps the key and normalized intent
+visible. The names are illustrative; no such framework API is implemented yet.
+
+```rust,no_run
+async fn on_post(&self, input: RequestView<'_>, body: &mut BodySlot)
+    -> Result<InvoiceReply, Failure>
+{
+    let key = input.required_header::<IdempotencyKeyHeader>()?;
+    let intent = CreateInvoice::validate_and_normalize(body.json().await?)?;
+    Ok(self.invoices.create(input.principal()?, key, intent).await?)
+}
+```
+
+`IdempotencyKeyHeader` denotes an application parser adapter returning a typed
+key, not an existing framework type. The application service owns scoped
+identity, fingerprint versions, claim and completion, durable transaction
+boundaries, and replay redaction. It remains callable without HTTP. An HTTP
+replay traverses resource authorization again; the service additionally checks
+current object-level access. The framework must not infer an operation's
+durable result from its eventual response status. Reserving in a resource hook
+and completing in a response hook is not the supported general mutation
+contract: cancellation can skip completion, and a later hook can fail after the
+domain effect committed. Lease expiry alone never establishes safe effect
+retry. See the [case study](actix-v2a-middleware-case-study.md) for the full
+counterexample and actix-v2a's proposed adapter boundaries.
 
 ## 5. Routing and HTTP method semantics
 
@@ -301,7 +371,8 @@ through the context, which may have no match.
 
 The pipeline applies these rules:
 
-1. Create context and run request hooks in registration order.
+1. Create context and request facts. Unless initialization already failed,
+   run request hooks in registration order.
 2. On completion or failure, stop forward processing and enter the response
    phase. Otherwise resolve the route and establish immutable parameters.
 3. On a route match, run resource hooks in registration order with the selected
@@ -309,13 +380,17 @@ The pipeline applies these rules:
 4. If forward processing remains active, dispatch one responder.
 5. Run every registered response hook once, in reverse registration order,
    irrespective of how many request or resource hooks ran.
-6. Render any pending failure, enforce HTTP invariants, and finalize once.
+6. Render the final selected failure, apply engine-owned correlation and
+   required headers, enforce HTTP invariants, and finalize once.
 
 For middleware A, B, C, a short circuit in B's request hook gives
 `A.request, B.request, C.response, B.response, A.response`. A normal request
 also includes `C.request`, all three resource hooks, and the responder before
 that response sequence. Hooks must tolerate missing setup in typed extensions.
 There is no second configurable unwind policy in the initial release.
+Response-hook status is provisional: another hook can still fail. Hooks do not
+own durable mutation completion or final-status instrumentation. Read-only
+request facts are available even when a hook's optional setup is absent.
 
 These guarantees cover futures driven to completion with ordinary `Result`
 failures. Dropping a future, runtime shutdown, or a panic can prevent later
@@ -343,9 +418,10 @@ Capturing a failure discards a partial success body and its representation
 headers. A default renderer supplies a small stable JSON error envelope with a
 machine-readable code and a safe message. It excludes internal error strings,
 credentials, and application data. Required failure headers, including `Allow`
-and authentication challenges, are derived from typed failure state. An
-explicit presentation operation marks an error as rendered; any subsequent
-failure invalidates that presentation and triggers rendering again.
+and authentication challenges, are derived from typed failure state. A
+presentation override stores safe structured presentation data, not a committed
+wire response. Any subsequent failure invalidates that override. Serialization
+occurs after all response hooks, for the selected failure.
 
 At finalization, retain only documented safe error-response headers, such as a
 validated request identifier and configured security or cross-origin headers.
@@ -358,6 +434,56 @@ The commitment boundary is handing the finalized response to Hyper. Before that
 boundary, an error can replace the response. Afterwards, body failures
 terminate the stream and produce transport diagnostics; they cannot change a
 status already sent. Response hooks never attempt to emit a second response.
+
+### 7.1. Illustration: final failure rendering with consistent correlation
+
+Provide a configured synchronous renderer over a public failure view and
+request facts. The view retains selected status, stable reason, bounded safe
+validation details, and typed required headers; it excludes private causes.
+Application mappings explicitly preserve domain distinctions and HTTP statuses.
+Rendering does not reverse-engineer error meaning from a body or `Display`
+string.
+
+The following candidate interface illustrates the ownership boundary. The
+returned representation supplies bounded bytes and media type; final status and
+required headers stay engine-owned.
+
+```rust,no_run
+fn render(
+    &self,
+    failure: &PublicFailure,
+    facts: &RequestFacts,
+) -> Result<ErrorRepresentation, RenderError> {
+    ErrorRepresentation::json(&ApiError {
+        code: failure.reason(),
+        message: failure.safe_message(),
+        request_id: facts.correlation_id(),
+        details: failure.safe_details(),
+    })
+}
+```
+
+For a 409 domain conflict followed by a failing response hook, this renderer
+receives the selected sanitized 500, while the original conflict is retained
+privately. Finalization applies the same correlation ID to the response header
+and error presentation. No registration trick is needed to put an
+error-rendering middleware after every possible failure. This extends the
+centralized error conversion already present in actix-v2a; it does not imply
+Actix lacks it.
+
+Compatibility renderers can retain an existing application's envelope. Explicit
+status, reason, and validated retry headers must survive mapping; retry
+guidance must not imply safe effect execution when the outcome is uncertain.
+Safe details exclude submitted secrets and have configured count/byte bounds.
+Renderer or serialization failure selects the static minimal 500 fallback.
+Supervised timeout responses use their minimal 504 renderer with the same
+safe-header/correlation finalization, without executing cancelled hooks or an
+unbounded async renderer. The renderer's output-size budget is part of
+configuration, not permission to collect streamed responses. These
+responsibilities refine §7's single finalizer. The static fallback may omit
+body correlation, while preserving the header. Response hooks cannot sign or
+compress final error bytes before serialization; a post-render body adapter
+would require a separate design and is not part of this initial contract.
 
 ## 8. Body consumption and streaming
 
@@ -383,6 +509,16 @@ middleware must not collect a stream implicitly for logging or error shaping.
 Streaming requests use a separately configured total-byte and idle-time policy;
 long-lived responses use an explicit idle-time policy rather than a fixed total
 response duration.
+
+Installing a response body also records its representation kind and associated
+headers. Replacing it clears stale content type, length, encoding, cache
+policy, and entity tags before the new representation is applied. Optional SSE
+support belongs in a response/body helper that installs event-stream media type
+and cache policy with an owned stream, rather than a route-wide response hook.
+A JSON policy rejection on the same route must remain JSON. Heartbeat
+scheduling, subscription cleanup, and replay-store access belong to that stream
+or its application service, not response hooks. Existing wire framing and
+pagination algorithms remain ordinary reusable helpers.
 
 On rejection with an unread HTTP/1.1 request body, the initial server closes
 the connection after the response instead of draining an attacker-controlled
@@ -450,11 +586,16 @@ synchronously entered span guard across `.await`.
 
 Use `metrics` counters for request outcomes and rejections, gauges for active
 requests/connections, and histograms for execution and transfer duration.
-Describe units and distinguish response finalization from body completion.
-Labels use registered templates or fixed unmatched values, bounded method
-classes, and stable error codes. Raw paths, identifiers, and error strings are
-not metric labels. Applications initialize exporters once at their composition
-root; the library only emits instrumentation.
+Describe units and distinguish response finalization from body completion. Emit
+the selected HTTP status only after hook failures, rendering, and final HTTP
+constraints have settled. Application services separately emit durable mutation
+outcomes: a committed mutation followed by a hook failure records mutation
+success and HTTP failure, not a fabricated rollback. Cancellation and
+incomplete transfer remain distinct; no asynchronous post-commit middleware is
+introduced. Labels use registered templates or fixed unmatched values, bounded
+method classes, and stable error codes. Raw paths, identifiers, and error
+strings are not metric labels. Applications initialize exporters once at their
+composition root; the library only emits instrumentation.
 
 ## 11. Correctness and evidence
 
@@ -478,6 +619,17 @@ The compiler experiment adds a four-way flag matrix, explicit diagnostic
 expectations, and semantic parity checks. Compiler acceptance cannot establish
 authorization correctness, runtime efficiency, or cancellation cleanup. See
 [experimental evidence](polonius-ownership-experiment.md#2-compiler-evidence-and-reproduction).
+
+The case study adds integration invariants: metadata parsing preserves
+duplicate headers and never consumes the body; correlation agrees across
+ordinary exits and supervised 504; rendering sees the last selected failure;
+replacing an SSE representation with a JSON error clears stream headers;
+mutation outcomes remain independent of final HTTP status. Exercise these as
+observable in-process and socket contracts, with compatibility fixtures for
+existing envelopes, pagination, and SSE bytes. Durable mutation conformance
+remains application-adapter work; HTTP traces cannot prove atomicity or crash
+recovery. Compare application wiring against Actix function middleware and
+extractors, not manual boilerplate alone.
 
 Use `rstest` and `rstest-bdd` within delivery tasks to express representative
 outcomes. Focus `insta` snapshots on stable error envelopes and lifecycle
@@ -519,7 +671,7 @@ adapter.
 
 The current library has no framework API to migrate. Stabilization requires
 agreement on terms-of-reference Q1–Q6, a compiled public API example, and
-acceptance or replacement of ADRs 001 and 002. Roadmap task 2.2.3 selects the
+acceptance or replacement of ADRs 001–003. Roadmap task 2.2.3 selects the
 compiler/ownership direction before API stabilization. Keep generated public
 documentation and [users' guide](users-guide.md) synchronized with each
 delivered slice; do not present proposed APIs there as already available.
