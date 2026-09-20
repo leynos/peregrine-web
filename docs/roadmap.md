@@ -7,7 +7,10 @@ no dates. Tasks remain unchecked because compiler probes are evidence for the
 proposal, not completion of the planned framework prototypes.
 [ADR 001](adr-001-resource-aware-lifecycle.md) and
 [ADR 002](adr-002-compiler-ownership-experiment.md) remain proposed. The key
-compiler experiment in phase 2 gates the implementation direction.
+compiler experiment in phase 2 gates the implementation direction. The
+[actix-v2a case study](actix-v2a-middleware-case-study.md) and proposed
+[ADR 003](adr-003-http-integration-boundaries.md) refine input, finalization,
+and application-service boundaries in the existing delivery tasks.
 
 The Goals, Ideas, Steps, Tasks (GIST) model links delivery to evidence. Goals
 state the outcomes, phases carry testable ideas, steps answer delivery
@@ -53,7 +56,9 @@ and technical design §§1, 4, 9, and 12.
   - See peregrine-design.md §§3 and 5–9; adr-001-resource-aware-lifecycle.md.
   - Success: contract tables cover every ordinary exit and cancellation
     boundary;
-    limits have units, defaults, validation rules, and explicit opt-outs.
+    limits have units, defaults, validation rules, and explicit opt-outs. Include
+    correlation, safe error-detail, and renderer-output budgets and the
+    engine/application boundaries in ADR 003.
 - [ ] 1.1.3. Compile a resource-policy and async ownership spike.
   - Requires 1.1.2.
   - See peregrine-design.md §§3–4 and 11–12; terms-of-reference.md Q3 and Q5.
@@ -108,6 +113,8 @@ and polonius-ownership-experiment.md §§1–4.
     standard-library entry APIs rather than compulsory cloning baselines. Compile
     the candidate lifetime-indexed middleware, associated-type, and returned-
     future `Send` bounds under both solvers; reduce differences or record none.
+    Include explicit metadata parsing and optional typed responder adaptation
+    from ADR 003 without a hidden input registry or body-consuming parser.
 - [ ] 2.1.3. Exercise lifecycle and ownership boundaries end to end in process.
   - Requires 2.1.2.
   - See polonius-ownership-experiment.md §§4–5; peregrine-design.md §11.
@@ -178,6 +185,8 @@ must reuse. See technical design §§2–7.
   - See peregrine-design.md §§6–7 and 11.
   - Success: generated traces match the model for every short-circuit position;
     response failures preserve diagnostics and cannot skip remaining hooks.
+    Rendering follows the final hook failure; immutable facts preserve
+    correlation on ordinary exits. See ADR 003 and case study §§3 and 6.
 - [ ] 3.1.4. Complete method semantics and final HTTP response constraints.
   - Requires 3.1.3.
   - See peregrine-design.md §§4–5 and 7, invariant I5 in §11.
@@ -243,7 +252,10 @@ pilot use. See technical design §§5–7 and 10–11.
   - See peregrine-design.md §11, invariants I2 and I3.
   - Success: identity, method, route outcome, and failure phase combinations
     include denied HEAD/OPTIONS and absent setup state during response hooks;
-    trusted early-response bypasses are explicit and documented.
+    trusted early-response bypasses are explicit and documented. A service
+    fixture rechecks policy on replay and distinguishes committed mutation
+    success from a later response-hook failure; this is not durable-store proof.
+    See actix-v2a-middleware-case-study.md §4.
 
 ## 5. Transfer bodies under explicit bounds
 
@@ -289,6 +301,9 @@ transfer workloads. See technical design §§8–9.
   - See peregrine-design.md §§8 and 11; users-guide.md.
   - Success: slow upload/download, chunked oversize, disconnect, and HEAD over
     a streamed representation demonstrate bounded framework buffering and cleanup.
+    A stream representation replaced by a JSON failure loses stale stream
+    headers; any optional SSE helper preserves the existing wire contract.
+    See ADR 003 and actix-v2a-middleware-case-study.md §5.3.
 
 ## 6. Establish operational and adoption evidence
 
@@ -307,7 +322,8 @@ See technical design §§9–11.
   - Requires steps 4.1 and 5.2.
   - See peregrine-design.md §9.
   - Success: request permits cover their documented lifetime; timeouts before
-    commitment produce 504 without claiming cancelled response hooks ran.
+    commitment produce 504 without claiming cancelled response hooks ran;
+    engine-owned facts retain correlation through minimal timeout finalization.
 - [ ] 6.1.2. Implement tracked graceful shutdown and bounded accept backoff.
   - Requires 6.1.1.
   - See peregrine-design.md §9.
@@ -318,6 +334,8 @@ See technical design §§9–11.
   - See peregrine-design.md §10.
   - Success: counters, gauges, histograms, and traces distinguish finalization
     from transfer completion; labels stay bounded and sensitive data is excluded.
+    Final status is observed after rendering; application mutation outcomes
+    remain independent of HTTP status. See ADR 003.
 - [ ] 6.1.4. Add overload, disconnect, and shutdown interaction tests.
   - Requires 6.1.3 and 4.2.1.
   - See peregrine-design.md §11.

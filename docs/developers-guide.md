@@ -15,6 +15,12 @@ does not change the repository's build settings or consumer requirements.
 Implementation must validate downstream and analyser compatibility before
 [ADR 002](adr-002-compiler-ownership-experiment.md) can be accepted.
 
+The [extension case study](actix-v2a-middleware-case-study.md) and
+[ADR 003](adr-003-http-integration-boundaries.md) distinguish HTTP lifecycle
+integration from application services. Prefer metadata parsers and response/body
+helpers for value-level work. Durable mutation completion must not depend on
+response hooks. These are proposed internal contracts, not implemented helpers.
+
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.
