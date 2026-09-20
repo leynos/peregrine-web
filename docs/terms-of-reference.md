@@ -1,6 +1,6 @@
 # Peregrine Web – terms of reference
 
-- Status: draft v0.1, reconstructed from the supplied project papers.
+- Status: draft v0.2, reconstructed from the supplied project papers.
 - Date: 2026-09-20.
 - Audience: project maintainers, prospective library users, and design
   reviewers.
@@ -179,6 +179,11 @@ The current package uses Rust edition 2024. The architectural paper's phrase
 - Resource policy can be represented through explicit typed interfaces. If
   applications need arbitrary runtime trait discovery, the proposed contract
   will not satisfy them without additional design.
+- The compiler/ownership experiment can compare one exclusively Polonius and
+  new-solver implementation with a compatible control without committing to two
+  supported products. If exclusivity adds no material benefit, retain the
+  compatible ownership design. See
+  [ADR 002](adr-002-compiler-ownership-experiment.md).
 - Dynamic dispatch and future allocation are acceptable costs. If measurements
   contradict this, optimize the implementation or reconsider the API before
   claiming readiness.
@@ -198,14 +203,14 @@ committed deliverable is identified in the inputs.
 
 Owners below are proposed roles; no individual has been assigned or consulted.
 
-| ID  | Question and consequence                                                                             | Closure evidence                                                             | Proposed owner                       |
-| --- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------ |
-| Q1  | Which service authors and workload should validate the architectural benefit? Gates adoption claims. | A named pilot scenario and comparative review against its current framework. | Project maintainer with pilot users. |
-| Q2  | Is HTTP/1.1 with external secure ingress an acceptable initial boundary? Gates serving scope.        | Confirmed deployment requirements and an accepted protocol-scope decision.   | Project maintainer with an operator. |
-| Q3  | Which resource-policy interface and enforcement default should be public? Gates API stability.       | A working public/protected example and review of missing-policy behaviour.   | API maintainer.                      |
-| Q4  | What latency, allocation, memory, and connection budgets define release readiness?                   | Reproducible measurements and agreed thresholds for the pilot workload.      | Maintainer with an operator.         |
-| Q5  | What compiler floor, supported platforms, and compatibility policy can be maintained?                | A tested build matrix and published support policy.                          | Release maintainer.                  |
-| Q6  | Who can accept the design and allocate ongoing maintenance effort?                                   | Named decision authority and explicit scope acceptance.                      | Project sponsor or maintainer.       |
+| ID  | Question and consequence                                                                             | Closure evidence                                                                            | Proposed owner                       |
+| --- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Q1  | Which service authors and workload should validate the architectural benefit? Gates adoption claims. | A named pilot scenario and comparative review against its current framework.                | Project maintainer with pilot users. |
+| Q2  | Is HTTP/1.1 with external secure ingress an acceptable initial boundary? Gates serving scope.        | Confirmed deployment requirements and an accepted protocol-scope decision.                  | Project maintainer with an operator. |
+| Q3  | Which resource-policy interface and enforcement default should be public? Gates API stability.       | A working public/protected example and review of missing-policy behaviour.                  | API maintainer.                      |
+| Q4  | What latency, allocation, memory, and connection budgets define release readiness?                   | Reproducible measurements and agreed thresholds for the pilot workload.                     | Maintainer with an operator.         |
+| Q5  | What compiler posture, supported platforms, and compatibility policy can be maintained?              | The phase 2 compiler experiment, a downstream build matrix, and a published support policy. | Release maintainer.                  |
+| Q6  | Who can accept the design and allocate ongoing maintenance effort?                                   | Named decision authority and explicit scope acceptance.                                     | Project sponsor or maintainer.       |
 
 _Table 4: Open decisions and evidence required to close them._
 

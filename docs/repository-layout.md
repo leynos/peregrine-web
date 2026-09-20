@@ -63,6 +63,8 @@ compact and omits build output such as `target/`.
   scope, evidence, and open questions.
 - `docs/peregrine-design.md`: Describes the proposed framework architecture
   and contracts, distinguished from the generated implementation.
+- `docs/polonius-ownership-experiment.md`: Contains paired API examples,
+  compiler evidence, ownership constraints, and experiment acceptance criteria.
 - `docs/roadmap.md`: Sequences potential delivery using Goals, Ideas, Steps,
   and Tasks without date commitments.
 - `docs/adr-*.md`: Holds architectural decision records. Proposed records
