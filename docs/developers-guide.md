@@ -21,6 +21,14 @@ integration from application services. Prefer metadata parsers and response/body
 helpers for value-level work. Durable mutation completion must not depend on
 response hooks. These are proposed internal contracts, not implemented helpers.
 
+The [hexagonal application case study](hexagonal-application-case-study.md) and
+[ADR 004](adr-004-application-port-boundaries.md) define proposed application
+integration contracts. Construct resource dependencies explicitly; keep
+application ports free of framework types, and permit concrete adapters only
+at composition roots and their own implementation boundaries. Examples must
+separate request middleware from unit-of-work and application lifespan owners.
+Boundary checks complement behavioural port tests; they do not replace them.
+
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.
