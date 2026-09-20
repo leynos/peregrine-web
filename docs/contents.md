@@ -40,6 +40,11 @@ documentation set.
 - [ADR 003: HTTP integration boundaries](adr-003-http-integration-boundaries.md)
   records proposed typed-input, request-fact, rendering, and service boundaries.
 
+- [Hexagonal application case study](hexagonal-application-case-study.md)
+  compares Corbusier, Wildside, and Episodic and defines boundary experiments.
+- [ADR 004: Application port boundaries](adr-004-application-port-boundaries.md)
+  records proposed resource injection, context, operation, and lifespan rules.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)

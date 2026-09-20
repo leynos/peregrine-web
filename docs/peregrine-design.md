@@ -1,6 +1,6 @@
 # Peregrine Web technical design
 
-- Status: proposed v0.3; describes a target, not implemented functionality.
+- Status: proposed v0.4; describes a target, not implemented functionality.
 - Date: 2026-09-20.
 - Audience: library implementers, API reviewers, and service maintainers.
 - Scope: a resource-oriented HTTP framework with an explicit middleware engine.
@@ -72,6 +72,18 @@ list, and explicit configuration. `build` validates routes and configuration,
 then freezes them into application state shared through `Arc`. Requests cannot
 mutate this registry. Resources own their application dependencies; the
 framework does not provide a dependency-injection container.
+
+A resource is an inbound HTTP adapter, not a domain entity. The application
+composition root constructs it with narrow service dependencies: a concrete
+service or an application-owned dyn-compatible port. Resource erasure at the
+router boundary does not require service erasure. Required dependencies are
+constructor inputs; missing services never trigger implicit fixture selection
+or request-time lookup. Shared dependency bundles remain an application choice.
+Application ports need no Peregrine, HTTP, or serialization types. Application
+roots may import concrete adapters; ordinary inbound adapters depend on
+application contracts rather than outbound implementations. See the
+[hexagonal case study](hexagonal-application-case-study.md) and proposed
+[ADR 004](adr-004-application-port-boundaries.md).
 
 The pipeline borrows resources and middleware from immutable application state.
 The baseline owns one context, passed sequentially as `&mut Context`. The
@@ -317,6 +329,46 @@ domain effect committed. Lease expiry alone never establishes safe effect
 retry. See the [case study](actix-v2a-middleware-case-study.md) for the full
 counterexample and actix-v2a's proposed adapter boundaries.
 
+### 4.2. Resource-local services and application context
+
+Corbusier's HTTP adapter forwards through application façades; Wildside injects
+command/query ports through a broad HTTP state bundle. A resource can instead
+own only its task or annotation service. This may reduce forwarding and the
+number of files changed when adding a dependency; it is hypothesis H1, not a
+measured improvement. The following schematic body illustrates the intended
+boundary, with application-defined types and helper functions:
+
+```rust
+// Inside a TasksResource responder, after resource-policy admission:
+let context = application_context(verified_identity, input.facts())?;
+let payload = decode_create_task(body).await?;
+let command = TaskCommand::try_from(payload)?;
+let task = self.tasks.create(&context, command).await.map_err(map_task_error)?;
+response.set_json(TaskReply::from(task))?;
+```
+
+The resource may contain `Arc<ConcreteTaskService>` or `Arc<dyn TaskCommands>`.
+The latter requires a dyn-compatible application port with explicit async
+future erasure; both must satisfy the resource's concurrency bounds. The
+compiler experiment must retain the same application boundary in both variants.
+A generic resource does not require a framework-defined application-service
+trait, resource base-class hierarchy, or universal workflow helper.
+
+Verified identity is distinct from request facts. The HTTP adapter explicitly
+constructs the application's own context; correlation and untrusted tenant
+headers grant no authority. The service preserves tenant and object-level
+checks when invoked by another adapter. Domain commands and outcomes remain
+independent of HTTP; the adapter owns request decoding, response projection,
+and error mapping. A non-HTTP caller supplies its own validated context.
+
+An application service or use-case wrapper owns per-operation units of work.
+Shared resources hold a service or factory, not a mutable transaction shared
+across requests. This is a proposed boundary improvement for adapter-owned
+unit-of-work helpers such as Episodic's, not a claim about existing migrations.
+Response hooks do not decide commit or rollback, and cancellation does not
+prove that no effect occurred. Case study E1 and E2 compare these choices using
+one bounded specimen before production API stabilization.
+
 ## 5. Routing and HTTP method semantics
 
 Use `matchit` behind registration and lookup boundaries. The proposed route
@@ -534,6 +586,20 @@ adapts accepted streams through Hyper's Tokio I/O integration and runs tracked
 connection tasks.[^3] The application owns runtime creation. Library
 entrypoints do not install a runtime, tracing subscriber, or metrics recorder.
 
+Application lifespan is separate from request middleware. The composition root
+owns initialized adapters and explicit asynchronous cleanup, including partial
+startup failure. Application construction validates supplied resources; it does
+not discover services or perform hidden startup I/O. Serving completion reports
+whether tracked requests and transfers drained or were cancelled, and must not
+silently detach remaining work. The application accounts for its own background
+work before closing pools or clients still in use. It attempts remaining
+eligible cleanup actions after one fails, within an application-defined
+shutdown budget, and reports incomplete or deferred cleanup when users remain
+active. No request hook guarantees that cleanup runs on process termination.
+Episodic's separate runtime roots and injected cleanup functions motivate this
+boundary without requiring lifespan methods on Peregrine's request middleware
+trait; see case study E4 and ADR 004.
+
 Require explicit validated limits for accepted connections, concurrent request
 execution, header parsing, buffered and streamed body sizes, request execution
 time, stream idle time, and shutdown drain time. Concrete defaults and units
@@ -597,6 +663,20 @@ method classes, and stable error codes. Raw paths, identifiers, and error
 strings are not metric labels. Applications initialize exporters once at their
 composition root; the library only emits instrumentation.
 
+Optional method-specific operation labels are declared beside resource policy
+from a finite startup set, then frozen into route facts. Registration validates
+the configured label budget and method mapping. This can replace Episodic's
+separate path-prefix/suffix classification for generation metrics: renaming a
+route should not require editing an unrelated telemetry table. The label is
+application metadata, not authority or an application outcome. Final-outcome
+instrumentation reads it after routing; pre-routing failures, misses, and
+unsupported methods use fixed fallbacks. An explicit HEAD responder supplies
+its own label; automatic HEAD uses the selected GET operation label while
+policy still evaluates HEAD. Synthetic OPTIONS uses a fixed operation class.
+These rules must not introduce another route-policy registry. Case study E3
+compares this proposal with the existing registered-template labels and rejects
+it if the additional surface provides no maintenance benefit.
+
 ## 11. Correctness and evidence
 
 In-process execution is the primary lifecycle test seam; it is not a claim that
@@ -630,6 +710,17 @@ existing envelopes, pagination, and SSE bytes. Durable mutation conformance
 remains application-adapter work; HTTP traces cannot prove atomicity or crash
 recovery. Compare application wiring against Actix function middleware and
 extractors, not manual boilerplate alone.
+
+The hexagonal case study adds E1–E5, separately from compiler acceptance. A
+bounded application fixture must build without framework/HTTP dependencies,
+accept both HTTP and non-HTTP callers with the same tenant and mutation
+semantics, and permit concrete or erased service storage. Negative dependency
+fixtures reject forbidden adapter imports and allow composition roots.
+Structural checks do not establish behavioural port conformance: compare a fake
+and a real outbound adapter before pilot acceptance. Record limitations of any
+import checker. Route-renaming and shutdown-failure experiments test operation
+metadata and lifecycle ownership. Axioms A1–A4 are chosen boundaries;
+assumptions S1–S4 and hypotheses H1–H5 require evidence, not assertion.
 
 Use `rstest` and `rstest-bdd` within delivery tasks to express representative
 outcomes. Focus `insta` snapshots on stable error envelopes and lifecycle
@@ -671,7 +762,7 @@ adapter.
 
 The current library has no framework API to migrate. Stabilization requires
 agreement on terms-of-reference Q1–Q6, a compiled public API example, and
-acceptance or replacement of ADRs 001–003. Roadmap task 2.2.3 selects the
+acceptance or replacement of ADRs 001–004. Roadmap task 2.2.3 selects the
 compiler/ownership direction before API stabilization. Keep generated public
 documentation and [users' guide](users-guide.md) synchronized with each
 delivered slice; do not present proposed APIs there as already available.

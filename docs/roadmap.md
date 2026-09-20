@@ -10,7 +10,10 @@ proposal, not completion of the planned framework prototypes.
 compiler experiment in phase 2 gates the implementation direction. The
 [actix-v2a case study](actix-v2a-middleware-case-study.md) and proposed
 [ADR 003](adr-003-http-integration-boundaries.md) refine input, finalization,
-and application-service boundaries in the existing delivery tasks.
+and application-service boundaries in the existing delivery tasks. The
+[hexagonal application case study](hexagonal-application-case-study.md) and
+[ADR 004](adr-004-application-port-boundaries.md) add independent architecture
+experiments E1–E5, with explicit axioms, assumptions, and rejection criteria.
 
 The Goals, Ideas, Steps, Tasks (GIST) model links delivery to evidence. Goals
 state the outcomes, phases carry testable ideas, steps answer delivery
@@ -84,6 +87,33 @@ technical design §§2, 11, and 12.
   - Success: an exhaustive Verus proof derives stop/dispatch safety from the
     transitions; normal and early-exit trace examples provide a runtime oracle.
 
+### 1.3. Test application boundaries with a small consumer specimen
+
+Idea: explicit resource dependencies can reduce adapter wiring while keeping
+application ports independent of HTTP. Can one protected use case remain usable
+through both HTTP and a non-HTTP driver? These architecture experiments serve
+G1 and G4 independently of the compiler experiment. See
+hexagonal-application-case-study.md §6 and ADR 004.
+
+- [ ] 1.3.1. Compare concrete and erased service injection.
+
+  - Requires 1.1.3.
+  - Success: E1 compiles heterogeneous resources containing concrete services
+    and dyn-compatible application ports, with explicit async and `Send` bounds.
+    Compare forwarding layers and files changed when adding one dependency
+    against equivalent Actix/Falcon patterns; retain the clearer boundary if
+    generic resource wiring brings no benefit. Do not add a service container.
+- [ ] 1.3.2. Exercise transport-independent use cases and boundary checks.
+
+  - Requires 1.3.1.
+  - Success: E2 invokes the same use case through an in-process HTTP adapter
+    and a non-HTTP driver, preserving tenant authorization, typed failures,
+    and per-operation unit-of-work semantics. The application fixture builds
+    without Peregrine/HTTP dependencies. E5 rejects forbidden dependency/import
+    fixtures and permits a composition root; fake-port tests cover behaviours,
+    not only method presence. Record gaps requiring a real outbound adapter
+    before pilot acceptance. No consumer migration is implied.
+
 ## 2. Test a pure Polonius and new-solver implementation
 
 Idea: if Peregrine can design exclusively for Polonius and the new trait
@@ -105,7 +135,7 @@ and polonius-ownership-experiment.md §§1–4.
     positive and negative examples record diagnostics, compiler identity, and
     whether benefits are checker-specific, solver-specific, or available to both.
 - [ ] 2.1.2. Build comparable entity-first ownership prototypes.
-  - Requires 2.1.1.
+  - Requires 2.1.1 and 1.3.1.
   - See polonius-ownership-experiment.md §§4–5; peregrine-design.md §§4–8.
   - Success: both prototypes run the same protected resource, fallible cache,
     and application-owned middleware sequence with the same typed phase views,
@@ -115,6 +145,8 @@ and polonius-ownership-experiment.md §§1–4.
     future `Send` bounds under both solvers; reduce differences or record none.
     Include explicit metadata parsing and optional typed responder adaptation
     from ADR 003 without a hidden input registry or body-consuming parser.
+    Keep the same application-port boundary and async-erasure strategy in both
+    variants so E1's API benefits are not attributed to the compiler.
 - [ ] 2.1.3. Exercise lifecycle and ownership boundaries end to end in process.
   - Requires 2.1.2.
   - See polonius-ownership-experiment.md §§4–5; peregrine-design.md §11.
@@ -170,11 +202,13 @@ behaviour end to end? This establishes the path later policy and body features
 must reuse. See technical design §§2–7.
 
 - [ ] 3.1.1. Implement immutable resource registration and context ownership.
-  - Requires phase 2.
+  - Requires phase 2 and step 1.3.
   - See peregrine-design.md §§2–5 and §3.1.
   - Success: route conflicts fail at build time; effective target freezing,
     the selected parameter representation and request-local extensions satisfy
-    the ownership model chosen by task 2.2.3.
+    the ownership model chosen by task 2.2.3. Validate bounded method-specific
+    operation declarations beside resource policy, including HEAD fallback and
+    synthetic-method mappings; see ADR 004 and case study E3.
 - [ ] 3.1.2. Implement in-process GET dispatch and response finalization.
   - Requires 3.1.1.
   - See peregrine-design.md §§3, 5, and 7.
@@ -255,7 +289,9 @@ pilot use. See technical design §§5–7 and 10–11.
     trusted early-response bypasses are explicit and documented. A service
     fixture rechecks policy on replay and distinguishes committed mutation
     success from a later response-hook failure; this is not durable-store proof.
-    See actix-v2a-middleware-case-study.md §4.
+    See actix-v2a-middleware-case-study.md §4. Repeat E2 from the hexagonal
+    case study against the implemented pipeline and a non-HTTP driver; tenant
+    and object authorization must hold through both entrypoints.
 
 ## 5. Transfer bodies under explicit bounds
 
@@ -329,18 +365,29 @@ See technical design §§9–11.
   - See peregrine-design.md §9.
   - Success: injected shutdown stops acceptance, drains within the configured
     deadline, cancels remaining work, and reports typed listener failures.
+    E4 adds an application-owned startup/cleanup example: partial startup
+    failure releases initialized adapters; pools remain available to active
+    streams/work; cleanup failure does not skip remaining eligible cleanup
+    actions.
+    State application shutdown budgets and incomplete-cleanup outcomes without
+    adding lifespan methods to request middleware. See ADR 004.
 - [ ] 6.1.3. Add request and transfer instrumentation.
   - Requires 6.1.2.
   - See peregrine-design.md §10.
   - Success: counters, gauges, histograms, and traces distinguish finalization
     from transfer completion; labels stay bounded and sensitive data is excluded.
     Final status is observed after rendering; application mutation outcomes
-    remain independent of HTTP status. See ADR 003.
+    remain independent of HTTP status. See ADR 003. E3 tests a route rename,
+    success, denial, HEAD, 405, misses, and pre-routing failure with stable,
+    bounded operation labels; compare against template-only labels before
+    accepting the new metadata contract. See ADR 004.
 - [ ] 6.1.4. Add overload, disconnect, and shutdown interaction tests.
   - Requires 6.1.3 and 4.2.1.
   - See peregrine-design.md §11.
   - Success: slow streams, protected requests, and response failures under drain
     preserve documented bounds; pairwise and mandatory higher-order cases pass.
+    E4 verifies no adapter closes while tracked consumers still use it and
+    separately accounts for application work beyond the server's task set.
 
 ### 6.2. Decide whether the experiment merits a release
 
@@ -358,6 +405,9 @@ See terms of reference §§7–9 and technical design §§11–12.
   - See terms-of-reference.md Q1–Q6; peregrine-design.md §12.
   - Success: reviewers assess endpoint/policy cohesion; maintainers record
     release budgets, supported platforms, compiler floor, and API stability policy.
+    Record E1–E5 outcomes, validate or revise S1–S4, and compare the specimen's
+    fake and real outbound adapter behaviours before accepting its boundary
+    claims. Reject proposed conveniences that add wiring without measured value.
 - [ ] 6.2.3. Prepare the pilot release documentation and package evidence.
   - Requires 6.2.2.
   - See peregrine-design.md §§1–13; users-guide.md and developers-guide.md.
