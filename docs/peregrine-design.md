@@ -1,7 +1,7 @@
 # Peregrine Web technical design
 
-- Status: proposed v0.4; describes a target, not implemented functionality.
-- Date: 2026-09-20.
+- Status: proposed v0.5; describes a target, not implemented functionality.
+- Date: 2026-09-21.
 - Audience: library implementers, API reviewers, and service maintainers.
 - Scope: a resource-oriented HTTP framework with an explicit middleware engine.
 - Authority: [terms of reference](terms-of-reference.md) establishes goals;
@@ -26,10 +26,13 @@ compatibility claim, or runnable framework example is implied.
 
 The initial delivery target is a single `peregrine-web` library, in-process
 request execution, and an HTTP/1.1 serving adapter. Buffered convenience and
-streaming belong in the core release. HTTP/2, native Transport Layer Security
-(TLS), WebSockets, hot route reload, and a supported Tower adapter are deferred
-pending the scope decisions in terms of reference §9. A deployment can supply
-secure ingress externally; trusted forwarding configuration remains explicit.
+streaming belong in the core release. Pachislot is now a named WebSocket
+extension consumer: §9.1 proposes an optional owned HTTP/1.1 upgrade boundary,
+with delivery gated separately from the initial core. HTTP/2, native Transport
+Layer Security (TLS), hot route reload, and a supported Tower adapter remain
+deferred pending the scope decisions in terms of reference §9. A deployment can
+supply secure ingress externally; trusted forwarding configuration remains
+explicit.
 
 ### 1.1. Reconciliation of the source papers
 
@@ -237,14 +240,27 @@ Actix already supports typed extractors; this refinement prevents Peregrine's
 context model from losing that clarity.
 
 Initialize read-only `RequestFacts` before request hooks with correlation and
-an injected start time. Validate or generate the correlation identifier using
-application configuration; invalid-input rejection still gets a locally
+an injected start time. An application-configured correlation policy validates
+or generates the identifier from header occurrences and trusted transport peer
+facts. Header name, generator, optional validator, trust rules, and response
+echo are explicit configuration. A falcon-correlate-compatible profile replaces
+untrusted/invalid IDs; a stricter rejection profile still assigns a locally
 generated identifier and a pending failure, then skips forward hooks. Freeze
 optional route facts after routing. Keep authentication separate. Hooks and
 rendering receive restricted views; arbitrary extension mutation cannot replace
 the engine's correlation value. Retain the small facts needed by the timeout
 supervisor without extending request-local body borrows. Pre-context
 parser/connection errors and panics have no correlation guarantee.
+
+Correlation is a bounded opaque value, not authentication or a mandatory UUID
+format. Generator output must also be safe and bounded. Finalization applies
+the configured echo policy; cleanup and cancellation do not rely on a response
+hook restoring ambient state. Optional logging, HTTP-client, and job adapters
+propagate owned snapshots and preserve carrier-specific override rules. An
+upgraded connection receives its own immutable facts; message correlation is
+separate from handshake correlation. See the
+[extension design](pachislot-extension-design.md) §3 and
+[ADR 005](adr-005-extension-and-upgrade-boundaries.md).
 
 ## 4. Resources, method metadata, and policy
 
@@ -399,19 +415,20 @@ policy processing. Earlier middleware may reject the request first.
 
 _Table 3: Routing and method outcomes for the proposed initial release._
 
-The effective method set adds HEAD when GET is supported and always includes
-OPTIONS. `OPTIONS *` is a server-level capability request: after request hooks,
-return 204 with the server's implemented method set, then response hooks; there
-is no routed resource. HEAD suppression applies to errors and short circuits,
-not only successful GET fallbacks.
+For ordinary HTTP resources, the effective method set adds HEAD when GET is
+supported and always includes OPTIONS. `OPTIONS *` is a server-level capability
+request: after request hooks, return 204 with the server's implemented method
+set, then response hooks; there is no routed resource. HEAD suppression applies
+to errors and short circuits, not only successful GET fallbacks.
 
 HTTP rules take precedence over response mutations. A 405 requires `Allow`;
 HEAD, 204, and 304 responses carry no content. Remove prohibited framing
 fields, including `Content-Length` on 204. Preserve a HEAD or 304 length only
 when it correctly describes the corresponding representation. Do not consume a
 stream to calculate that length. Reject informational status codes as final
-application responses in the initial adapter; protocol upgrades are
-deferred.[^6]
+application responses.[^6] The optional upgrade endpoint in §9.1 is a separate,
+validated final outcome; it never treats an arbitrary response status of 101 as
+permission to transfer a connection.
 
 ## 6. Middleware lifecycle and completion
 
@@ -432,8 +449,9 @@ The pipeline applies these rules:
 4. If forward processing remains active, dispatch one responder.
 5. Run every registered response hook once, in reverse registration order,
    irrespective of how many request or resource hooks ran.
-6. Render the final selected failure, apply engine-owned correlation and
-   required headers, enforce HTTP invariants, and finalize once.
+6. Render the final selected failure, apply the configured engine-owned
+   correlation policy and required headers, enforce HTTP invariants, and
+   finalize once.
 
 For middleware A, B, C, a short circuit in B's request hook gives
 `A.request, B.request, C.response, B.response, A.response`. A normal request
@@ -517,11 +535,11 @@ fn render(
 
 For a 409 domain conflict followed by a failing response hook, this renderer
 receives the selected sanitized 500, while the original conflict is retained
-privately. Finalization applies the same correlation ID to the response header
-and error presentation. No registration trick is needed to put an
-error-rendering middleware after every possible failure. This extends the
-centralized error conversion already present in actix-v2a; it does not imply
-Actix lacks it.
+privately. When echo is enabled, finalization applies the same correlation ID
+to the response header and error presentation. No registration trick is needed
+to put an error-rendering middleware after every possible failure. This extends
+the centralized error conversion already present in actix-v2a; it does not
+imply Actix lacks it.
 
 Compatibility renderers can retain an existing application's envelope. Explicit
 status, reason, and validated retry headers must survive mapping; retry
@@ -533,9 +551,10 @@ safe-header/correlation finalization, without executing cancelled hooks or an
 unbounded async renderer. The renderer's output-size budget is part of
 configuration, not permission to collect streamed responses. These
 responsibilities refine §7's single finalizer. The static fallback may omit
-body correlation, while preserving the header. Response hooks cannot sign or
-compress final error bytes before serialization; a post-render body adapter
-would require a separate design and is not part of this initial contract.
+body correlation, while preserving the header when echo is enabled. Response
+hooks cannot sign or compress final error bytes before serialization; a
+post-render body adapter would require a separate design and is not part of
+this initial contract.
 
 ## 8. Body consumption and streaming
 
@@ -629,6 +648,50 @@ listener failures surface as typed server errors; transient accept failures use
 bounded backoff. A connection failure is reported without terminating other
 connections. The clock and shutdown trigger are injectable for deterministic
 verification.
+
+### 9.1. Pachislot and an owned protocol-upgrade extension
+
+Pachislot is proposed as an in-process companion library whose WebSocket
+endpoint runs inside the Peregrine service. It maps named AsyncAPI channels and
+message definitions to session entities and Rust operation traits. The
+[extension design](pachislot-extension-design.md) records pinned Falcon
+extension sources, compatibility limits, and experiments X1–X5. ADR 005 remains
+proposed.
+
+The core needs a narrow upgrade capability, not a message dispatcher. An
+explicit upgrade endpoint shares frozen route identity and admission policy,
+including the resolved Pachislot channel before commitment,
+while retaining a separate method contract: valid HTTP/1.1 GET handshake,
+non-upgrading OPTIONS, and no inherited automatic HEAD upgrade. The engine
+creates an owned, one-shot `UpgradePlan` only after policy and handshake
+validation. Its final outcome is mutually exclusive with an ordinary response.
+HTTP response hooks run before commitment; a hook failure or response
+replacement invalidates the pending plan. Only the finalizer emits the valid
+101 and protocol headers, with no response body. Hooks cannot rewrite required
+handshake fields; body transforms skip this outcome.
+
+The transport supervisor registers the pending hand-off and reserves session
+capacity before returning the handshake response. It activates Pachislot only
+when Hyper completes the upgrade, preserving any buffered bytes. Never await
+that completion before returning the HTTP response. Failure or cancellation
+releases reservations. The session owns I/O, immutable connection facts, and
+its state, with no borrowed HTTP context. HTTP execution permits end at the
+handshake; session accounting and shutdown tracking end at session termination.
+
+Pachislot owns the message loop, codecs, entity/operation admission, bounded
+writers, room backend, and close semantics. HTTP middleware does not run per
+message or again on disconnect. Application services preserve authorization and
+transaction semantics across HTTP and message entrypoints. Application startup
+and shutdown coordinate workers and sessions before closing adapters.
+
+Start with one AsyncAPI WebSocket channel per resolved connection and many
+message types within it. Multiplexing channels requires a versioned
+subprotocol, not an implicit change to Pachinko's wire envelope. AsyncAPI
+operation traits are reusable metadata; Rust receive/emission traits supply
+executable capabilities. A single frozen registry connects those descriptions
+and exposes unambiguous schema, direction, and policy mappings. Compatibility
+must be established against both Pachinko codecs and its observed hook-layer
+rules, which differ from Peregrine's independent HTTP response hooks.
 
 ## 10. Trust boundaries and observability
 
@@ -762,13 +825,15 @@ adapter.
 
 The current library has no framework API to migrate. Stabilization requires
 agreement on terms-of-reference Q1–Q6, a compiled public API example, and
-acceptance or replacement of ADRs 001–004. Roadmap task 2.2.3 selects the
+acceptance or replacement of ADRs 001–005. Roadmap task 2.2.3 selects the
 compiler/ownership direction before API stabilization. Keep generated public
 documentation and [users' guide](users-guide.md) synchronized with each
 delivered slice; do not present proposed APIs there as already available.
 
-Defer HTTP/2, native TLS, WebSockets, arbitrary extension methods, a supported
-Tower adapter, optional local-thread execution, and registration macros.
+Defer HTTP/2, native TLS, arbitrary extension methods, a supported Tower
+adapter, optional local-thread execution, and registration macros. WebSocket
+requirements now have the Pachislot consumer and a proposed extension boundary;
+roadmap 1.4.1 and 7.3 gate its implementation and compatibility claims.
 Borrowed parameter representation is now evaluated within the bounded §3.1
 experiment rather than deferred without evidence. Each needs a demonstrated
 user need and a compatibility review. Database tooling, identity-provider

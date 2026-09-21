@@ -45,6 +45,12 @@ documentation set.
 - [ADR 004: Application port boundaries](adr-004-application-port-boundaries.md)
   records proposed resource injection, context, operation, and lifespan rules.
 
+- [Correlation and Pachislot extension design](pachislot-extension-design.md)
+  explains correlation policy, owned upgrades, AsyncAPI mapping, and
+  compatibility.
+- [ADR 005: Protocol extension ownership](adr-005-extension-and-upgrade-boundaries.md)
+  records the proposed boundary between HTTP and long-lived session processing.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)

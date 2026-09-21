@@ -120,6 +120,8 @@ ______________________________________________________________________
   middleware helps and where ordinary helpers or services are clearer.
 - [Hexagonal application case study](docs/hexagonal-application-case-study.md)
   — lessons from Corbusier, Wildside, and Episodic.
+- [Pachislot extension design](docs/pachislot-extension-design.md) — correlation
+  propagation and a proposed WebSocket companion hosted inside Peregrine.
 - [Users' guide](docs/users-guide.md) — current scaffold and build commands.
 - [Developers' guide](docs/developers-guide.md) — contributor workflow and
   proposed integration boundaries.

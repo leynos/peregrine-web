@@ -29,6 +29,13 @@ at composition roots and their own implementation boundaries. Examples must
 separate request middleware from unit-of-work and application lifespan owners.
 Boundary checks complement behavioural port tests; they do not replace them.
 
+The [extension design](pachislot-extension-design.md) and proposed
+[ADR 005](adr-005-extension-and-upgrade-boundaries.md) separate correlation policy
+from propagation adapters and HTTP upgrade from Pachislot message processing.
+An upgrade plan must own everything that outlives the HTTP request. Keep
+connection and message lifetimes explicit in examples and verify compatibility
+against pinned source behaviour before describing it as supported.
+
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.

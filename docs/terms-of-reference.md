@@ -1,7 +1,7 @@
 # Peregrine Web – terms of reference
 
-- Status: draft v0.2, reconstructed from the supplied project papers.
-- Date: 2026-09-20.
+- Status: draft v0.3, incorporating the supplied papers and extension requirements.
+- Date: 2026-09-21.
 - Audience: project maintainers, prospective library users, and design
   reviewers.
 - Companions: [technical design](peregrine-design.md),
@@ -135,6 +135,15 @@ in §7; the implementation mechanisms belong in the technical design.
   Small, explicit helpers are compatible with the brief.
 - Immediate support for every HTTP extension or deployment arrangement.
   The proposed initial protocol boundary is subject to Q2 below.
+
+A subsequent requirement identifies Pachislot as a compatible successor to
+falcon-pachinko, hosted through a WebSocket endpoint inside a Peregrine
+service. Its named channels, messages, and operation traits are an extension
+use case for G1–G4. The [extension proposal](pachislot-extension-design.md)
+investigates HTTP/1.1 upgrade, correlation propagation, and behavioural
+compatibility. This clarifies demand without claiming a completed
+implementation or requiring Python source compatibility; initial-core and
+extension delivery remain separate scope decisions under Q2.
 
 ## 7. Success criteria
 

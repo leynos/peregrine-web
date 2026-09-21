@@ -14,6 +14,9 @@ and application-service boundaries in the existing delivery tasks. The
 [hexagonal application case study](hexagonal-application-case-study.md) and
 [ADR 004](adr-004-application-port-boundaries.md) add independent architecture
 experiments E1–E5, with explicit axioms, assumptions, and rejection criteria.
+The [Pachislot extension design](pachislot-extension-design.md) and proposed
+[ADR 005](adr-005-extension-and-upgrade-boundaries.md) add correlation and
+upgrade experiments X1–X5 for a named WebSocket consumer.
 
 The Goals, Ideas, Steps, Tasks (GIST) model links delivery to evidence. Goals
 state the outcomes, phases carry testable ideas, steps answer delivery
@@ -114,6 +117,24 @@ hexagonal-application-case-study.md §6 and ADR 004.
     not only method presence. Record gaps requiring a real outbound adapter
     before pilot acceptance. No consumer migration is implied.
 
+### 1.4. Define extension ownership before stabilizing the core
+
+Idea: an owned upgrade hand-off and configurable correlation facts can support
+Pachislot without teaching HTTP middleware to process messages. Can a small
+contract preserve lifetime, policy, and compatibility boundaries? This serves
+G1–G4; see pachislot-extension-design.md and ADR 005.
+
+- [ ] 1.4.1. Specify correlation compatibility and compile an upgrade seam.
+
+  - Requires 1.1.3.
+  - Success: X1 records falcon-correlate selection, echo, propagation, duplicate
+    header, and generator-failure fixtures, including deliberate differences.
+    X2 compiles owned session transfer and rejects borrowed HTTP-context escape;
+    the state model covers plan invalidation, reservation release, method
+    handling, and admission before 101. Record the Pachinko reference revision,
+    one-channel-per-socket assumption, and separate Rust/AsyncAPI trait meanings.
+    This is an interface spike, not socket-level compatibility evidence.
+
 ## 2. Test a pure Polonius and new-solver implementation
 
 Idea: if Peregrine can design exclusively for Polonius and the new trait
@@ -202,7 +223,7 @@ behaviour end to end? This establishes the path later policy and body features
 must reuse. See technical design §§2–7.
 
 - [ ] 3.1.1. Implement immutable resource registration and context ownership.
-  - Requires phase 2 and step 1.3.
+  - Requires phase 2, step 1.3, and 1.4.1.
   - See peregrine-design.md §§2–5 and §3.1.
   - Success: route conflicts fail at build time; effective target freezing,
     the selected parameter representation and request-local extensions satisfy
@@ -220,7 +241,9 @@ must reuse. See technical design §§2–7.
   - Success: generated traces match the model for every short-circuit position;
     response failures preserve diagnostics and cannot skip remaining hooks.
     Rendering follows the final hook failure; immutable facts preserve
-    correlation on ordinary exits. See ADR 003 and case study §§3 and 6.
+    correlation on ordinary exits. X1 additionally verifies configured header
+    echo and compatible selection rules, outbound override behaviour, and
+    cancellation-safe context isolation. See ADRs 003 and 005 and the case studies.
 - [ ] 3.1.4. Complete method semantics and final HTTP response constraints.
   - Requires 3.1.3.
   - See peregrine-design.md §§4–5 and 7, invariant I5 in §11.
@@ -417,10 +440,11 @@ See terms of reference §§7–9 and technical design §§11–12.
 
 ## 7. Evaluate deferred extensions
 
-Idea: after the core promise is supported by pilot evidence, extensions can be
-selected by demonstrated user value without obscuring lifecycle contracts. This
-phase serves G4. Tasks below are conditional investigations with go/no-go
-evidence, not commitments to ship every extension.
+Idea: extensions selected by demonstrated user value can preserve the core
+lifecycle contracts. This phase serves G4; Pachislot also exercises G1–G3.
+Exploratory contracts and fixtures may start early. Runtime integration follows
+the explicit core dependencies below. Tasks retain go/no-go evidence rather
+than promising every extension before the core pilot.
 
 ### 7.1. Evaluate broader transport and ecosystem integration
 
@@ -428,11 +452,12 @@ Which missing boundary prevents a confirmed adopter from using the core? The
 answer determines whether an extension deserves a separately scoped design. See
 technical design §§1 and 12.
 
-- [ ] 7.1.1. Evaluate HTTP/2, native TLS, and WebSocket adoption requirements.
+- [ ] 7.1.1. Evaluate HTTP/2 and native TLS adoption requirements.
   - Requires phase 6.
   - See peregrine-design.md §§1, 9, and 12; terms-of-reference.md Q2.
   - Success: each candidate has a user requirement, trust and cancellation
     analysis, and an explicit accept/defer decision before implementation planning.
+    Pachislot's named WebSocket requirement is tracked separately in step 7.3.
 - [ ] 7.1.2. Prototype an outer Tower compatibility adapter.
   - Requires phase 6.
   - See peregrine-design.md §§1–2 and 12; adr-001-resource-aware-lifecycle.md.
@@ -455,3 +480,36 @@ to public resource, policy, and body contracts. See technical design §§4 and 1
   - See peregrine-design.md §§3, 11, and 12.
   - Success: a measured bottleneck justifies a bounded prototype; retain it only
     if repeatable results improve without weakening lifetime or lifecycle contracts.
+
+### 7.3. Prove Pachislot compatibility inside a Peregrine service
+
+Idea: named channels, typed messages, and entity operation traits can preserve
+Pachinko behaviour behind a small HTTP upgrade boundary. Does the extension
+remain understandable and bounded under real connections? This serves G1–G4.
+Contract and fixture work may start early; integration depends on the core
+transport and lifecycle gates below. See pachislot-extension-design.md §§4–7.
+
+- [ ] 7.3.1. Implement and test the tracked HTTP/1.1 upgrade hand-off.
+
+  - Requires 1.4.1, 3.2.2, and 6.1.4.
+  - Success: X2 covers policy and handshake denial, response-hook failure,
+    HEAD/OPTIONS, 101 commitment, failed transfer, buffered first frames,
+    session admission, and shutdown. No untracked session or HTTP-context borrow
+    survives the transition. Ordinary endpoints continue to reject bare 101.
+- [ ] 7.3.2. Establish Pachinko wire and AsyncAPI operation compatibility.
+
+  - Requires 7.3.1.
+  - Success: X3 compares client traces for both codecs, nested routing, hook
+    ordering/errors, rooms, and workers against pinned Python reference glue.
+    X4 validates channel/message/operation mappings, operation-trait metadata,
+    direction, schema agreement, and runtime authorization. Declare supported
+    schema features and intentional differences; do not claim multiplexing or
+    Python source compatibility. Use one canonical registry, not duplicate tables.
+- [ ] 7.3.3. Validate correlation isolation and session resource bounds.
+
+  - Requires 7.3.2.
+  - Success: X5 exercises concurrent sessions, message cancellation, full writer
+    queues, stalled peers, fan-out failures, context propagation, and shutdown.
+    Connection/message/effect outcomes remain distinct; HTTP and WebSocket
+    adapters invoke the same protected application use case. Record explicit
+    limits, close/error semantics, compatibility verdict, and release scope.
