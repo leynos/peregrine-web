@@ -34,7 +34,8 @@ inside those nested environments cannot fix a linker missing from the host. The
 `act-validation` workflow is the Linux runner-level acceptance path. After
 outer Cargo tests link successfully, `make test WITH_ACT=1` runs the real CI
 workflow through Act. A local run needs Docker, Act, and the same host linker
-prerequisites; it does not replace a fresh GitHub-hosted Ubuntu run.
+prerequisites, plus a GitHub token for nested actions; it does not replace a
+fresh GitHub-hosted Ubuntu run.
 The Act harness skips CI's coverage action because its hosted cache and
 coverage-object collection services are not available in local containers.
 

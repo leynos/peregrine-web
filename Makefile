@@ -24,6 +24,7 @@ WITH_ACT ?= 0
 ACT ?= act
 ACT_RUNNER_IMAGE ?= catthehacker/ubuntu:act-latest
 ACT_GIT_COMMON_DIR := $(shell git rev-parse --path-format=absolute --git-common-dir)
+ACT_GITHUB_TOKEN ?= $(or $(GITHUB_TOKEN),$(GH_TOKEN))
 COVERAGE_LINKER_FLAGS ?= -fuse-ld=lld
 COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) -C link-arg=$(COVERAGE_LINKER_FLAGS)
 MDLINT ?= markdownlint-cli2
@@ -51,8 +52,9 @@ test: ## Run tests with warnings treated as errors
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
 
 act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
-	$(ACT) pull_request --bind \
+	@GITHUB_TOKEN="$(ACT_GITHUB_TOKEN)" $(ACT) pull_request --bind \
 		--container-options "--volume $(ACT_GIT_COMMON_DIR):$(ACT_GIT_COMMON_DIR):ro" \
+		--secret GITHUB_TOKEN \
 		--env ACT=true \
 		--platform "ubuntu-latest=$(ACT_RUNNER_IMAGE)" \
 		--workflows .github/workflows/ci.yml --job build-test
@@ -63,7 +65,6 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
 	CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
-		CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm \
 		RUSTFLAGS="$(COVERAGE_RUST_FLAGS)" \
 		CFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
