@@ -25,6 +25,19 @@ The main `.github/workflows/ci.yml` workflow deliberately does not run
 `make test WITH_ACT=1`; the separate Act workflow runs those slower
 container-backed checks in parallel.
 
+Act validation has two dependency boundaries. The GitHub Actions host first
+builds the repository's Rust test binaries for `make test WITH_ACT=1`. On
+Linux, Cargo reads `.cargo/config.toml`, which selects `clang` and `mold`, so
+the host must install both packages before Cargo starts. Only after that outer
+test process reaches Act do nested containers and workflows run. Packages
+inside those nested environments cannot fix a linker missing from the host. The
+`act-validation` workflow is the Linux runner-level acceptance path. After
+outer Cargo tests link successfully, `make test WITH_ACT=1` runs the real CI
+workflow through Act. A local run needs Docker, Act, and the same host linker
+prerequisites; it does not replace a fresh GitHub-hosted Ubuntu run.
+The Act harness skips CI's coverage action because its hosted cache and
+coverage-object collection services are not available in local containers.
+
 A scheduled `.github/workflows/mutation-testing.yml` workflow also runs
 `cargo-mutants` via the shared reusable workflow, daily and on manual
 dispatch. It is informational and does not gate pull requests. Dependabot

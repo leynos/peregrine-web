@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit
+.PHONY: help all clean test act-validation build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit
 
 SHELL := bash
 
@@ -20,6 +20,10 @@ CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+WITH_ACT ?= 0
+ACT ?= act
+ACT_RUNNER_IMAGE ?= catthehacker/ubuntu:act-latest
+ACT_GIT_COMMON_DIR := $(shell git rev-parse --path-format=absolute --git-common-dir)
 COVERAGE_LINKER_FLAGS ?= -fuse-ld=lld
 COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) -C link-arg=$(COVERAGE_LINKER_FLAGS)
 MDLINT ?= markdownlint-cli2
@@ -44,6 +48,14 @@ test: export RUSTFLAGS := $(DEV_RUST_FLAGS)
 test: ## Run tests with warnings treated as errors
 	$(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
+
+act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
+	$(ACT) pull_request --bind \
+		--container-options "--volume $(ACT_GIT_COMMON_DIR):$(ACT_GIT_COMMON_DIR):ro" \
+		--env ACT=true \
+		--platform "ubuntu-latest=$(ACT_RUNNER_IMAGE)" \
+		--workflows .github/workflows/ci.yml --job build-test
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	RUSTFLAGS="$(DEV_RUST_FLAGS)" $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
