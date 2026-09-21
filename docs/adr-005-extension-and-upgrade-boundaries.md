@@ -94,6 +94,11 @@ design names experiments X1–X5, including negative ownership cases and
 differential client traces. Native sockets remain necessary to establish
 handshake and close behaviour; simulators alone are insufficient.
 
+[ADR 006](adr-006-extension-interface-stabilization.md) defines mandatory
+consumer delivery, generality, and stabilization gates. Task 7.3.4 explicitly
+delivers Pachislot; tasks 7.4.1–7.4.3 deliver the correlation companion, test
+an independent adapter, and require the combined evidence before stabilization.
+
 Exact response/close mappings, budgets, publication layout, supported schema
 subset, and the compatibility baseline require experimental closure. HTTP/2
 extended CONNECT and a distributed connection backend remain separate work.

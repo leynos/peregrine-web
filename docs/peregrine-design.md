@@ -11,6 +11,13 @@
   [compiler/ownership experiment](polonius-ownership-experiment.md) and
   [ADR 002](adr-002-compiler-ownership-experiment.md).
 
+Extension-interface stabilization is governed by
+[ADR 006](adr-006-extension-interface-stabilization.md): separate delivery of
+`peregrine-correlate` and Pachislot, an independent WebSocket adapter, and
+removal, substitution, composition, and failure-symmetry evidence are
+mandatory. Roadmap tasks 7.3.4 and 7.4.1–7.4.3 deliver and evaluate these
+consumers.
+
 ## 1. Problem, evidence, and design boundaries
 
 Peregrine keeps endpoint operations, dependencies, and policy on resource

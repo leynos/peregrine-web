@@ -17,6 +17,9 @@ experiments E1–E5, with explicit axioms, assumptions, and rejection criteria.
 The [Pachislot extension design](pachislot-extension-design.md) and proposed
 [ADR 005](adr-005-extension-and-upgrade-boundaries.md) add correlation and
 upgrade experiments X1–X5 for a named WebSocket consumer.
+[ADR 006](adr-006-extension-interface-stabilization.md) makes companion
+delivery and independent generality evidence prerequisites for interface
+stabilization.
 
 The Goals, Ideas, Steps, Tasks (GIST) model links delivery to evidence. Goals
 state the outcomes, phases carry testable ideas, steps answer delivery
@@ -134,6 +137,7 @@ G1–G4; see pachislot-extension-design.md and ADR 005.
     handling, and admission before 101. Record the Pachinko reference revision,
     one-channel-per-socket assumption, and separate Rust/AsyncAPI trait meanings.
     This is an interface spike, not socket-level compatibility evidence.
+    ADR 006 gates A–D remain required before extension-interface stabilization.
 
 ## 2. Test a pure Polonius and new-solver implementation
 
@@ -498,7 +502,8 @@ transport and lifecycle gates below. See pachislot-extension-design.md §§4–7
     survives the transition. Ordinary endpoints continue to reject bare 101.
 - [ ] 7.3.2. Establish Pachinko wire and AsyncAPI operation compatibility.
 
-  - Requires 7.3.1.
+  - Requires 7.3.4.
+  - See ADR 006 gates A and C.
   - Success: X3 compares client traces for both codecs, nested routing, hook
     ordering/errors, rooms, and workers against pinned Python reference glue.
     X4 validates channel/message/operation mappings, operation-trait metadata,
@@ -507,9 +512,53 @@ transport and lifecycle gates below. See pachislot-extension-design.md §§4–7
     Python source compatibility. Use one canonical registry, not duplicate tables.
 - [ ] 7.3.3. Validate correlation isolation and session resource bounds.
 
-  - Requires 7.3.2.
+  - Requires 7.3.2 and 7.4.1.
+  - See ADR 006 gates B and C.
   - Success: X5 exercises concurrent sessions, message cancellation, full writer
     queues, stalled peers, fan-out failures, context propagation, and shutdown.
     Connection/message/effect outcomes remain distinct; HTTP and WebSocket
     adapters invoke the same protected application use case. Record explicit
     limits, close/error semantics, compatibility verdict, and release scope.
+
+- [ ] 7.3.4. Implement Pachislot as a separate extension consumer.
+  - Requires 7.3.1.
+  - See ADR 006 gate A and pachislot-extension-design.md §§4–6.
+  - Success: a separate crate consumes public extension interfaces and delivers
+    the entity/channel/message registry, operation traits, both codecs, dispatch,
+    hooks, rooms, workers, bounded writers, and session cleanup. A runnable
+    Peregrine-hosted endpoint demonstrates the implementation. Core has no
+    Pachislot dependency or concrete-type dispatch. Task 7.3.2 separately
+    establishes compatibility; task numbering does not imply execution order.
+
+### 7.4. Gate extension-interface stabilization on independent consumers
+
+Idea: this hardening step can falsify accidental coupling by removing,
+substituting, and composing real consumers through one public boundary. Do
+three consumers establish the generality claimed in ADR 006? This serves G2–G4
+and does not delay a core pilot that keeps the interfaces experimental.
+
+- [ ] 7.4.1. Deliver peregrine-correlate as a separate companion crate.
+  - Requires 1.4.1 and 3.1.3.
+  - See ADR 006 gate A and extension experiment X1.
+  - Success: the crate implements the selected profile, request facts, echo,
+    and explicit outbound propagation using public extension interfaces.
+    X1 fixtures pass, including failure, cancellation, and concurrent isolation;
+    unsupported Python integrations and deliberate differences are recorded.
+    A runnable HTTP consumer requires no companion-specific Peregrine branches.
+- [ ] 7.4.2. Implement the independent adapter and generality matrix.
+  - Requires 7.3.3, 7.3.4, and 7.4.1.
+  - See ADR 006 gates A–C and table 1.
+  - Success: a minimal echo WebSocket adapter consumes the public upgrade
+    capability without Pachislot runtime or glue. Real sockets demonstrate
+    removal, substitution, composition, and failure symmetry for both adapters,
+    with correlation and ordinary HTTP middleware. Record ownership, permit,
+    context, cancellation, and shutdown evidence; generated properties and
+    production-connected proofs cover the stated non-trivial invariants.
+- [ ] 7.4.3. Decide whether to stabilize the extension interfaces.
+  - Requires 7.3.2, 7.3.3, 7.4.1, and 7.4.2.
+  - See ADR 006 gate D.
+  - Success: both companion libraries and the independent adapter integrate
+    against one identified core revision. The evidence ledger covers all four
+    generality checks, gates A–D, X1–X5, and applicable quality gates. The
+    designated maintainer records accept, revise, or defer and updates ADR 005
+    and design status. Missing or failing evidence blocks stabilization.
