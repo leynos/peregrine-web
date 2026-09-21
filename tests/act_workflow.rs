@@ -24,23 +24,23 @@ struct Step {
 #[test]
 fn installs_linker_prerequisites_before_act_validation() {
     let workflow = parse_workflow();
-    let Some(act_job) = workflow.jobs.get("act-validation") else {
-        panic!("the workflow must define the act-validation job");
-    };
-    let Some(act_test_step) = act_job.steps.iter().position(step_runs_act_tests) else {
-        panic!("the act-validation job must run make test WITH_ACT=1");
-    };
-    let Some(prerequisite_steps) = act_job.steps.get(..act_test_step) else {
-        panic!("the Act test step index must refer to the workflow step list");
-    };
 
     assert!(
-        prerequisite_steps
-            .iter()
-            .filter_map(|step| step.run.as_deref())
-            .any(script_installs_linker_prerequisites),
+        workflow_has_linker_prerequisites_before_act_validation(&workflow),
         "an executable sudo apt-get install command for clang and mold must run before make test \
          WITH_ACT=1"
+    );
+}
+
+#[test]
+fn rejects_workflow_without_linker_bootstrap() {
+    let workflow = parse_workflow_source(
+        "jobs:\n  act-validation:\n    steps:\n      - run: make test WITH_ACT=1\n",
+    );
+
+    assert!(
+        !workflow_has_linker_prerequisites_before_act_validation(&workflow),
+        "a workflow without a preceding linker installation must fail the contract"
     );
 }
 
@@ -60,11 +60,30 @@ fn ignores_inert_package_references() {
     );
 }
 
-fn parse_workflow() -> Workflow {
-    match serde_yaml::from_str(ACT_VALIDATION_WORKFLOW) {
+fn parse_workflow() -> Workflow { parse_workflow_source(ACT_VALIDATION_WORKFLOW) }
+
+fn parse_workflow_source(workflow_source: &str) -> Workflow {
+    match serde_yaml::from_str(workflow_source) {
         Ok(workflow) => workflow,
         Err(error) => panic!("the Act validation workflow must be valid YAML: {error}"),
     }
+}
+
+fn workflow_has_linker_prerequisites_before_act_validation(workflow: &Workflow) -> bool {
+    let Some(act_job) = workflow.jobs.get("act-validation") else {
+        return false;
+    };
+    let Some(act_test_step) = act_job.steps.iter().position(step_runs_act_tests) else {
+        return false;
+    };
+    let Some(prerequisite_steps) = act_job.steps.get(..act_test_step) else {
+        return false;
+    };
+
+    prerequisite_steps
+        .iter()
+        .filter_map(|step| step.run.as_deref())
+        .any(script_installs_linker_prerequisites)
 }
 
 fn step_runs_act_tests(step: &Step) -> bool {
