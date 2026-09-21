@@ -51,6 +51,10 @@ documentation set.
 - [ADR 005: Protocol extension ownership](adr-005-extension-and-upgrade-boundaries.md)
   records the proposed boundary between HTTP and long-lived session processing.
 
+- [ADR 006: Extension-interface stabilization](adr-006-extension-interface-stabilization.md)
+  requires independent consumers and complete generality evidence before
+  experimental interfaces stabilize.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
