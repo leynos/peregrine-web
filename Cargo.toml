@@ -12,6 +12,10 @@ categories = ["network"]
 
 [dependencies]
 
+[dev-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 

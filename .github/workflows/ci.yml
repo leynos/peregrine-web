@@ -102,6 +102,7 @@ jobs:
           echo "Coverage CFLAGS: -fuse-ld=lld"
           echo "Coverage LDFLAGS: -fuse-ld=lld"
       - name: Test and Measure Coverage
+        if: env.ACT != 'true'
         uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
@@ -115,4 +116,3 @@ jobs:
           # The publisher in coverage-main.yml owns the coverage artefact and
           # the ratchet baseline; this lane only compares against it.
           publish-artefact: 'false'
-
