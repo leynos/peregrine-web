@@ -59,7 +59,11 @@ manually. `make coverage` uses `cargo llvm-cov` with `lld`.
 GitHub Actions Act validation lives in `.github/workflows/act-validation.yml`.
 The main `.github/workflows/ci.yml` workflow deliberately does not run
 `make test WITH_ACT=1`; the separate Act workflow runs those slower
-container-backed checks in parallel.
+container-backed checks in parallel. For opt-in local validation, install Act
+and Docker before running `make test WITH_ACT=1`: this path invokes Act against
+`.github/workflows/ci.yml` and executes its `build-test` job in Docker. The
+Makefile maps `ubuntu-latest` to `catthehacker/ubuntu:act-latest` so Act does
+not prompt for an image interactively.
 
 Act validation has two dependency boundaries. The GitHub Actions host first
 builds the repository's Rust test binaries for `make test WITH_ACT=1`. On
@@ -207,3 +211,13 @@ Install mdtablefix 0.6.0 or later locally with
 `cargo install --locked mdtablefix@0.6.0`. Install markdownlint-cli2 with
 `bun add --global markdownlint-cli2` or
 `npm install --global markdownlint-cli2`.
+
+## Act validation linker prerequisites
+
+The Act validation workflow installs and then probes `clang` and `mold` on its
+Ubuntu runner before `make test WITH_ACT=1`; the ordering contract is covered by
+`tests/act_workflow.rs`. The nested Act run disables the shared `setup-rust`
+sccache accelerator, because Act containers cannot provide the GitHub Actions
+cache, and replaces the hosted coverage step with `make test`, because the
+coverage action also needs runtime-token services. Normal CI retains both
+sccache and coverage.
