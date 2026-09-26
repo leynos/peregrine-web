@@ -3,6 +3,39 @@
 This guide explains the contributor workflow for the generated Peregrine Web
 project.
 
+The [technical design](peregrine-design.md) describes the proposed framework;
+[ADR 001](adr-001-resource-aware-lifecycle.md) remains proposed. Consult the
+[repository layout](repository-layout.md) for file ownership and the
+[potential roadmap](roadmap.md) for delivery sequencing. The current library
+is a generated stub, so these proposals are not available APIs.
+
+The [compiler ownership experiment](polonius-ownership-experiment.md) records
+explicit four-way compiler probes. Its flags are experimental; this proposal
+does not change the repository's build settings or consumer requirements.
+Implementation must validate downstream and analyser compatibility before
+[ADR 002](adr-002-compiler-ownership-experiment.md) can be accepted.
+
+The [extension case study](actix-v2a-middleware-case-study.md) and
+[ADR 003](adr-003-http-integration-boundaries.md) distinguish HTTP lifecycle
+integration from application services. Prefer metadata parsers and response/body
+helpers for value-level work. Durable mutation completion must not depend on
+response hooks. These are proposed internal contracts, not implemented helpers.
+
+The [hexagonal application case study](hexagonal-application-case-study.md) and
+[ADR 004](adr-004-application-port-boundaries.md) define proposed application
+integration contracts. Construct resource dependencies explicitly; keep
+application ports free of framework types, and permit concrete adapters only
+at composition roots and their own implementation boundaries. Examples must
+separate request middleware from unit-of-work and application lifespan owners.
+Boundary checks complement behavioural port tests; they do not replace them.
+
+The [extension design](pachislot-extension-design.md) and proposed
+[ADR 005](adr-005-extension-and-upgrade-boundaries.md) separate correlation policy
+from propagation adapters and HTTP upgrade from Pachislot message processing.
+An upgrade plan must own everything that outlives the HTTP request. Keep
+connection and message lifetimes explicit in examples and verify compatibility
+against pinned source behaviour before describing it as supported.
+
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.

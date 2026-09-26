@@ -59,6 +59,16 @@ compact and omits build output such as `target/`.
   design material.
 - `docs/contents.md`: Indexes the documentation set and should be updated when
   documentation files are added, renamed, or removed.
+- `docs/terms-of-reference.md`: Records the product problem, intended users,
+  scope, evidence, and open questions.
+- `docs/peregrine-design.md`: Describes the proposed framework architecture
+  and contracts, distinguished from the generated implementation.
+- `docs/polonius-ownership-experiment.md`: Contains paired API examples,
+  compiler evidence, ownership constraints, and experiment acceptance criteria.
+- `docs/roadmap.md`: Sequences potential delivery using Goals, Ideas, Steps,
+  and Tasks without date commitments.
+- `docs/adr-*.md`: Holds architectural decision records. Proposed records
+  remain non-binding until accepted.
 - `docs/users-guide.md`: Explains how to use the generated project and its
   public build and test commands.
 - `docs/developers-guide.md`: Explains the contributor workflow and local
