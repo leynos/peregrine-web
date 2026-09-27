@@ -8,8 +8,9 @@ about. Peregrine proposes bringing that architecture to Rust, with explicit
 ownership and a request lifecycle you can follow without a séance.
 
 **Status: design and experiments.** The repository currently contains a library
-scaffold, a greeting function, and one placeholder test. The framework APIs
-below are proposed; there is no HTTP server to run yet.
+scaffold, a greeting function, and the workflow and Makefile contract tests
+that guard the generated tooling. The framework APIs below are proposed; there
+is no HTTP server to run yet.
 
 ______________________________________________________________________
 
@@ -51,8 +52,9 @@ cd peregrine-web
 cargo test
 ```
 
-A successful run currently reports one passing placeholder test. That checks
-the scaffold, not the proposed HTTP contracts.
+A successful run currently passes the scaffold placeholder plus the workflow
+and Makefile contract tests that guard the generated tooling. These check the
+scaffold, not the proposed HTTP contracts.
 
 ### Explore the current library
 
