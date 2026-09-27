@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 
 const ACT_VALIDATION_WORKFLOW: &str = include_str!("../.github/workflows/act-validation.yml");
-const MAKEFILE: &str = include_str!("../Makefile");
 const CI_WORKFLOW: &str = include_str!("../.github/workflows/ci.yml");
 
 #[derive(Deserialize)]
@@ -20,11 +19,14 @@ struct Job {
 
 #[derive(Deserialize)]
 struct Step {
+    name: Option<String>,
+    #[serde(rename = "if")]
+    condition: Option<String>,
     run: Option<String>,
 }
 
-#[test]
 /// Verifies the committed workflow installs the host linker before Act.
+#[test]
 fn installs_linker_prerequisites_before_act_validation() {
     let workflow = parse_workflow();
 
@@ -35,8 +37,8 @@ fn installs_linker_prerequisites_before_act_validation() {
     );
 }
 
-#[test]
 /// Proves a pre-bootstrap workflow cannot satisfy the contract.
+#[test]
 fn rejects_workflow_without_linker_bootstrap() {
     let workflow = parse_workflow_source(
         "jobs:\n  act-validation:\n    steps:\n      - run: make test WITH_ACT=1\n",
@@ -48,19 +50,17 @@ fn rejects_workflow_without_linker_bootstrap() {
     );
 }
 
-#[test]
 /// Rejects ambiguous YAML workflow mappings.
+#[test]
+#[should_panic(expected = "unique YAML mapping keys")]
 fn rejects_duplicate_act_validation_jobs() {
     let duplicate_jobs =
         "jobs:\n  act-validation:\n    steps: []\n  act-validation:\n    steps: []\n";
-    assert!(
-        validate_mapping_keys(duplicate_jobs).is_err(),
-        "duplicate job keys must be rejected"
-    );
+    parse_workflow_source(duplicate_jobs);
 }
 
-#[test]
 /// Rejects comments, malformed continuations, and later shell commands.
+#[test]
 fn ignores_inert_package_references() {
     assert!(
         !is_linker_install_command("# sudo apt-get install clang mold"),
@@ -84,26 +84,69 @@ fn ignores_inert_package_references() {
     );
 }
 
+/// Preserves the hosted-coverage guard for nested Act.
 #[test]
-/// Preserves the Makefile switch and nested-Act forwarding contract.
-fn preserves_makefile_act_execution_contract() {
-    assert!(
-        MAKEFILE.contains("if [ \"$(WITH_ACT)\" = \"1\" ]; then $(MAKE) act-validation; fi"),
-        "WITH_ACT=1 must invoke Act after outer tests"
+fn preserves_ci_coverage_guard_for_nested_act() {
+    assert_eq!(
+        coverage_step_runs(&parse_ci_workflow(CI_WORKFLOW), Some("true")),
+        Some(false),
+        "hosted coverage must be skipped when ACT is true"
     );
-    assert!(
-        MAKEFILE.contains("--secret GITHUB_TOKEN") && MAKEFILE.contains("--env ACT=true"),
-        "Act must receive the token secret and ACT marker"
+    assert_eq!(
+        coverage_step_runs(&parse_ci_workflow(CI_WORKFLOW), None),
+        Some(true),
+        "hosted coverage must run when ACT is unset"
+    );
+    assert_eq!(
+        coverage_step_runs(&parse_ci_workflow(CI_WORKFLOW), Some("false")),
+        Some(true),
+        "hosted coverage must run when ACT is not true"
     );
 }
 
+/// Rejects coverage guards missing from the coverage step.
 #[test]
-/// Preserves the hosted-coverage guard for nested Act.
-fn preserves_ci_coverage_guard_for_nested_act() {
-    assert!(
-        CI_WORKFLOW.contains("if: env.ACT != 'true'"),
-        "nested Act must skip hosted coverage collection"
+fn rejects_missing_coverage_guard() {
+    let fixture = "jobs:\n  build-test:\n    steps:\n      - name: Test and Measure Coverage\n";
+    assert_eq!(
+        coverage_step_runs(&parse_ci_workflow(fixture), Some("true")),
+        None,
+        "a coverage step without its own guard must fail the contract"
     );
+}
+
+/// Rejects a guard attached to a different step.
+#[test]
+fn rejects_coverage_guard_on_wrong_step() {
+    let fixture = "jobs:\n  build-test:\n    steps:\n      - name: Other step\n        if: \
+                   env.ACT != 'true'\n      - name: Test and Measure Coverage\n";
+    assert_eq!(
+        coverage_step_runs(&parse_ci_workflow(fixture), Some("true")),
+        None,
+        "a guard on another step must not satisfy the coverage contract"
+    );
+}
+
+/// Parses the CI workflow after validating its YAML mapping keys.
+fn parse_ci_workflow(source: &str) -> Workflow {
+    if let Err(error) = validate_mapping_keys(source) {
+        panic!("the CI workflow must have unique YAML mapping keys: {error}");
+    }
+    match serde_yaml::from_str(source) {
+        Ok(workflow) => workflow,
+        Err(error) => panic!("the CI workflow must be valid YAML: {error}"),
+    }
+}
+
+/// Evaluates the build-test coverage guard for one ACT environment value.
+fn coverage_step_runs(workflow: &Workflow, act_value: Option<&str>) -> Option<bool> {
+    let job = workflow.jobs.get("build-test")?;
+    let coverage_step = job
+        .steps
+        .iter()
+        .find(|step| step.name.as_deref() == Some("Test and Measure Coverage"))?;
+    let condition = coverage_step.condition.as_deref()?;
+    (condition.trim() == "env.ACT != 'true'").then_some(act_value != Some("true"))
 }
 
 /// Parses the committed Act workflow.
