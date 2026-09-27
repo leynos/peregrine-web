@@ -1,7 +1,7 @@
 # Repository layout
 
-This document describes the generated Peregrine Web repository layout. It
-is the canonical reference for where source code, tests, configuration,
+This document describes the generated Peregrine Web repository layout. It is
+the canonical reference for where source code, tests, configuration,
 automation, and long-lived documentation belong.
 
 ## Top-level tree
