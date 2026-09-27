@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 
 const ACT_VALIDATION_WORKFLOW: &str = include_str!("../.github/workflows/act-validation.yml");
+const MAKEFILE: &str = include_str!("../Makefile");
+const CI_WORKFLOW: &str = include_str!("../.github/workflows/ci.yml");
 
 #[derive(Deserialize)]
 struct Workflow {
@@ -22,6 +24,7 @@ struct Step {
 }
 
 #[test]
+/// Verifies the committed workflow installs the host linker before Act.
 fn installs_linker_prerequisites_before_act_validation() {
     let workflow = parse_workflow();
 
@@ -33,6 +36,7 @@ fn installs_linker_prerequisites_before_act_validation() {
 }
 
 #[test]
+/// Proves a pre-bootstrap workflow cannot satisfy the contract.
 fn rejects_workflow_without_linker_bootstrap() {
     let workflow = parse_workflow_source(
         "jobs:\n  act-validation:\n    steps:\n      - run: make test WITH_ACT=1\n",
@@ -45,6 +49,18 @@ fn rejects_workflow_without_linker_bootstrap() {
 }
 
 #[test]
+/// Rejects ambiguous YAML workflow mappings.
+fn rejects_duplicate_act_validation_jobs() {
+    let duplicate_jobs =
+        "jobs:\n  act-validation:\n    steps: []\n  act-validation:\n    steps: []\n";
+    assert!(
+        validate_mapping_keys(duplicate_jobs).is_err(),
+        "duplicate job keys must be rejected"
+    );
+}
+
+#[test]
+/// Rejects comments, malformed continuations, and later shell commands.
 fn ignores_inert_package_references() {
     assert!(
         !is_linker_install_command("# sudo apt-get install clang mold"),
@@ -58,17 +74,58 @@ fn ignores_inert_package_references() {
         !is_linker_install_command("sudo apt-get install clang # mold"),
         "shell comments must not add packages to an installation command"
     );
+    assert!(
+        !is_linker_install_command("sudo apt-get install other || echo clang mold"),
+        "packages in a later shell command must not satisfy the contract"
+    );
+    assert!(
+        !is_linker_install_command("sudo apt-get install clang mold\\ "),
+        "whitespace after a continuation backslash must be rejected"
+    );
 }
 
+#[test]
+/// Preserves the Makefile switch and nested-Act forwarding contract.
+fn preserves_makefile_act_execution_contract() {
+    assert!(
+        MAKEFILE.contains("if [ \"$(WITH_ACT)\" = \"1\" ]; then $(MAKE) act-validation; fi"),
+        "WITH_ACT=1 must invoke Act after outer tests"
+    );
+    assert!(
+        MAKEFILE.contains("--secret GITHUB_TOKEN") && MAKEFILE.contains("--env ACT=true"),
+        "Act must receive the token secret and ACT marker"
+    );
+}
+
+#[test]
+/// Preserves the hosted-coverage guard for nested Act.
+fn preserves_ci_coverage_guard_for_nested_act() {
+    assert!(
+        CI_WORKFLOW.contains("if: env.ACT != 'true'"),
+        "nested Act must skip hosted coverage collection"
+    );
+}
+
+/// Parses the committed Act workflow.
 fn parse_workflow() -> Workflow { parse_workflow_source(ACT_VALIDATION_WORKFLOW) }
 
+/// Parses validated workflow text into the test model.
 fn parse_workflow_source(workflow_source: &str) -> Workflow {
+    if let Err(error) = validate_mapping_keys(workflow_source) {
+        panic!("the Act validation workflow must have unique YAML mapping keys: {error}");
+    }
     match serde_yaml::from_str(workflow_source) {
         Ok(workflow) => workflow,
         Err(error) => panic!("the Act validation workflow must be valid YAML: {error}"),
     }
 }
 
+/// Validates YAML mappings before typed deserialisation.
+fn validate_mapping_keys(workflow_source: &str) -> Result<(), serde_yaml::Error> {
+    serde_yaml::from_str::<serde_yaml::Mapping>(workflow_source).map(|_| ())
+}
+
+/// Determines whether prerequisites precede the Act test step.
 fn workflow_has_linker_prerequisites_before_act_validation(workflow: &Workflow) -> bool {
     let Some(act_job) = workflow.jobs.get("act-validation") else {
         return false;
@@ -86,6 +143,7 @@ fn workflow_has_linker_prerequisites_before_act_validation(workflow: &Workflow) 
         .any(script_installs_linker_prerequisites)
 }
 
+/// Identifies the outer Act test command.
 fn step_runs_act_tests(step: &Step) -> bool {
     step.run.as_deref().is_some_and(|script| {
         script
@@ -95,6 +153,7 @@ fn step_runs_act_tests(step: &Step) -> bool {
     })
 }
 
+/// Identifies a valid linker-installation command in a script.
 fn script_installs_linker_prerequisites(script: &str) -> bool {
     script
         .lines()
@@ -102,7 +161,11 @@ fn script_installs_linker_prerequisites(script: &str) -> bool {
         .any(is_linker_install_command)
 }
 
+/// Normalises a valid shell command line.
 fn normalise_command(raw_command: &str) -> &str {
+    if raw_command.ends_with([' ', '\t']) && raw_command.trim_end().ends_with('\\') {
+        return "";
+    }
     let trimmed_command = raw_command.trim().trim_end_matches('\\').trim_end();
 
     trimmed_command
@@ -110,6 +173,7 @@ fn normalise_command(raw_command: &str) -> &str {
         .map_or(trimmed_command, str::trim_start)
 }
 
+/// Matches the exact Make invocation that enables Act.
 fn is_act_test_command(raw_command: &str) -> bool {
     let mut words = raw_command.split_whitespace();
 
@@ -119,6 +183,7 @@ fn is_act_test_command(raw_command: &str) -> bool {
     )
 }
 
+/// Matches an executable apt installation of both linker packages.
 fn is_linker_install_command(raw_command: &str) -> bool {
     let normalised_command = normalise_command(raw_command);
     let mut words = normalised_command.split_whitespace();
@@ -127,7 +192,7 @@ fn is_linker_install_command(raw_command: &str) -> bool {
         (Some("sudo"), Some("apt-get"), Some("install"))
     );
     let arguments = words
-        .take_while(|word| !word.starts_with('#'))
+        .take_while(|word| !word.starts_with('#') && !matches!(*word, "&&" | "||" | ";" | "|"))
         .collect::<Vec<_>>();
 
     is_apt_install && arguments.contains(&"clang") && arguments.contains(&"mold")
