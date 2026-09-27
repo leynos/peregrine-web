@@ -320,7 +320,7 @@ status, validation paths, cursor tokens, page-limit behaviour, and SSE wire
 bytes. Consumers with additional envelope fields must supply their own
 fixtures; the PR's consumer observations are not independently reproduced here.
 Durable mutation guarantees require the separate restart, concurrency, and
-ambiguous- acknowledgement harness specified by PR #92. HTTP pipeline tests
+ambiguous-acknowledgement harness specified by PR #92. HTTP pipeline tests
 cannot replace it.
 
 ## 8. Sources
