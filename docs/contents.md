@@ -15,6 +15,46 @@ documentation set.
   spelling, structure, Markdown, Architecture Decision Record (ADR), Request
   for Comments (RFC), and roadmap conventions used by this documentation set.
 
+## Product direction and design
+
+- [Terms of reference](terms-of-reference.md) defines the intended users,
+  goals, scope, assumptions, and unresolved decisions from the source papers.
+- [Technical design](peregrine-design.md) proposes the resource, lifecycle,
+  body, transport, and verification contracts.
+- [Potential GIST roadmap](roadmap.md) links Goals, Ideas, Steps, and Tasks to
+  review-sized delivery slices and observable success criteria.
+- [ADR 001: Resource-aware lifecycle](adr-001-resource-aware-lifecycle.md)
+  records the proposed choice to own the inner middleware pipeline.
+- [Compiler ownership experiment](polonius-ownership-experiment.md) compares
+  old-checker-compatible and exclusive Polonius/new-solver designs with code
+  examples, measured acceptance, and adoption criteria.
+- [ADR 002: Compiler ownership experiment](adr-002-compiler-ownership-experiment.md)
+  records the proposed experiment and the conditions for a compiler commitment.
+- [Compiler probe evidence](compiler-probe-evidence.md): complete isolated
+  compiler fixtures and recorded outcomes.
+- [Polonius ownership design review](polonius-design-review.md): six-perspective
+  findings, pre-mortem, and adoption conditions.
+
+- [Actix v2a middleware case study](actix-v2a-middleware-case-study.md) compares
+  implemented and proposed extensions, including where middleware adds friction.
+- [ADR 003: HTTP integration boundaries](adr-003-http-integration-boundaries.md)
+  records proposed typed-input, request-fact, rendering, and service boundaries.
+
+- [Hexagonal application case study](hexagonal-application-case-study.md)
+  compares Corbusier, Wildside, and Episodic and defines boundary experiments.
+- [ADR 004: Application port boundaries](adr-004-application-port-boundaries.md)
+  records proposed resource injection, context, operation, and lifespan rules.
+
+- [Correlation and Pachislot extension design](pachislot-extension-design.md)
+  explains correlation policy, owned upgrades, AsyncAPI mapping, and
+  compatibility.
+- [ADR 005: Protocol extension ownership](adr-005-extension-and-upgrade-boundaries.md)
+  records the proposed boundary between HTTP and long-lived session processing.
+
+- [ADR 006: Extension-interface stabilization](adr-006-extension-interface-stabilization.md)
+  requires independent consumers and complete generality evidence before
+  experimental interfaces stabilize.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
