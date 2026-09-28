@@ -21,8 +21,15 @@ BUILD_JOBS ?=
 POLONIUS_FLAGS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
-DEV_LINKER_FLAGS ?= $(if $(filter Linux,$(shell uname -s)),-C link-arg=-fuse-ld=mold)
-DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_LINKER_FLAGS)
+# The build standard: every `rustflags` source in `.cargo/config.toml` carries
+# the parallel frontend, and the Linux source adds mold. Assigning `RUSTFLAGS`
+# replaces those sources outright, so the gate targets restate the flags here.
+# Coverage and release builds deliberately take neither.
+DEV_THREADS_FLAGS ?= -Zthreads=8
+BUILD_HOST_OS := $(shell uname -s)
+DEV_LINKER_FLAGS ?= $(if $(filter Linux,$(BUILD_HOST_OS)),-C link-arg=-fuse-ld=mold)
+DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_THREADS_FLAGS) $(DEV_LINKER_FLAGS)
+RELEASE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS)
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --all-targets --all-features
@@ -54,10 +61,9 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
-test: export RUSTFLAGS := $(DEV_RUST_FLAGS)
 test: ## Run tests with warnings treated as errors
-	$(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+	RUSTFLAGS="$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
 
 act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
@@ -69,7 +75,7 @@ act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 		--workflows .github/workflows/ci.yml --job build-test
 
 target/%/$(TARGET): ## Build binary in debug or release mode
-	RUSTFLAGS="$(DEV_RUST_FLAGS)" $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
+	RUSTFLAGS="$(if $(findstring release,$(@)),$(RELEASE_RUST_FLAGS),$(DEV_RUST_FLAGS))" $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
 
 coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"

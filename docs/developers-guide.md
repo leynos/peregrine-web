@@ -102,11 +102,17 @@ publishes nothing until a dispatch from `main` or the next push.
 
 ## Tooling
 
-Development builds use Cranelift for debug code generation. On Linux targets,
-`.cargo/config.toml` configures clang to link with `mold` so debug builds link
-quickly. Coverage generation switches the dev profile back to LLVM and uses
-`lld` because LLVM coverage tooling expects LLVM-compatible code generation and
-linker behaviour.
+Development builds use Cranelift for debug code generation. Every `rustflags`
+source in `.cargo/config.toml` enables the parallel `rustc` frontend with
+`-Zthreads=8`, and on Linux targets it also configures clang to link with
+`mold` so debug builds link quickly. Cargo applies one `rustflags` source and
+an assigned `RUSTFLAGS` replaces them all, so the Makefile restates both flags
+in `DEV_RUST_FLAGS` for the targets that assign `RUSTFLAGS`. Release builds
+assign `RELEASE_RUST_FLAGS` and coverage assigns its own, so neither takes the
+standard flags. `tests/build_standard_contract.rs` holds the configuration
+sources and those recipes to this. Coverage generation switches the dev profile
+back to LLVM and uses `lld` because LLVM coverage tooling expects
+LLVM-compatible code generation and linker behaviour.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
