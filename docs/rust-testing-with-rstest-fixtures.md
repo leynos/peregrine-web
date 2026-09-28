@@ -11,7 +11,7 @@ document provides a comprehensive exploration of `rstest`, from fundamental
 concepts to advanced techniques, enabling Rust developers to write cleaner,
 more expressive, and robust tests.
 
-## 1. Introduction to `rstest` and test fixtures in Rust
+## I. Introduction to `rstest` and test fixtures in Rust
 
 ### A. What are test fixtures and why use them?
 
@@ -111,9 +111,9 @@ Add the following lines to the project's `Cargo.toml` under the
 
 ```toml
 [dev-dependencies]
-rstest = "0.26.1" # Or the latest version available on crates.io
+rstest = "0.27.0" # Or the latest version available on crates.io
 # rstest_macros may also be needed explicitly depending on usage or version
-# rstest_macros = "0.26.1" # Check crates.io for the latest version
+# rstest_macros = "0.27.0" # Check crates.io for the latest version
 ```
 
 It is advisable to check `crates.io` for the latest stable version of `rstest`
@@ -123,14 +123,13 @@ libraries. This convention prevents testing utilities from being included in
 production binaries, which helps keep them small while reducing compile times
 for non-test builds.
 
-When leveraging Tokio's test utilities—for example `tokio::time::pause` or the
-Input/output helpers in `tokio-test`—enable the `test-util` feature via a
-dev-only dependency:
+When leveraging Tokio's test utilities—for example `tokio::time::pause`—enable
+the `time` and `test-util` features via a dev-only dependency:
 
 ```toml
 [dev-dependencies]
-tokio = { version = "1", default-features = false, features = ["test-util"] }
-rstest = "0.26.1"
+tokio = { version = "1", default-features = false, features = ["time", "test-util"] }
+rstest = "0.27.0"
 ```
 
 ### B. First fixture: defining with `#[fixture]`
@@ -384,9 +383,9 @@ an incoming event:
 ```rust,no_run
 use rstest::rstest;
 
-#
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State { Init, Start, Processing, Terminated }
-#
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Event { Process, Error, Fatal }
 
 impl State {
@@ -404,18 +403,32 @@ impl State {
 
 #[rstest]
 fn test_state_transitions(
+    #[values(State::Init, State::Start, State::Processing, State::Terminated)]
     initial_state: State,
     #[values(Event::Process, Event::Error, Event::Fatal)] event: Event
 ) {
-    // Real tests typically include more specific assertions based on expected_next_state
     let next_state = initial_state.process(event);
-    println!("Testing: {:?} + {:?} -> {:?}", initial_state, event, next_state);
-    // For demonstration, a generic assertion:
-    assert!(true); // Replace with actual assertions
+    let expected_next_state = match (initial_state, event) {
+        (State::Init, Event::Process) => State::Start,
+        (State::Start, Event::Process) => State::Processing,
+        (State::Processing, Event::Process) => State::Processing,
+        (_, Event::Error) => State::Start,
+        (_, Event::Fatal) => State::Terminated,
+        (state, _) => state,
+    };
+
+    assert_eq!(
+        next_state,
+        expected_next_state,
+        "Testing: {:?} + {:?} -> {:?}",
+        initial_state,
+        event,
+        next_state
+    );
 }
 ```
 
-In this scenario, `rstest` will generate 3×3=9 individual test cases, covering
+In this scenario, `rstest` will generate 4×3=12 individual test cases, covering
 all combinations of `initial_state` and `event` specified in the `#[values]`
 attributes.
 
@@ -521,12 +534,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[fixture]
 #[once]
-fn expensive_setup() -> &'static AtomicUsize {
+fn expensive_setup() -> AtomicUsize {
     // Simulate expensive setup
     println!("Performing expensive_setup once…");
-    static COUNTER: AtomicUsize = AtomicUsize::new(0);
-    COUNTER.fetch_add(1, Ordering::Relaxed); // To demonstrate it's called once
-    &COUNTER
+    let counter = AtomicUsize::new(0);
+    counter.fetch_add(1, Ordering::Relaxed); // To demonstrate it's called once
+    counter
 }
 
 #[rstest]
@@ -553,8 +566,9 @@ When using `#[once]`, there are critical warnings:
    and cannot be generic functions (neither with generic type parameters nor
    using `impl Trait` in arguments or return types).
 3. **Attribute Propagation:** `rstest` macros currently drop `#[expect]`
-   attributes. If a test relies on lint expectations, use `#[allow]` instead to
-   silence false positives.
+   attributes from fixtures and test functions. If a test relies on a lint
+   expectation, use `#[allow]` instead and note the workaround in a comment
+   referencing this upstream limitation.
 
 The "never dropped" behaviour arises because `rstest` typically creates a
 `static` variable to hold the result of the `#[once]` fixture. `static`
@@ -694,6 +708,15 @@ diagnostic messages.
 integrating with common async runtimes and offering syntactic sugar for
 managing futures.
 
+The examples below use `async-std` for `async_std::task::sleep` and the
+`#[async_std::test]` attribute macro. Add it under `[dev-dependencies]` with
+the `attributes` feature enabled:
+
+```toml
+[dev-dependencies]
+async-std = { version = "1", features = ["attributes"] }
+```
+
 ### A. Defining asynchronous fixtures (`async fn`)
 
 Creating an asynchronous fixture is straightforward: simply define the fixture
@@ -738,10 +761,10 @@ async fn async_fixture_value() -> u32 {
 
 #[rstest]
 #[async_std::test] // Or #[tokio::test], #[actix_rt::test]
-async fn my_async_test(async_fixture_value: u32) {
+async fn my_async_test(#[future] async_fixture_value: u32) {
     // Simulate further async work in the test
     async_std::task::sleep(Duration::from_millis(5)).await;
-    assert_eq!(async_fixture_value, 100);
+    assert_eq!(async_fixture_value.await, 100);
 }
 ```
 
@@ -825,15 +848,15 @@ async fn potentially_long_operation(duration: Duration) -> u32 {
 }
 
 #[rstest]
-#
 #[async_std::test]
+#[timeout(Duration::from_millis(50))]
 async fn test_operation_within_timeout() {
     assert_eq!(potentially_long_operation(Duration::from_millis(10)).await, 42);
 }
 
 #[rstest]
-#
 #[async_std::test]
+#[timeout(Duration::from_millis(50))]
 #[should_panic] // Expect this test to panic due to timeout
 async fn test_operation_exceeds_timeout() {
     assert_eq!(potentially_long_operation(Duration::from_millis(100)).await, 42);
@@ -844,6 +867,12 @@ A default timeout for all `rstest` async tests can also be set using the
 `RSTEST_TIMEOUT` environment variable (value in seconds), evaluated at test
 compile time. This built-in timeout support is a practical feature for ensuring
 test suite stability.
+
+Table: Environment variables for `rstest` fixture execution
+
+| Variable name    | Meaning                                                          | Default or rule                                                  |
+| ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `RSTEST_TIMEOUT` | Sets a default timeout, in seconds, for all `rstest` async tests | Value in seconds; evaluated at compile time; no default if unset |
 
 ## VII. Working with external resources and test data
 
@@ -930,6 +959,7 @@ A conceptual example using a hypothetical mocking library:
 
 ```rust,no_run
 use rstest::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 // Assume mockall or a similar library is used to define MockMyDatabase
@@ -946,12 +976,12 @@ pub trait MyDatabase {
 pub struct MockMyDatabase {
     pub expected_id: u32,
     pub user_to_return: Option<String>,
-    pub called: std::cell::Cell<bool>,
+    pub called: AtomicBool,
 }
 
 impl MyDatabase for MockMyDatabase {
     fn get_user_name(&self, id: u32) -> Option<String> {
-        self.called.set(true);
+        self.called.store(true, Ordering::Relaxed);
         if id == self.expected_id {
             self.user_to_return.clone()
         } else {
@@ -966,7 +996,7 @@ fn mock_db_returns_alice() -> MockMyDatabase {
     MockMyDatabase {
         expected_id: 1,
         user_to_return: Some("Alice".to_string()),
-        called: std::cell::Cell::new(false),
+        called: AtomicBool::new(false),
     }
 }
 
@@ -1010,7 +1040,7 @@ provides the `#[files("glob_pattern")]` attribute. This attribute can be used
 on a test function argument to inject file paths that match a given glob
 pattern. The argument type is typically `PathBuf`. It can also inject file
 contents directly as `&str` or `&[u8]` by specifying a mode, e.g.,
-`#[files("glob_pattern", mode = "str")]`, and additional attributes such as
+`#[files("glob_pattern")] #[mode = str]`, and additional attributes such as
 `#[base_dir = "…"]` can specify a base directory for the glob, and
 `#[exclude("regex")]` can filter out paths matching a regular expression.
 
@@ -1030,8 +1060,11 @@ fn process_text_file(#[files] path: PathBuf) {
 }
 
 #[rstest]
-#[files("tests/test_data/*.json", mode = "str")] // Injects content of each.json file as &str
-fn process_json_content(#[files] content: &str) {
+fn process_json_content(
+    #[files("tests/test_data/*.json")]
+    #[mode = str]
+    content: &str,
+) {
     println!("Processing JSON content (first 50 chars): {:.50}", content);
     assert!(content.contains("{")); // Basic check for JSON-like content
 }
@@ -1120,9 +1153,13 @@ for maintainability and scalability.
     (in the `tests/` directory), consider creating a common module within the
     `tests/` directory (e.g., `tests/common/fixtures.rs`) and re-exporting
     public fixtures.
+  - For integration helpers reused across multiple test crates, prefer
+    exporting them from a dedicated test-support crate so they compile once
+    and avoid per-test-crate lint suppressions.
   - Alternatively, define shared fixtures in the library crate itself (e.g., in
-    `src/lib.rs` or `src/fixtures.rs` under `#[cfg(test)]`) and `use` them in
-    integration tests.
+    `src/lib.rs` or `src/fixtures.rs`) and `use` them in integration tests.
+    Integration tests compile as external crates, so shared library fixtures
+    must not be hidden behind `#[cfg(test)]`.
 - **Naming Conventions:** Use clear, descriptive names for fixtures that
   indicate what they provide or set up. Test function names should clearly
   state what behaviour they are verifying.
@@ -1233,7 +1270,7 @@ mind:
 - `no_std` **Support:** `rstest` generally relies on the standard library
   (`std`) being available, as test runners and many common testing utilities
   depend on `std`. Therefore, it is typically not suitable for testing
-  `#! [no_std]` libraries in a truly `no_std` test environment where the test
+  `#![no_std]` libraries in a truly `no_std` test environment where the test
   harness itself cannot link `std`.
 - **Learning Curve:** While designed for simplicity in basic use cases, the full
   range of attributes and advanced features (e.g., fixture composition, partial

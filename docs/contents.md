@@ -64,6 +64,8 @@ documentation set.
   explains how to write maintainable, executable Rust documentation examples.
 - [Rust testing with `rstest` fixtures](rust-testing-with-rstest-fixtures.md)
   explains fixture-based, parameterized, and asynchronous testing with `rstest`.
+- [`rstest-bdd` user's guide](rstest-bdd-users-guide.md) explains how to bind
+  Gherkin scenarios to Rust tests with `rstest-bdd`.
 
 ## Engineering practice
 
