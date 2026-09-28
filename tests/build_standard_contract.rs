@@ -37,6 +37,10 @@ const DEVELOPMENT_TARGETS: [&str; 4] = ["test", "typecheck", "lint", "build"];
 /// `RUSTFLAGS` and none carries a standard flag.
 const HELD_OUT_TARGETS: [&str; 2] = ["coverage", "release"];
 
+/// Development targets that must assign `RUSTFLAGS` in at least one command,
+/// so the restatement checks above cannot pass by finding nothing to check.
+const ASSIGNING_TARGETS: [&str; 4] = ["test", "typecheck", "lint", "build"];
+
 /// The result of a reader, which the tests unwrap.
 type Read<T> = Result<T, Box<dyn Error>>;
 
@@ -97,16 +101,28 @@ fn make_rustflags(target: &str, host: &str) -> Read<Vec<Option<Vec<String>>>> {
     }
     // A recipe continued with a trailing backslash is one command.
     let stdout = String::from_utf8_lossy(&output.stdout).replace("\\\n", " ");
-    let commands: Vec<Option<Vec<String>>> = stdout
+    let mut commands: Vec<Option<Vec<String>>> = Vec::new();
+    for line in stdout
         .lines()
         .filter(|line| line.contains("cargo") || line.contains("whitaker"))
-        .map(|line| {
-            let (_, rest) = line.split_once("RUSTFLAGS=\"")?;
-            let (value, _) = rest.split_once('"')?;
-            let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
-            Some(normalized(&words))
-        })
-        .collect();
+    {
+        let assigned = match line.split_once("RUSTFLAGS=\"") {
+            Some((_, rest)) => {
+                let (value, _) = rest
+                    .split_once('"')
+                    .ok_or_else(|| format!("unterminated RUSTFLAGS in `{line}`"))?;
+                let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
+                Some(normalized(&words))
+            }
+            // Any other spelling still replaces the configuration's sources,
+            // so a form this reader cannot parse fails rather than passing.
+            None if line.contains("RUSTFLAGS=") => {
+                return Err(format!("unreadable RUSTFLAGS assignment in `{line}`").into());
+            }
+            None => None,
+        };
+        commands.push(assigned);
+    }
     if commands.is_empty() {
         return Err(format!("`make -n {target}` runs no cargo command").into());
     }
@@ -191,15 +207,14 @@ fn sources_differ_only_by_the_linker() {
 fn development_targets_restate_both_flags_on_linux() {
     let problems = check_development_targets("Linux", true).expect("read `make -n` output");
     assert!(problems.is_empty(), "{problems:#?}");
-    let assigned = make_rustflags("test", "Linux")
-        .expect("read `make -n` output")
-        .into_iter()
-        .flatten()
-        .count();
-    assert!(
-        assigned > 0,
-        "`make test` assigns no RUSTFLAGS, so the check above proves nothing"
-    );
+    for target in ASSIGNING_TARGETS {
+        let assigned = make_rustflags(target, "Linux")
+            .expect("read `make -n` output")
+            .into_iter()
+            .flatten()
+            .count();
+        assert!(assigned > 0, "`make {target}` assigns no RUSTFLAGS");
+    }
 }
 
 #[test]
