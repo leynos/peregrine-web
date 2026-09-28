@@ -7,7 +7,9 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
-.PHONY: help all clean test act-validation build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit
+.PHONY: help all clean test act-validation build release package coverage \
+  lint lint-clippy lint-whitaker fmt check-fmt markdownlint spelling nixie \
+  audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
 SHELL := bash
 
@@ -18,24 +20,29 @@ USER_WHITAKER := $(HOME)/.local/bin/whitaker
 USER_BIN_PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.bun/bin
 CARGO ?= cargo
 BUILD_JOBS ?=
+BUILD_TOOLS_PREFIX ?= $(HOME)/.local
+CHECK_BUILD_TOOLS ?= scripts/check-build-tools.sh
+export BUILD_TOOLS_PREFIX
+export PATH := $(BUILD_TOOLS_PREFIX)/bin:$(PATH)
 POLONIUS_FLAGS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
 # The build standard: every `rustflags` source in `.cargo/config.toml` carries
-# the parallel frontend, and the Linux source adds mold. Assigning `RUSTFLAGS`
+# the parallel frontend, and the x86_64 GNU Linux source adds mold. Assigning `RUSTFLAGS`
 # replaces those sources outright, so the gate targets restate the flags here.
-# Coverage and release builds deliberately take neither. Development recipes
-# add the flags to any inherited `RUSTFLAGS` (setup-rust exports one in CI),
-# and coverage builds on LLVM because `-Cinstrument-coverage` is LLVM-only.
+# Development recipes add those flags to inherited RUSTFLAGS, including the CI
+# setup-rust value. Coverage, release, and packaging take neither. The checked toolchain
+# components come from rust-toolchain.toml. Native Cargo routes through the
+# Clang wrapper, which puts pinned ld.mold first; coverage checks its lld linker.
 DEV_THREADS_FLAGS ?= -Zthreads=8
 BUILD_HOST_OS := $(shell uname -s)
-# mold only when the machine doing the build is Linux (only Make can tell
-# whether it has mold) and so is the compilation target, which is the host
-# unless `CARGO_BUILD_TARGET` names another triple.
-DEV_TARGET_IS_LINUX = $(if $(CARGO_BUILD_TARGET),$(findstring -linux-,$(CARGO_BUILD_TARGET)),yes)
-DEV_LINKER_FLAGS ?= $(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(DEV_TARGET_IS_LINUX),-C link-arg=-fuse-ld=mold))
+# Only the native x86_64 GNU Linux route has a pinned mold linker.
+BUILD_HOST_ARCH := $(shell uname -m)
+BUILD_HOST_TRIPLE := $(shell rustup show 2>/dev/null | sed -n 's/^Default host: //p')
+DEV_LINKER_FLAGS ?= $(if $(and $(filter Linux,$(BUILD_HOST_OS)),$(filter x86_64,$(BUILD_HOST_ARCH)),$(filter x86_64-unknown-linux-gnu,$(BUILD_HOST_TRIPLE))),-C link-arg=-fuse-ld=mold)
 DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_THREADS_FLAGS) $(DEV_LINKER_FLAGS)
 RELEASE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS)
+PACKAGE_FLAGS ?=
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --all-targets --all-features
@@ -49,6 +56,8 @@ ACT_GIT_COMMON_DIR := $(shell git rev-parse --path-format=absolute --git-common-
 ACT_GITHUB_TOKEN ?= $(or $(GITHUB_TOKEN),$(GH_TOKEN))
 COVERAGE_LINKER_FLAGS ?= -fuse-ld=lld
 COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) -C link-arg=$(COVERAGE_LINKER_FLAGS)
+# RUSTFLAGS displaces configured flags, while the dev profile backend needs its
+# own override so coverage runs LLVM instrumentation instead of Cranelift.
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.1
@@ -58,16 +67,23 @@ TYPOS_CONFIG_BUILDER = uv tool run --from \
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
 
 build: target/debug/$(TARGET) ## Build debug binary
-release: target/release/$(TARGET) ## Build release binary
+release: ## Build the production release artefact with LLVM and the platform linker
+	$(PRODUCTION_ENV) $(CARGO) build $(BUILD_JOBS) --release
 
-all: check-fmt lint test ## Perform a comprehensive check of code
+package: ## Build and verify a publishable Cargo package with LLVM
+	$(PRODUCTION_ENV) $(CARGO) package --locked $(PACKAGE_FLAGS)
+
+all: ## Perform every commit gate sequentially, even with make -j
+	+$(MAKE) check-fmt
+	+$(MAKE) lint
+	+$(MAKE) test
 	+$(MAKE) spelling
 
 clean: ## Remove build artefacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
-test: ## Run tests with warnings treated as errors
+test: check-build-tools ## Run tests with warnings treated as errors
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
@@ -80,29 +96,55 @@ act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 		--platform "ubuntu-latest=$(ACT_RUNNER_IMAGE)" \
 		--workflows .github/workflows/ci.yml --job build-test
 
-target/%/$(TARGET): ## Build binary in debug or release mode
-	RUSTFLAGS="$(if $(findstring release,$(@)),$(RELEASE_RUST_FLAGS),$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS))" $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
+target/debug/$(TARGET): check-build-tools ## Build debug binary
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) build $(BUILD_JOBS)
 
-coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
+# Cargo packages the repository config and verifies with the dev profile. Both
+# profiles therefore select LLVM; the native linker override bypasses the
+# development wrapper even for release host/build-script units. An inherited
+# encoded flags value would outrank RUSTFLAGS, so remove it explicitly.
+PRODUCTION_ENV = env -u CARGO_ENCODED_RUSTFLAGS CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm CARGO_PROFILE_RELEASE_CODEGEN_BACKEND=llvm RUSTFLAGS="$(RELEASE_RUST_FLAGS)"
+
+coverage: check-coverage-tools ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
-	CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm \
-		CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
+	CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
+		CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm \
 		RUSTFLAGS="$(COVERAGE_RUST_FLAGS)" \
 		CFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(TEST_FLAGS)
 
-lint: ## Run Clippy with warnings denied
+lint: ## Run rustdoc, Clippy, then Whitaker sequentially
+	+$(MAKE) lint-clippy
+	+$(MAKE) lint-whitaker
+
+lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
-	@echo "Whitaker binary: $(WHITAKER)"
-	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
-typecheck: ## Type-check without building
+lint-whitaker: ## Run Whitaker without Cargo's inherited or development flags
+	@env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS -u CARGO_PROFILE_DEV_CODEGEN_BACKEND $(CHECK_BUILD_TOOLS)
+	@echo "Whitaker binary: $(WHITAKER)"
+	env -u CARGO_ENCODED_RUSTFLAGS PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="" CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm $(WHITAKER) --all -- $(CARGO_FLAGS)
+
+typecheck: check-build-tools ## Type-check without building
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
+install-build-tools: ## Install pinned mold and the repository toolchain
+	@scripts/install-build-tools.sh
+
+check-build-tools: ## Check pinned development build prerequisites
+	@case " $(CARGO_FLAGS) $(TEST_FLAGS) $(BUILD_JOBS) " in *" --target"*) \
+		echo "build-tools: --target is outside the supported native Make build" >&2; exit 1;; \
+	esac; $(CHECK_BUILD_TOOLS)
+
+check-coverage-tools: ## Check coverage linker prerequisites
+	@case " $(TEST_FLAGS) " in *" --target"*) \
+		echo "build-tools: --target is outside the supported native Make coverage" >&2; exit 1;; \
+	esac; $(CHECK_BUILD_TOOLS) --coverage
+
 fmt: ## Format Rust and Markdown sources
-	$(CARGO) +nightly fmt --all
+	$(CARGO) fmt --all
 	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 	$(MDLINT) --fix "**/*.md"
 

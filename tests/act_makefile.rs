@@ -72,6 +72,7 @@ impl MakeHarness {
             .arg(format!("ACT={}", self.directory_path.join("act")))
             .arg(format!("ACT_RUNNER_IMAGE={RUNNER_IMAGE}"))
             .arg(format!("ACT_GITHUB_TOKEN={ACT_TOKEN}"))
+            .arg("CHECK_BUILD_TOOLS=true")
             .current_dir(manifest_directory)
             .env(
                 "INVOCATION_LOG",

@@ -28,10 +28,10 @@ settings, and documented starter code. Library projects render `src/lib.rs`.
 Application projects render `src/main.rs`, `src/lib.rs`, release automation, and
 `[package.metadata.binstall]` metadata for binary installation.
 
-Development builds use Cranelift for debug code generation. On Linux targets,
-`.cargo/config.toml` configures clang to link with `mold` so local debug builds
-link quickly. Coverage generation uses `lld` instead because LLVM coverage
-tools expect LLVM-compatible linker behaviour.
+Development builds use Cranelift for debug code generation. On native x86_64
+GNU Linux, `.cargo/config.toml` routes Clang through the pinned `mold` linker
+so local debug builds link quickly. Coverage generation uses `lld` instead
+because LLVM coverage tools expect LLVM-compatible linker behaviour.
 
 ## Validation and Environment Policy
 
@@ -93,7 +93,8 @@ The generated `Makefile` exposes these public targets:
   falls back to `cargo test` otherwise. It denies warnings in normal tests and
   in the separate all-feature workspace doctest run.
 - `make build` builds the debug target.
-- `make release` builds the release target.
+- `make release` builds the production release artefact with LLVM.
+- `make package` creates and verifies a publishable Cargo archive with LLVM.
 - `make coverage` writes `lcov.info` using `cargo llvm-cov` and `lld`.
 - `make audit` derives the Rust workspace root with `cargo metadata` and runs
   `cargo audit` once from that root. In PR CI, Dependabot runs skip
@@ -115,13 +116,16 @@ The generated `Makefile` exposes these public targets:
   rest of the project.
 - `make nixie` validates Mermaid diagrams.
 
-Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
-full generated workflow locally on Linux.
+Install `clang`, `lld`, `python3`, and `cargo-audit` before running the full
+generated workflow locally on Linux. Run `make install-build-tools` to install
+the pinned `mold` linker and Rust toolchain, then `make check-build-tools` to
+verify them before building.
 
 Development builds, including `make build`, `make test`, `make lint`, and
 `make typecheck`, use the parallel `rustc` frontend (`-Zthreads=8`) and, on
-Linux, link with `mold`. `make release` and `make coverage` use their own flag
-sets and take neither.
+native x86_64 GNU Linux, link with `mold`. `make release`, `make package`, and
+`make coverage` use their own flag sets and take neither. Release and packaging
+select LLVM with the platform linker; coverage selects LLVM with `lld`.
 
 ## Scheduled Mutation Testing
 

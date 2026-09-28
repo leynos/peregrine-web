@@ -40,21 +40,26 @@ compatibility against pinned source behaviour before describing it as supported.
 
 ## Local Workflow
 
-Use `make all` as the public entrypoint for formatting, linting, and tests.
-`make lint` runs rustdoc, Clippy, and Whitaker. `make test` prefers
-`cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
-available. `make check-fmt` verifies Rust formatting with
-`cargo fmt --all -- --check` and Markdown formatting with `mdtablefix --check`,
-and `make fmt` formats Rust sources with nightly `rustfmt` and Markdown with
-`mdtablefix --in-place` followed by `markdownlint-cli2 --fix`. `make typecheck`
-type-checks without building via `cargo check`. `make audit` derives the Rust
-workspace root with `cargo metadata`, logs workspace member manifests, and runs
-`cargo audit` once from the workspace root. PR CI skips `make audit` and the
-audit-only setup when `github.actor` is `dependabot[bot]`; that keeps
-whole-lockfile advisories from blocking unrelated Dependabot PRs while human
-PRs retain the audit gate. The compensating control is
-`.github/workflows/audit.yml`, which runs weekly and can also be triggered
-manually. `make coverage` uses `cargo llvm-cov` with `lld`.
+Use `make all` as the public entrypoint for formatting, linting, tests, and
+spelling. It runs these gates one at a time even when invoked with `make -j`.
+`make lint` runs `lint-clippy` (rustdoc, then Clippy) before `lint-whitaker`,
+also under `make -j`. Whitaker clears inherited `RUSTFLAGS` and
+`CARGO_ENCODED_RUSTFLAGS`, and uses LLVM instead of the development backend;
+its Dylint compilation must not inherit the application's frontend or linker
+flags. `make test` prefers `cargo nextest run` and falls back to `cargo test`
+when cargo-nextest is not available. `make check-fmt` verifies Rust formatting
+with `cargo fmt --all -- --check` and Markdown formatting via
+`mdtablefix --check` using the configured selection and formatting rules.
+`make fmt` formats Rust with the pinned `rustfmt`, then applies the Markdown
+formatter and `markdownlint-cli2 --fix`. `make typecheck` type-checks without
+building via `cargo check`. `make audit` derives the Rust workspace root with
+`cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
+from the workspace root. PR CI skips `make audit` and the audit-only setup when
+`github.actor` is `dependabot[bot]`; that keeps whole-lockfile advisories from
+blocking unrelated Dependabot PRs while human PRs retain the audit gate. The
+compensating control is `.github/workflows/audit.yml`, which runs weekly and
+can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
+`lld`.
 
 GitHub Actions Act validation lives in `.github/workflows/act-validation.yml`.
 The main `.github/workflows/ci.yml` workflow deliberately does not run
@@ -104,22 +109,59 @@ publishes nothing until a dispatch from `main` or the next push.
 
 Development builds use Cranelift for debug code generation. Every `rustflags`
 source in `.cargo/config.toml` enables the parallel `rustc` frontend with
-`-Zthreads=8`, and on Linux targets it also configures clang to link with `mold`
-so debug builds link quickly. Cargo applies one `rustflags` source and an
+`-Zthreads=8`. On native x86_64 GNU Linux, Cargo selects
+`scripts/native-clang-linker.sh` and `-fuse-ld=mold`. The wrapper gives Clang
+`BUILD_TOOLS_PREFIX/bin` as its first linker search directory, so bare Cargo
+builds use the pinned `ld.mold` rather than a system copy. The wrapper refuses
+an absent, diverted, or wrong-version linker before a development link; it
+shares this verification with Make preflight through
+`scripts/build-tools-common.sh`. Cargo applies one `rustflags` source; an
 assigned `RUSTFLAGS` replaces them all, so the Makefile restates both flags in
-`DEV_RUST_FLAGS` for the targets that assign `RUSTFLAGS`, adding them to any
-`RUSTFLAGS` the recipe inherits (setup-rust exports one in CI); `mold` is added
-only when both the host and the compilation target (`CARGO_BUILD_TARGET`, when
-set) are Linux. `make release` assigns `RELEASE_RUST_FLAGS` (a bare
-`cargo build --release` still takes both flags, because Cargo does not select
-`rustflags` by profile) and coverage assigns its own, so neither takes the
-standard flags. `tests/build_standard_contract.rs` holds the configuration
-sources and those recipes to this. Coverage generation switches the dev profile
-back to LLVM and uses `lld` because LLVM coverage tooling expects
-LLVM-compatible code generation and linker behaviour.
+`DEV_RUST_FLAGS` for targets that assign `RUSTFLAGS`, appending them to any
+inherited caller flags (including setup-rust's CI value). Use `make release`
+for a production build and `make package` for a verified, publishable Cargo
+archive. Both commands assign `RELEASE_RUST_FLAGS`, select LLVM for the dev and
+release profiles, clear inherited encoded Rust flags, and select Clang directly
+on native x86_64 GNU Linux. The package includes `.cargo/config.toml`; its
+verification build therefore needs the same explicit production route. Direct
+`cargo build --release` and `cargo package` still inherit Cargo's development
+`rustflags` and are not production routes. Coverage assigns its own flags,
+selects LLVM for the dev profile, and uses `lld` because LLVM coverage tooling
+expects LLVM-compatible code generation and linker behaviour.
+`tests/build_standard_contract.rs` checks the configuration sources and recipes.
 
-Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
-full generated workflow locally on Linux.
+Run `make install-build-tools` after checking out the project. On native x86_64
+GNU Linux, it installs the pinned `mold` release and verifies its archive
+against `tools/mold/SHA256SUMS`, and installs the repository's pinned nightly
+with its required components, including rust-analyzer. On x86_64 GNU Linux,
+`make check-build-tools` asks Clang which `ld.mold` it will execute, checks its
+link plan and version against `tools/mold/VERSION`, and fails if Clang selects
+a different executable. It also checks that the nightly and every pinned
+component are installed. It checks clang for native Linux builds, and
+`make coverage` also checks clang and lld. Development Make targets run this
+check before Cargo. The Makefile exports `BUILD_TOOLS_PREFIX` (default
+`~/.local`) for the native Clang wrapper and prepends its `bin` directory to
+`PATH` for direct tools. The installer and checker belong to the root build
+workflow. Callers may use them directly or through Make targets. CI, Act,
+mutation testing, and the main coverage job install the tools before running
+tests. The measured coverage command and release build still use their separate
+linker flags. The supported mold configuration is native x86_64 GNU Linux;
+x86_64 Linux musl and cross-target builds do not select this route. Make
+preflight rejects cross targets and encoded Rust flags that could bypass the
+selected linker or flags. It also rejects a non-Cranelift development backend
+override; coverage explicitly selects LLVM after its coverage-specific
+preflight. An explicit native target linker must remain the repository's Clang
+wrapper so its search directory and the mold link argument apply together.
+
+The `mold` 2.41.0 version and x86_64 archive digest in `tools/mold/` come from
+the merged Netsuke build-standard follow-up
+`4af7b348aa09de5a25fbd2d4f9c396999baedbc8`. The installer downloads the release
+archive from `rui314/mold`, verifies the recorded digest, and fails if the
+download, checksum, unpack, or toolchain installation fails.
+
+Install `clang`, `lld`, `python3`, and `cargo-audit` before running the full
+generated workflow locally on Linux. `make install-build-tools` supplies the
+pinned `mold` and nightly toolchain.
 
 ## Spelling policy
 
