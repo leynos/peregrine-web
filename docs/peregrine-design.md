@@ -667,15 +667,15 @@ proposed.
 
 The core needs a narrow upgrade capability, not a message dispatcher. An
 explicit upgrade endpoint shares frozen route identity and admission policy,
-including the resolved Pachislot channel before commitment,
-while retaining a separate method contract: valid HTTP/1.1 GET handshake,
-non-upgrading OPTIONS, and no inherited automatic HEAD upgrade. The engine
-creates an owned, one-shot `UpgradePlan` only after policy and handshake
-validation. Its final outcome is mutually exclusive with an ordinary response.
-HTTP response hooks run before commitment; a hook failure or response
-replacement invalidates the pending plan. Only the finalizer emits the valid
-101 and protocol headers, with no response body. Hooks cannot rewrite required
-handshake fields; body transforms skip this outcome.
+including the resolved Pachislot channel before commitment, while retaining a
+separate method contract: valid HTTP/1.1 GET handshake, non-upgrading OPTIONS,
+and no inherited automatic HEAD upgrade. The engine creates an owned, one-shot
+`UpgradePlan` only after policy and handshake validation. Its final outcome is
+mutually exclusive with an ordinary response. HTTP response hooks run before
+commitment; a hook failure or response replacement invalidates the pending
+plan. Only the finalizer emits the valid 101 and protocol headers, with no
+response body. Hooks cannot rewrite required handshake fields; body transforms
+skip this outcome.
 
 The transport supervisor registers the pending hand-off and reserves session
 capacity before returning the handshake response. It activates Pachislot only

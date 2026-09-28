@@ -1,6 +1,7 @@
 # Peregrine Web – terms of reference
 
-- Status: draft v0.3, incorporating the supplied papers and extension requirements.
+- Status: draft v0.3, incorporating the supplied papers and extension
+  requirements.
 - Date: 2026-09-21.
 - Audience: project maintainers, prospective library users, and design
   reviewers.

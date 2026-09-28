@@ -333,10 +333,11 @@ configuration route separately for `RUSTFLAGS`, `RUSTDOCFLAGS`, editor checks,
 and each analyser; success in one does not establish the others. A clean
 consumer must also exercise deliberately omitted flags and record effective
 defaults. Omission may still compile on a particular nightly; do not assume
-failure. Disabling a mechanism needed by the source must produce a useful compiler
-diagnostic, with recovery instructions. A policy-only solver requirement may
-still compile when disabled; document its configuration check or unsupported
-status separately rather than promising automatic compiler rejection.
+failure. Disabling a mechanism needed by the source must produce a useful
+compiler diagnostic, with recovery instructions. A policy-only solver
+requirement may still compile when disabled; document its configuration check
+or unsupported status separately rather than promising automatic compiler
+rejection.
 
 Pin a last-known-good toolchain and preserve a reproducible consumer example.
 For a compiler regression, restore that toolchain or defer the upgrade; do not
