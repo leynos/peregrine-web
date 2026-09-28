@@ -13,9 +13,13 @@ git add -A
 make all
 ```
 
-The spelling gate enumerates its inputs with `git ls-files`, so `make all`,
-`make markdownlint` and `make spelling` have nothing to check until the project
-is a Git repository with its files staged.
+Each gate selects its Markdown differently. `make check-fmt` runs
+`mdtablefix --check --git --include-untracked`, which reads the tracked files
+and the untracked files Git does not ignore, so it needs a Git repository but
+not staged files. `make markdownlint` runs `markdownlint-cli2 '**/*.md'` over
+every matching file, staged or not, and then runs `make spelling`. The spelling
+gate enumerates its inputs with `git ls-files`, so it checks only files Git
+already tracks: stage new Markdown before relying on it.
 
 ## Generated Tooling
 
@@ -79,7 +83,8 @@ doctest therefore fails the command.
 The generated `Makefile` exposes these public targets:
 
 - `make all` runs formatting checks, linting, tests, and spelling checks.
-- `make check-fmt` verifies Rust formatting.
+- `make check-fmt` verifies Rust formatting and, with
+  `mdtablefix --check --git --include-untracked`, Markdown formatting.
 - `make fmt` formats Rust and Markdown sources.
 - `make lint` builds documentation, then runs Clippy and Whitaker, with every
   warning denied.
@@ -103,9 +108,11 @@ The generated `Makefile` exposes these public targets:
   `typos.toml` from the live shared dictionary and the `typos.local.toml`
   overlay, then checks Markdown prose, so `typos.toml` is never drift checked
   in CI. The gate enumerates its inputs with `git ls-files`, so the project
-  must be a Git repository with its files staged; `make spelling` fails with
-  that instruction when it is not. The first run writes `typos.toml`, which is
-  generated but tracked output: commit it alongside the rest of the project.
+  must be a Git repository in which Git already tracks some files;
+  `make spelling` fails with that instruction when `git ls-files` lists
+  nothing, and checks only the files Git tracks. The first run writes
+  `typos.toml`, which is generated but tracked output: commit it alongside the
+  rest of the project.
 - `make nixie` validates Mermaid diagrams.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
