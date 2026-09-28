@@ -29,7 +29,11 @@ RUST_FLAGS := -D warnings $(RUST_FLAGS)
 # and coverage builds on LLVM because `-Cinstrument-coverage` is LLVM-only.
 DEV_THREADS_FLAGS ?= -Zthreads=8
 BUILD_HOST_OS := $(shell uname -s)
-DEV_LINKER_FLAGS ?= $(if $(filter Linux,$(BUILD_HOST_OS)),-C link-arg=-fuse-ld=mold)
+# mold only when the machine doing the build is Linux (only Make can tell
+# whether it has mold) and so is the compilation target, which is the host
+# unless `CARGO_BUILD_TARGET` names another triple.
+DEV_TARGET_IS_LINUX = $(if $(CARGO_BUILD_TARGET),$(findstring -linux-,$(CARGO_BUILD_TARGET)),yes)
+DEV_LINKER_FLAGS ?= $(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(DEV_TARGET_IS_LINUX),-C link-arg=-fuse-ld=mold))
 DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_THREADS_FLAGS) $(DEV_LINKER_FLAGS)
 RELEASE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS)
 RUSTDOC_FLAGS ?=
