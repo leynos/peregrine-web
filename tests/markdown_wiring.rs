@@ -44,11 +44,15 @@ fn assignment(line: &str) -> Option<(&str, &str)> {
     is_name.then_some((name, value.trim()))
 }
 
+/// The text of a Makefile, read line by line.
+#[derive(Clone, Copy)]
+struct Makefile<'a>(&'a str);
+
 /// Returns each variable assigned exactly once, so a reference to anything
 /// else stays unexpanded.
-fn variables(makefile: &str) -> BTreeMap<&str, &str> {
+fn variables(makefile: Makefile<'_>) -> BTreeMap<&str, &str> {
     let mut seen: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-    for (name, value) in makefile.lines().filter_map(assignment) {
+    for (name, value) in makefile.0.lines().filter_map(assignment) {
         seen.entry(name).or_default().push(value);
     }
     seen.into_iter()
@@ -71,8 +75,9 @@ fn expand(text: &str, known: &BTreeMap<&str, &str>) -> String {
 }
 
 /// Returns the recipe lines of the `check-fmt` rule.
-fn check_fmt_recipes(makefile: &str) -> Vec<&str> {
+fn check_fmt_recipes(makefile: Makefile<'_>) -> Vec<&str> {
     makefile
+        .0
         .lines()
         .skip_while(|line| !line.starts_with("check-fmt:"))
         .skip(1)
@@ -101,69 +106,80 @@ fn recipe_runs_check(recipe: &str, known: &BTreeMap<&str, &str>) -> bool {
 }
 
 /// Returns whether the Makefile's `check-fmt` rule runs the mdtablefix check.
-fn runs_mdtablefix_check(makefile: &str) -> bool {
+fn runs_mdtablefix_check(makefile: Makefile<'_>) -> bool {
     let known = variables(makefile);
     check_fmt_recipes(makefile)
         .into_iter()
         .any(|recipe| recipe_runs_check(recipe, &known))
 }
 
-/// Returns the steps of every job in a workflow, keyed by job name.
-fn job_steps(workflow: &str) -> Result<Vec<(String, Vec<Value>)>, serde_yaml::Error> {
-    let parsed: Value = serde_yaml::from_str(workflow)?;
-    let jobs = parsed.get("jobs").and_then(Value::as_mapping).cloned();
-    Ok(jobs
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(name, job)| {
-            let steps = job.get("steps").and_then(Value::as_sequence).cloned();
-            (
-                name.as_str().unwrap_or_default().to_owned(),
-                steps.unwrap_or_default(),
-            )
-        })
-        .collect())
+/// A decoded workflow: each job's name with its steps, in file order.
+struct Workflow {
+    /// The jobs, as `(name, steps)`.
+    jobs: Vec<(String, Vec<Value>)>,
 }
 
-/// Returns a step's text field, or the empty string.
-fn field<'a>(step: &'a Value, key: &str) -> &'a str {
-    step.get(key).and_then(Value::as_str).unwrap_or_default()
+impl Workflow {
+    /// Decodes workflow YAML, keeping only what the contract reads.
+    fn parse(text: &str) -> Result<Self, serde_yaml::Error> {
+        let parsed: Value = serde_yaml::from_str(text)?;
+        let mapping = parsed.get("jobs").and_then(Value::as_mapping).cloned();
+        let jobs = mapping
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(name, job)| {
+                let steps = job.get("steps").and_then(Value::as_sequence).cloned();
+                (
+                    name.as_str().unwrap_or_default().to_owned(),
+                    steps.unwrap_or_default(),
+                )
+            })
+            .collect();
+        Ok(Self { jobs })
+    }
 }
+
+/// Returns a step's `uses:` reference, or the empty string.
+fn uses(step: &Value) -> &str { step.get("uses").and_then(Value::as_str).unwrap_or_default() }
+
+/// Returns a step's `run:` script, or the empty string.
+fn run(step: &Value) -> &str { step.get("run").and_then(Value::as_str).unwrap_or_default() }
 
 /// Returns whether a step's `run:` has a line that is exactly `make check-fmt`.
 fn runs_check_fmt(step: &Value) -> bool {
-    field(step, "run")
+    run(step)
         .lines()
         .any(|line| line.trim() == "make check-fmt")
 }
 
 /// Returns each job that runs `make check-fmt` before installing mdtablefix.
-fn uninstalled_check_fmt(workflow: &str) -> Result<Vec<String>, serde_yaml::Error> {
+fn uninstalled_check_fmt(workflow: &Workflow) -> Vec<String> {
     let mut missing = Vec::new();
-    for (name, steps) in job_steps(workflow)? {
+    for (name, steps) in &workflow.jobs {
         let installed_before = |index: usize| {
             steps
                 .iter()
                 .take(index)
-                .any(|step| field(step, "uses").starts_with(INSTALL_ACTION))
+                .any(|step| uses(step).starts_with(INSTALL_ACTION))
         };
         let uninstalled = steps
             .iter()
             .enumerate()
             .any(|(index, step)| runs_check_fmt(step) && !installed_before(index));
         if uninstalled {
-            missing.push(name);
+            missing.push(name.clone());
         }
     }
-    Ok(missing)
+    missing
 }
 
 /// Returns `(action steps, steps not linting **/*.md)` in a workflow.
-fn lint_action_globs(workflow: &str) -> Result<(usize, usize), serde_yaml::Error> {
-    let steps: Vec<Value> = job_steps(workflow)?
-        .into_iter()
+fn lint_action_globs(workflow: &Workflow) -> (usize, usize) {
+    let steps: Vec<&Value> = workflow
+        .jobs
+        .iter()
         .flat_map(|(_, steps)| steps)
-        .filter(|step| field(step, "uses").starts_with(LINT_ACTION))
+        .filter(|step| uses(step).starts_with(LINT_ACTION))
         .collect();
     let narrowed = steps
         .iter()
@@ -172,7 +188,7 @@ fn lint_action_globs(workflow: &str) -> Result<(usize, usize), serde_yaml::Error
             globs.and_then(Value::as_str) != Some("**/*.md")
         })
         .count();
-    Ok((steps.len(), narrowed))
+    (steps.len(), narrowed)
 }
 
 /// Returns a minimal Makefile whose `check-fmt` runs one recipe line.
@@ -183,15 +199,16 @@ fn makefile(recipe: &str, variables: &str) -> String {
 /// The repository's `check-fmt` runs the mdtablefix check with its status.
 #[test]
 fn the_repository_makefile_runs_the_check() {
-    assert!(runs_mdtablefix_check(MAKEFILE));
+    assert!(runs_mdtablefix_check(Makefile(MAKEFILE)));
 }
 
 /// CI installs mdtablefix before `make check-fmt` and lints all Markdown.
 #[test]
 fn the_repository_workflows_install_and_lint() {
-    let uninstalled = uninstalled_check_fmt(CI_WORKFLOW).expect("the CI workflow parses");
+    let workflow = Workflow::parse(CI_WORKFLOW).expect("the CI workflow parses");
+    let uninstalled = uninstalled_check_fmt(&workflow);
     assert_eq!(uninstalled, Vec::<String>::new());
-    let (steps, narrowed) = lint_action_globs(CI_WORKFLOW).expect("the CI workflow parses");
+    let (steps, narrowed) = lint_action_globs(&workflow);
     assert!(steps > 0, "no step runs the markdownlint-cli2-action");
     assert_eq!(
         narrowed, 0,
@@ -212,7 +229,7 @@ fn a_weakened_check_is_refused() {
     ];
     for recipe in weakened {
         assert!(
-            !runs_mdtablefix_check(&makefile(recipe, VARIABLES)),
+            !runs_mdtablefix_check(Makefile(&makefile(recipe, VARIABLES))),
             "accepted: {recipe}"
         );
     }
@@ -239,7 +256,7 @@ fn a_legitimate_check_is_accepted() {
     ];
     for (recipe, variables) in legitimate {
         assert!(
-            runs_mdtablefix_check(&makefile(recipe, variables)),
+            runs_mdtablefix_check(Makefile(&makefile(recipe, variables))),
             "refused: {recipe}"
         );
     }
@@ -248,23 +265,25 @@ fn a_legitimate_check_is_accepted() {
 /// An install step after `make check-fmt` does not provision it.
 #[test]
 fn an_install_after_check_fmt_is_refused() {
-    let workflow = concat!(
+    let text = concat!(
         "jobs:\n  build-test:\n    steps:\n",
         "      - run: make check-fmt\n",
         "      - uses: leynos/shared-actions/.github/actions/install-mdtablefix@abc\n",
     );
-    let uninstalled = uninstalled_check_fmt(workflow).expect("the fixture parses");
+    let workflow = Workflow::parse(text).expect("the fixture parses");
+    let uninstalled = uninstalled_check_fmt(&workflow);
     assert_eq!(uninstalled, vec!["build-test".to_owned()]);
 }
 
 /// A lint step over a narrower glob is counted as narrowed.
 #[test]
 fn narrowed_lint_globs_are_refused() {
-    let workflow = concat!(
+    let text = concat!(
         "jobs:\n  lint:\n    steps:\n",
         "      - uses: DavidAnson/markdownlint-cli2-action@abc\n",
         "        with:\n          globs: 'docs/**/*.md'\n",
     );
-    let counts = lint_action_globs(workflow).expect("the fixture parses");
+    let workflow = Workflow::parse(text).expect("the fixture parses");
+    let counts = lint_action_globs(&workflow);
     assert_eq!(counts, (1, 1));
 }
