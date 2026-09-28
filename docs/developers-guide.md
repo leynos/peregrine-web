@@ -195,6 +195,11 @@ Markdown follows the estate's `markdown-formatting-baseline` rule.
 - CI installs mdtablefix 0.6.0 with the shared `install-mdtablefix` action
   before `make check-fmt`, and lints Markdown with
   `DavidAnson/markdownlint-cli2-action` over `**/*.md`.
+- `tests/markdown_wiring.rs` holds that wiring by contract: `check-fmt` must
+  run `mdtablefix --check --git --include-untracked` with its exit status
+  reaching Make, the CI job must install mdtablefix before `make check-fmt`,
+  and every lint action step must lint `**/*.md`. Each clause is also tested
+  against weakened and equivalent fixtures.
 
 Install mdtablefix 0.6.0 or later locally with
 `cargo binstall --no-confirm mdtablefix@0.6.0`, or
