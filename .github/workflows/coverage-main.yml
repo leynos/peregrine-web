@@ -46,19 +46,21 @@ jobs:
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
         with:
-          rustflags: -D warnings
+          rustflags: ''
       - name: Log Rust compiler configuration
         run: |-
           rustc --version
           printf 'Base RUSTFLAGS: %s\n' "$RUSTFLAGS"
-      - name: Install mold linker
+      - name: Install linker prerequisites
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          # mold accelerates dev builds; coverage uses lld for llvm-tools compatibility.
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the build standard
+        # Coverage excludes mold, but its test suite reaches Make targets that check it.
+        run: make install-build-tools
       - name: Install test runner
         env:
           RUSTFLAGS: ""
@@ -72,6 +74,7 @@ jobs:
       - name: Test and Measure Coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         env:
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
           RUSTFLAGS: -D warnings -C link-arg=-fuse-ld=lld
           CFLAGS: -fuse-ld=lld
@@ -101,4 +104,3 @@ jobs:
           format: lcov
           mode: upload
           access-token: ${{ secrets.CS_ACCESS_TOKEN }}
-

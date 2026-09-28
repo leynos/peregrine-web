@@ -22,19 +22,23 @@ jobs:
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
         with:
-          rustflags: -D warnings
+          # An empty input leaves Cargo's configured development flags active.
+          # Make gates still assign their own warning and build-standard flags.
+          rustflags: ''
       - name: Log Rust compiler configuration
         run: |-
           rustc --version
           printf 'Base RUSTFLAGS: %s\n' "$RUSTFLAGS"
-      - name: Install mold linker
+      - name: Install linker prerequisites
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          # mold accelerates dev builds; coverage uses lld for llvm-tools compatibility.
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the build standard
+        # The pinned toolchain and mold must precede every local suite route.
+        run: make install-build-tools
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
@@ -109,6 +113,7 @@ jobs:
         if: env.ACT != 'true'
         uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         env:
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
           RUSTFLAGS: -D warnings -C link-arg=-fuse-ld=lld
           CFLAGS: -fuse-ld=lld
@@ -120,3 +125,7 @@ jobs:
           # The publisher in coverage-main.yml owns the coverage artefact and
           # the ratchet baseline; this lane only compares against it.
           publish-artefact: 'false'
+      - name: Test under Act
+        # Hosted coverage is skipped under Act, so execute the ordinary suite.
+        if: env.ACT == 'true'
+        run: make test

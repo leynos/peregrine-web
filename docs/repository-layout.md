@@ -31,8 +31,17 @@ compact and omits build output such as `target/`.
 
 │   └── lib.rs
 
+├── scripts/
+│   ├── build-tools-common.sh
+│   ├── check-build-tools.sh
+│   ├── install-build-tools.sh
+│   └── native-clang-linker.sh
 ├── tests/
 │   └── stub.rs
+├── tools/
+│   └── mold/
+│       ├── SHA256SUMS
+│       └── VERSION
 ├── AGENTS.md
 ├── Cargo.toml
 ├── LICENSE
@@ -79,11 +88,17 @@ compact and omits build output such as `target/`.
 
 - `src/lib.rs`: Contains the library crate root and exported public API
   surface.
+- `scripts/build-tools-*.sh`, `scripts/check-build-tools.sh`, and
+  `scripts/install-build-tools.sh`: Resolve the pinned build tools and provide
+  the install and prerequisite checks used by the Makefile.
+- `scripts/native-clang-linker.sh`: Gives Clang the pinned mold directory before
+  its system linker search path for native x86_64 GNU Linux Cargo builds.
 
 - `tests/`: Holds integration and behavioural tests that exercise public
   behaviour.
 - `tests/stub.rs`: Keeps the generated test directory valid until real tests
   replace it.
+- `tools/mold/`: Pins the supported mold release and archive checksums.
 - `AGENTS.md`: Provides repository-specific working instructions for agents and
   contributors.
 - `Cargo.toml`: Defines package metadata, dependencies, lint policy, and Cargo
