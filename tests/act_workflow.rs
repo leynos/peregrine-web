@@ -27,7 +27,16 @@ struct Step {
     #[serde(rename = "if")]
     condition: Option<String>,
     run: Option<String>,
+    uses: Option<String>,
+    #[serde(default)]
+    with: BTreeMap<String, serde_yaml::Value>,
 }
+
+const MDTABLEFIX_ACTION: &str = "leynos/shared-actions/.github/actions/install-mdtablefix@\
+                                 4fb8eb7ad52454678a0662865d81d3cd17aa6e0e";
+const UNPINNED_MDTABLEFIX_ACTION: &str =
+    "leynos/shared-actions/.github/actions/install-mdtablefix@main";
+const MDTABLEFIX_VERSION: &str = "0.6.0";
 
 /// The ACT values relevant to hosted coverage and its local test fallback.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,7 +46,7 @@ enum ActValue {
     Unset,
 }
 
-/// Verifies the committed workflow installs the host linker before Act.
+/// Verifies the committed workflow installs the prerequisites before Act.
 #[test]
 fn installs_linker_prerequisites_before_act_validation() {
     let workflow = parse_workflow();
@@ -46,6 +55,10 @@ fn installs_linker_prerequisites_before_act_validation() {
         workflow_has_linker_prerequisites_before_act_validation(&workflow),
         "an executable sudo apt-get install command for clang and mold must run before make test \
          WITH_ACT=1"
+    );
+    assert!(
+        workflow_has_mdtablefix_before_act_validation(&workflow),
+        "the pinned mdtablefix action must install version 0.6.0 before make test WITH_ACT=1"
     );
 }
 
@@ -60,6 +73,42 @@ fn rejects_workflow_without_linker_bootstrap() {
         !workflow_has_linker_prerequisites_before_act_validation(&workflow),
         "a workflow without a preceding linker installation must fail the contract"
     );
+}
+
+/// Rejects missing, unpinned, or misordered formatter installation.
+#[test]
+fn rejects_invalid_mdtablefix_provisioning() {
+    let fixtures = [
+        ("missing installation", None, MDTABLEFIX_VERSION, true),
+        (
+            "wrong action revision",
+            Some(UNPINNED_MDTABLEFIX_ACTION),
+            MDTABLEFIX_VERSION,
+            true,
+        ),
+        (
+            "wrong binary version",
+            Some(MDTABLEFIX_ACTION),
+            "0.5.0",
+            true,
+        ),
+        (
+            "installation after tests",
+            Some(MDTABLEFIX_ACTION),
+            MDTABLEFIX_VERSION,
+            false,
+        ),
+    ];
+
+    for (reason, action, version, installs_before_test) in fixtures {
+        let fixture = mdtablefix_workflow_fixture(action, version, installs_before_test);
+        assert!(
+            !workflow_has_mdtablefix_before_act_validation(&parse_workflow_source(WorkflowSource(
+                &fixture
+            ))),
+            "the workflow contract must reject {reason}"
+        );
+    }
 }
 
 /// Rejects ambiguous YAML workflow mappings.
@@ -257,6 +306,42 @@ fn workflow_has_linker_prerequisites_before_act_validation(workflow: &Workflow) 
         .iter()
         .filter_map(|step| step.run.as_deref())
         .any(script_installs_linker_prerequisites)
+}
+
+/// Determines whether the exact formatter action and binary precede the Act test.
+fn workflow_has_mdtablefix_before_act_validation(workflow: &Workflow) -> bool {
+    let Some(act_job) = workflow.jobs.get("act-validation") else {
+        return false;
+    };
+    let Some(act_test_step) = act_job.steps.iter().position(step_runs_act_tests) else {
+        return false;
+    };
+
+    act_job.steps.get(..act_test_step).is_some_and(|steps| {
+        steps.iter().any(|step| {
+            step.uses.as_deref() == Some(MDTABLEFIX_ACTION)
+                && step.with.get("version").and_then(serde_yaml::Value::as_str)
+                    == Some(MDTABLEFIX_VERSION)
+        })
+    })
+}
+
+fn mdtablefix_workflow_fixture(
+    action: Option<&str>,
+    version: &str,
+    installs_before_test: bool,
+) -> String {
+    let install = action.map_or_else(String::new, |action_ref| {
+        format!("      - uses: {action_ref}\n        with:\n          version: '{version}'\n")
+    });
+    let test = "      - run: make test WITH_ACT=1\n";
+    let (first_step, second_step) = if installs_before_test {
+        (install.as_str(), test)
+    } else {
+        (test, install.as_str())
+    };
+
+    format!("jobs:\n  act-validation:\n    steps:\n{first_step}{second_step}")
 }
 
 /// Identifies the outer Act test command.
