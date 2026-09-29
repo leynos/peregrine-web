@@ -105,10 +105,10 @@ Doctests reside within documentation comments. Rust recognizes two types:
   `lib.rs` or `mod.rs` to provide crate- or module-level documentation.[^6]
 
 Within these comments, a code block is denoted by triple back-ticks. While
-`rustdoc` defaults to Rust syntax, explicitly add the `rust` language
-specifier for clarity.[^2] A doctest "passes" when it compiles and runs
-without panicking. To assert specific outcomes, use the standard macros
-`assert!`, `assert_eq!`, and `assert_ne!`.[^2]
+`rustdoc` defaults to Rust syntax, explicitly add the `rust` language specifier
+for clarity.[^2] A doctest "passes" when it compiles and runs without
+panicking. To assert specific outcomes, use the standard macros `assert!`,
+`assert_eq!`, and `assert_ne!`.[^2]
 
 ### 2.2 The Philosophy of a Good Example
 
@@ -310,8 +310,8 @@ any pollution of the final binary or the public API.
 
 The typical implementation pattern is to create a public helper module within
 the library. The doctest must refer to it via the crate name (here `mycrate`,
-standing for the reader's own crate), never via `crate::`, because the
-doctest compiles as its own separate crate:
+standing for the reader's own crate), never via `crate::`, because the doctest
+compiles as its own separate crate:
 
 ```rust
 // In lib.rs or a submodule
@@ -401,20 +401,19 @@ builds.[^12]
 pub struct UnixSocket;
 ```
 
-This `any` directive ensures the struct is compiled either when the `unix`
-cfg is set OR when `rustdoc` is running. This correctly makes the item
-visible in the generated HTML. However, it is crucial to understand that
-this **does not** make the doctest for `UnixSocket` pass on non-Unix
-platforms.
+This `any` directive ensures the struct is compiled either when the `unix` cfg
+is set OR when `rustdoc` is running. This correctly makes the item visible in
+the generated HTML. However, it is crucial to understand that this **does not**
+make the doctest for `UnixSocket` pass on non-Unix platforms.
 
 This distinction highlights the "cfg duality." The `#[cfg(doc)]` attribute
 controls the *table of contents* of the documentation; it determines which
 items are parsed and rendered. The actual compilation of a doctest, however,
 happens in a separate, later stage. In that stage, the `doc` cfg is *not*
 passed to the compiler.[^12] The compiler only sees the host cfg (e.g., the
-absence of `unix` on Windows), so the `UnixSocket` type is not available,
-and the test fails to compile. `#[cfg(doc)]` affects what is documented, not
-what is testable.
+absence of `unix` on Windows), so the `UnixSocket` type is not available, and
+the test fails to compile. `#[cfg(doc)]` affects what is documented, not what
+is testable.
 
 ### 5.2 Executing Doctests Conditionally: Feature Flags
 
@@ -476,8 +475,8 @@ To complement conditional execution, Rust provides a way to visually flag
 feature-gated items in the generated documentation. This is achieved with the
 `#[doc(cfg(...))]` attribute, which requires enabling the
 `#![feature(doc_cfg)]` feature gate at the crate root. Both the attribute and
-the feature gate are nightly-only; the example below does not compile on
-stable Rust, and it does not compile under this repository's default
+the feature gate are nightly-only; the example below does not compile on stable
+Rust, and it does not compile under this repository's default
 `RUST_CHANNEL=stable`. It is retained here purely as a reference for projects
 that build their documentation on nightly (for example, via `docs.rs`, which
 runs nightly `rustdoc`).
@@ -633,8 +632,7 @@ mastering doctests:
    <https://swatinem.de/blog/fix-rustdoc/>
 
 [^4]: How to organise your Rust tests - LogRocket Blog, accessed on
-   July 15, 2025:
-   <https://blog.logrocket.com/how-to-organize-rust-tests/>
+   July 15, 2025: <https://blog.logrocket.com/how-to-organize-rust-tests/>
 
 [^5]: Writing Rust Documentation - DEV Community, accessed on July 15, 2025:
    <https://dev.to/gritmax/writing-rust-documentation-5hn5>
@@ -662,14 +660,13 @@ mastering doctests:
    <https://docs.rs/quote-doctest>
 
 [^12]: Advanced features - The rustdoc book - Rust Documentation, accessed
-   on July 15, 2025:
-   <https://doc.rust-lang.org/rustdoc/advanced-features.html>
+   on July 15, 2025: <https://doc.rust-lang.org/rustdoc/advanced-features.html>
 
 [^13]: rust - How can I conditionally execute a module-level doctest based
    on a feature flag, accessed on July 15, 2025:
    <https://stackoverflow.com/questions/50312190/how-can-i-conditionally-execute-a-module-level-doctest-based-on-a-feature-flag>;
-   How would one achieve conditional compilation with Rust projects that
-   have doctests, accessed on July 15, 2025:
+   How would one achieve conditional compilation with Rust projects that have
+   doctests, accessed on July 15, 2025:
    <https://stackoverflow.com/questions/38292741/how-would-one-achieve-conditional-compilation-with-rust-projects-that-have-doctests>
 
 [^14]: Best practice for doc testing README - help - The Rust Programming
