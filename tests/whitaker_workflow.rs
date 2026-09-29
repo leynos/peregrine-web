@@ -48,55 +48,84 @@ fn check_installer(source: &str) -> Result<(), String> {
         .get("jobs")
         .and_then(|jobs| jobs.get("build-test"))
         .ok_or("build-test job is missing")?;
+    check_job_versions(job)?;
+    let steps = job
+        .get("steps")
+        .and_then(Value::as_sequence)
+        .ok_or("build-test steps are missing")?;
+    check_steps(steps)
+}
+
+fn check_job_versions(job: &Value) -> Result<(), String> {
     if job.get("env").is_some_and(|env| {
         env.get("WHITAKER_INSTALLER_VERSION").is_some()
             || env.get("WHITAKER_SUITE_VERSION").is_some()
     }) {
         return Err("job overrides the shared Whitaker versions".into());
     }
-    let steps = job
-        .get("steps")
-        .and_then(Value::as_sequence)
-        .ok_or("build-test steps are missing")?;
+    Ok(())
+}
 
+fn check_steps(steps: &[Value]) -> Result<(), String> {
     let mut installer = None;
     let mut lint = None;
     for (index, step) in steps.iter().enumerate() {
-        let uses = step.get("uses").and_then(Value::as_str);
-        let run = step.get("run").and_then(Value::as_str).unwrap_or("");
-        if uses.is_some_and(|action| action.contains("install-whitaker")) {
-            check_install_step(step)?;
-            if installer.replace(index).is_some() {
-                return Err("more than one Whitaker installer".into());
-            }
-        }
-        if run.trim() == "make lint" {
-            if lint.replace(index).is_some() {
-                return Err("more than one CI lint gate".into());
-            }
-            if step.get("if").is_some() || step.get("continue-on-error").is_some() {
-                return Err("CI lint gate can be skipped or softened".into());
-            }
-        }
-        let cargo_installer = ["cargo binstall", "whitaker"]
-            .into_iter()
-            .all(|part| run.contains(part));
-        if run.contains("whitaker-installer") || cargo_installer {
-            return Err("direct Whitaker installation bypasses the shared action".into());
-        }
-        if uses.is_some_and(|action| action.contains("actions/cache"))
-            && step
-                .get("name")
-                .and_then(Value::as_str)
-                .is_some_and(|name| name.contains("Whitaker"))
-        {
-            return Err("a separate Whitaker cache bypasses action ownership".into());
-        }
+        record_installer(step, index, &mut installer)?;
+        record_lint(step, index, &mut lint)?;
+        check_no_bypass(step)?;
     }
     match (installer, lint) {
         (Some(install), Some(gate)) if install < gate => Ok(()),
         _ => Err("Whitaker action must precede the binding lint gate".into()),
     }
+}
+
+fn record_installer(
+    step: &Value,
+    index: usize,
+    installer: &mut Option<usize>,
+) -> Result<(), String> {
+    let uses = step.get("uses").and_then(Value::as_str);
+    if uses.is_some_and(|action| action.contains("install-whitaker")) {
+        check_install_step(step)?;
+        if installer.replace(index).is_some() {
+            return Err("more than one Whitaker installer".into());
+        }
+    }
+    Ok(())
+}
+
+fn record_lint(step: &Value, index: usize, lint: &mut Option<usize>) -> Result<(), String> {
+    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
+    if run.trim() == "make lint" {
+        if lint.replace(index).is_some() {
+            return Err("more than one CI lint gate".into());
+        }
+        if step.get("if").is_some() || step.get("continue-on-error").is_some() {
+            return Err("CI lint gate can be skipped or softened".into());
+        }
+    }
+    Ok(())
+}
+
+fn check_no_bypass(step: &Value) -> Result<(), String> {
+    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
+    let cargo_installer = ["cargo binstall", "whitaker"]
+        .into_iter()
+        .all(|part| run.contains(part));
+    if run.contains("whitaker-installer") || cargo_installer {
+        return Err("direct Whitaker installation bypasses the shared action".into());
+    }
+    let uses = step.get("uses").and_then(Value::as_str);
+    if uses.is_some_and(|action| action.contains("actions/cache"))
+        && step
+            .get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.contains("Whitaker"))
+    {
+        return Err("a separate Whitaker cache bypasses action ownership".into());
+    }
+    Ok(())
 }
 
 #[test]
