@@ -145,13 +145,13 @@ check before Cargo. The Makefile exports `BUILD_TOOLS_PREFIX` (default
 workflow. Callers may use them directly or through Make targets. CI, Act,
 mutation testing, and the main coverage job install the tools before running
 tests. The measured coverage command and release build still use their separate
-linker flags. The supported mold configuration is native x86_64 GNU Linux;
+linker flags. The supported `mold` configuration is native x86_64 GNU Linux;
 x86_64 Linux musl and cross-target builds do not select this route. Make
 preflight rejects cross targets and encoded Rust flags that could bypass the
 selected linker or flags. It also rejects a non-Cranelift development backend
 override; coverage explicitly selects LLVM after its coverage-specific
 preflight. An explicit native target linker must remain the repository's Clang
-wrapper so its search directory and the mold link argument apply together.
+wrapper so its search directory and the `mold` link argument apply together.
 
 The `mold` 2.41.0 version and x86_64 archive digest in `tools/mold/` come from
 the merged Netsuke build-standard follow-up
