@@ -243,40 +243,54 @@ fn make_rustflags(target: &str, host: Host, inherited: Option<&str>) -> Read<Vec
     Ok(commands)
 }
 
+/// Returns the problems in one assigned `RUSTFLAGS` value for a target: a
+/// dropped frontend flag, mold on the wrong host, or a dropped caller value.
+fn flag_problems(target: &str, host: Host, inherited: Option<&str>, flags: &Flags) -> Vec<String> {
+    let checks = [
+        (
+            !flags.names(THREADS_FLAG),
+            format!("`make {target}` on {host:?} drops {THREADS_FLAG}: {flags:?}"),
+        ),
+        (
+            flags.names(MOLD_FLAG) != host.expects_mold(),
+            format!("`make {target}` on {host:?} gets mold wrong: {flags:?}"),
+        ),
+        (
+            inherited.is_some_and(|caller| !flags.carries_run(caller)),
+            format!("`make {target}` drops the caller's RUSTFLAGS: {flags:?}"),
+        ),
+    ];
+    checks
+        .into_iter()
+        .filter_map(|(is_violated, problem)| is_violated.then_some(problem))
+        .collect()
+}
+
+/// Returns the problems in one development target's commands on one host.
+fn target_problems(target: &str, host: Host, inherited: Option<&str>) -> Read<Vec<String>> {
+    let commands = make_rustflags(target, host, inherited)?;
+    let takes_only_callers = inherited.is_some() && commands.iter().any(Option::is_none);
+    let unassigned = takes_only_callers
+        .then(|| format!("`make {target}` runs a command that takes only the caller's RUSTFLAGS"));
+    // An empty assignment is `Some(Flags(vec![]))` and is checked like any other.
+    let assigned = commands
+        .into_iter()
+        .flatten()
+        .flat_map(|flags| flag_problems(target, host, inherited, &flags));
+    Ok(unassigned.into_iter().chain(assigned).collect())
+}
+
 /// Checks every development target on one host: an assigned `RUSTFLAGS`
 /// carries the frontend flag, carries mold exactly when the host and target
 /// are Linux, and keeps an inherited `RUSTFLAGS`. Under an inherited
 /// `RUSTFLAGS` every command must assign, because the caller's value displaces
 /// the configuration's sources; setup-rust exports one in CI.
 fn check_development_targets(host: Host, inherited: Option<&str>) -> Read<Vec<String>> {
-    let mut problems = Vec::new();
-    for target in DEVELOPMENT_TARGETS {
-        let commands = make_rustflags(target, host, inherited)?;
-        if inherited.is_some() && commands.iter().any(Option::is_none) {
-            problems.push(format!(
-                "`make {target}` runs a command that takes only the caller's RUSTFLAGS"
-            ));
-        }
-        // An empty assignment is `Some(Flags(vec![]))` and is checked like any other.
-        for flags in commands.into_iter().flatten() {
-            if !flags.names(THREADS_FLAG) {
-                problems.push(format!(
-                    "`make {target}` on {host:?} drops {THREADS_FLAG}: {flags:?}"
-                ));
-            }
-            if flags.names(MOLD_FLAG) != host.expects_mold() {
-                problems.push(format!(
-                    "`make {target}` on {host:?} gets mold wrong: {flags:?}"
-                ));
-            }
-            if inherited.is_some_and(|caller| !flags.carries_run(caller)) {
-                problems.push(format!(
-                    "`make {target}` drops the caller's RUSTFLAGS: {flags:?}"
-                ));
-            }
-        }
-    }
-    Ok(problems)
+    let per_target = DEVELOPMENT_TARGETS
+        .iter()
+        .map(|target| target_problems(target, host, inherited))
+        .collect::<Read<Vec<_>>>()?;
+    Ok(per_target.into_iter().flatten().collect())
 }
 
 #[test]
