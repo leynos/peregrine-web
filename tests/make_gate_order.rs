@@ -75,6 +75,11 @@ impl GateProbe {
             "#!/bin/sh\nprintf '%s\\n' spelling >> \"$GATE_LOG\"\n[ \"${GATE_FAIL_AT:-}\" != \
              spelling ]\n",
         )?;
+        Self::script(
+            &directory,
+            "probe-act",
+            "#!/bin/sh\nprintf '%s\\n' act >> \"$GATE_LOG\"\nexit 1\n",
+        )?;
         let path = parent_path.join(&name);
         Ok(Self {
             parent,
@@ -104,6 +109,8 @@ impl GateProbe {
                 "TYPOS_CONFIG_BUILDER={}",
                 self.path.join("probe-spelling")
             ))
+            .arg(format!("ACT={}", self.path.join("probe-act")))
+            .arg("WITH_ACT=0")
             .current_dir(Utf8Path::new(env!("CARGO_MANIFEST_DIR")))
             .env("GATE_LOG", self.path.join("gate.log").as_str())
             .env(
@@ -138,11 +145,6 @@ fn parallel_all_runs_each_gate_in_order() {
     let output = probe
         .run("all", None)
         .expect("execute parallel Make composite");
-    assert!(
-        output.status.success(),
-        "all gates must pass: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
     assert_eq!(
         probe.stages().expect("read gate order"),
         [
@@ -158,6 +160,31 @@ fn parallel_all_runs_each_gate_in_order() {
             "spelling"
         ],
         "make -j all must finish each gate before starting the next"
+    );
+    assert!(
+        output.status.success(),
+        "all gates must pass: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn inherited_with_act_does_not_reach_nested_make_all() {
+    let test_binary = std::env::current_exe().expect("find current test executable");
+    let output = Command::new(test_binary)
+        .args([
+            "--exact",
+            "parallel_all_runs_each_gate_in_order",
+            "--nocapture",
+        ])
+        .env("WITH_ACT", "1")
+        .output()
+        .expect("run exact gate-order test with Act enabled in its environment");
+    assert!(
+        output.status.success(),
+        "the gate-order test must clear inherited WITH_ACT before nested Make: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 
