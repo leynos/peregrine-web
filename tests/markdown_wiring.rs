@@ -199,7 +199,10 @@ fn makefile(recipe: &str, variables: &str) -> String {
 /// The repository's `check-fmt` runs the mdtablefix check with its status.
 #[test]
 fn the_repository_makefile_runs_the_check() {
-    assert!(runs_mdtablefix_check(Makefile(MAKEFILE)));
+    assert!(
+        runs_mdtablefix_check(Makefile(MAKEFILE)),
+        "`make check-fmt` does not run `mdtablefix --check` with its exit status"
+    );
 }
 
 /// CI installs mdtablefix before `make check-fmt` and lints all Markdown.
@@ -207,7 +210,11 @@ fn the_repository_makefile_runs_the_check() {
 fn the_repository_workflows_install_and_lint() {
     let workflow = Workflow::parse(CI_WORKFLOW).expect("the CI workflow parses");
     let uninstalled = uninstalled_check_fmt(&workflow);
-    assert_eq!(uninstalled, Vec::<String>::new());
+    assert_eq!(
+        uninstalled,
+        Vec::<String>::new(),
+        "a job runs `make check-fmt` without installing mdtablefix first"
+    );
     let (steps, narrowed) = lint_action_globs(&workflow);
     assert!(steps > 0, "no step runs the markdownlint-cli2-action");
     assert_eq!(
@@ -272,7 +279,11 @@ fn an_install_after_check_fmt_is_refused() {
     );
     let workflow = Workflow::parse(text).expect("the fixture parses");
     let uninstalled = uninstalled_check_fmt(&workflow);
-    assert_eq!(uninstalled, vec!["build-test".to_owned()]);
+    assert_eq!(
+        uninstalled,
+        vec!["build-test".to_owned()],
+        "an install step after `make check-fmt` must not count"
+    );
 }
 
 /// A lint step over a narrower glob is counted as narrowed.
@@ -285,5 +296,9 @@ fn narrowed_lint_globs_are_refused() {
     );
     let workflow = Workflow::parse(text).expect("the fixture parses");
     let counts = lint_action_globs(&workflow);
-    assert_eq!(counts, (1, 1));
+    assert_eq!(
+        counts,
+        (1, 1),
+        "one lint step with a narrowed glob is one step, one narrowed"
+    );
 }
