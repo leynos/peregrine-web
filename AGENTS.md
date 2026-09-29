@@ -24,7 +24,7 @@
 - **Use consistent spelling and grammar.** Comments must use en-GB-oxendict
   ("-ize" / "-yse" / "-our") spelling and grammar, with the exception of
   references to external APIs. Prose is enforced mechanically by the
-  en-GB-oxendict spelling gate in `make markdownlint` and `make spelling`.
+  en-GB-oxendict spelling gate.
 - **Illustrate with clear examples.** Function documentation must include clear
   examples demonstrating the usage and outcome of the function. Test
   documentation should omit examples where the example serves only to reiterate
@@ -140,21 +140,21 @@ project:
 
 - `rust-toolchain.toml` pins the nightly, Cranelift, rust-analyzer, rustfmt,
   Clippy, and LLVM tools. Run `make install-build-tools` to install that
-  toolchain and the checksum-verified mold 2.41.0 release. Run
+  toolchain and the checksum-verified `mold` 2.41.0 release. Run
   `make check-build-tools` to inspect development prerequisites;
   `make coverage` additionally checks clang and lld.
 - Bare Cargo development builds use Cranelift and the parallel frontend from
   `.cargo/config.toml`; native x86_64 GNU Linux builds use the repository's
-  Clang wrapper to select pinned mold ahead of the system linker. Make targets
-  that assign `RUSTFLAGS` restate the development flags because Cargo does not
-  merge them with its configuration. Use `make release` and `make package` for
-  production artefacts; both set their own flags and select LLVM for the dev
-  and release profiles because package verification uses the dev profile.
-  Measured coverage also selects LLVM. These routes exclude the parallel
-  frontend, Cranelift, and mold. Coverage uses lld. Development Make gates
-  reject a non-Cranelift `CARGO_PROFILE_DEV_CODEGEN_BACKEND` override.
+  Clang wrapper to select pinned `mold` ahead of the system linker. Make
+  targets that assign `RUSTFLAGS` restate the development flags because Cargo
+  does not merge them with its configuration. Use `make release` and
+  `make package` for production artefacts; both set their own flags and select
+  LLVM for the dev and release profiles because package verification uses the
+  dev profile. Measured coverage also selects LLVM. These routes exclude the
+  parallel frontend, Cranelift, and `mold`. Coverage uses lld. Development Make
+  gates reject a non-Cranelift `CARGO_PROFILE_DEV_CODEGEN_BACKEND` override.
   Cross-target Make builds, x86_64 Linux musl, and encoded Rust flags are
-  unsupported for the mold route; native linker overrides must select the
+  unsupported for the `mold` route; native linker overrides must select the
   repository's Clang wrapper.
 - Run `make check-fmt`, `make lint`, and `make test` before committing. These
   targets wrap the following commands, so contributors understand the exact
@@ -383,10 +383,23 @@ project:
 
 - Validate Markdown files using `make markdownlint`. This target also runs the
   en-GB-oxendict spelling gate.
-- Enforce spelling with `make spelling`. It regenerates `typos.toml` from the
-  live shared dictionary and the `typos.local.toml` overlay on every run, so
-  `typos.toml` must not be drift checked in CI. Put narrow repository-specific
-  exceptions in `typos.local.toml`; never edit generated entries by hand.
+
+<!-- typos-config-builder:agents-md:start -->
+
+## Spelling
+
+- `make spelling` runs the pinned `typos-config-builder gate`, which
+  regenerates `typos.toml` from the shared en-GB-oxendict dictionary and
+  `typos.local.toml`, then checks spelling and the shared phrase corrections.
+- `typos.toml` is generated: never edit it by hand. Put narrow
+  repository-specific exceptions in `typos.local.toml`, as exact or full-line
+  patterns rather than bare accepted words.
+- When `make spelling` changes `typos.toml`, commit the regenerated file. If
+  the change is unrelated to your work, commit it in a separate base pull
+  request and stack your branch on it, so each review diff stays focused.
+
+<!-- typos-config-builder:agents-md:end -->
+
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.

@@ -28,7 +28,7 @@ POLONIUS_FLAGS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
 # The build standard: every `rustflags` source in `.cargo/config.toml` carries
-# the parallel frontend, and the x86_64 GNU Linux source adds mold. Assigning `RUSTFLAGS`
+# the parallel frontend, and the x86_64 GNU Linux source adds `mold`. Assigning `RUSTFLAGS`
 # replaces those sources outright, so the gate targets restate the flags here.
 # Development recipes add those flags to inherited RUSTFLAGS, including the CI
 # setup-rust value. Coverage, release, and packaging take neither. The checked toolchain
@@ -60,9 +60,8 @@ COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) -C link-arg=$(COVERAGE_LI
 # own override so coverage runs LLVM instrumentation instead of Cranelift.
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
-TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.1
 TYPOS_CONFIG_BUILDER = uv tool run --from \
-	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
+	"git+https://github.com/leynos/typos-config-builder.git@v0.1.3" \
 	typos-config-builder
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
 
@@ -130,7 +129,7 @@ lint-whitaker: ## Run Whitaker without Cargo's inherited or development flags
 typecheck: check-build-tools ## Type-check without building
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
-install-build-tools: ## Install pinned mold and the repository toolchain
+install-build-tools: ## Install pinned `mold` and the repository toolchain
 	@scripts/install-build-tools.sh
 
 check-build-tools: ## Check pinned development build prerequisites
@@ -164,7 +163,7 @@ spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
 		echo "make spelling found no tracked files: the gate enumerates tracked files with git ls-files. Run: git add -A" >&2; \
 		exit 1; \
 	fi
-	$(TYPOS_CONFIG_BUILDER) gate --repository .
+	$(TYPOS_CONFIG_BUILDER) gate
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
