@@ -212,13 +212,19 @@ fn assigned_flag_problems(
 ) -> Vec<String> {
     let mut problems = Vec::new();
     if !flags.names(THREADS_FLAG) {
-        problems.push(format!("`make {target}` on {host:?} drops {THREADS_FLAG}: {flags:?}"));
+        problems.push(format!(
+            "`make {target}` on {host:?} drops {THREADS_FLAG}: {flags:?}"
+        ));
     }
     if flags.names(MOLD_FLAG) != host.expects_mold() {
-        problems.push(format!("`make {target}` on {host:?} gets mold wrong: {flags:?}"));
+        problems.push(format!(
+            "`make {target}` on {host:?} gets mold wrong: {flags:?}"
+        ));
     }
     if inherited.is_some_and(|caller| !flags.carries_run(caller)) {
-        problems.push(format!("`make {target}` drops the caller's RUSTFLAGS: {flags:?}"));
+        problems.push(format!(
+            "`make {target}` drops the caller's RUSTFLAGS: {flags:?}"
+        ));
     }
     problems
 }
