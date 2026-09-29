@@ -2,138 +2,48 @@
 
 #![cfg(all(target_os = "linux", target_arch = "x86_64"))]
 
-use std::{
-    error::Error,
-    fmt::Write as _,
-    io,
-    process::{Command, Output},
-    sync::atomic::{AtomicUsize, Ordering},
-};
+#[path = "support/build_tools_preflight.rs"]
+mod support;
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{
-    ambient_authority,
-    fs::{Permissions, PermissionsExt},
-    fs_utf8::Dir,
-};
+use std::{env, process::Command};
 
-type Read<T> = Result<T, Box<dyn Error>>;
-static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+use support::ToolFixture;
 
-/// Owns fake build tools in a private scratch directory.
-struct ToolFixture {
-    parent: Dir,
-    directory: Dir,
-    name: String,
-    path: Utf8PathBuf,
+#[test]
+fn preflight_ignores_inherited_coverage_build_selection() {
+    let test_binary = env::current_exe().expect("locate the preflight test binary");
+    let output = Command::new(test_binary)
+        .arg("--exact")
+        .arg("preflight_child_accepts_default_development_tools")
+        .env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm")
+        .env("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "clang")
+        .env("CARGO_BUILD_TARGET", "aarch64-unknown-linux-gnu")
+        .env("CARGO_ENCODED_RUSTFLAGS", "-C\u{1f}link-arg=-fuse-ld=other")
+        .output()
+        .expect("run a preflight test with inherited coverage settings");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "default development preflight must ignore inherited build selection: {stdout} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains("1 passed"),
+        "the isolated preflight test must execute: {stdout}"
+    );
 }
 
-impl ToolFixture {
-    fn new() -> Read<Self> {
-        let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
-            .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
-        let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
-        let name = format!(
-            "peregrine-build-tools-{}-{}",
-            std::process::id(),
-            NEXT_ID.fetch_add(1, Ordering::Relaxed)
-        );
-        parent.create_dir(&name)?;
-        let directory = parent.open_dir(&name)?;
-        directory.write(
-            "rustup",
-            "#!/bin/sh\ncase \"$1 $2\" in\n  'toolchain list') cat \"$FAKE_TOOLCHAINS\" ;;\n  \
-             'component list') cat \"$FAKE_COMPONENTS\" ;;\n  'show ') printf '%s\\n' 'Default \
-             host: x86_64-unknown-linux-gnu' ;;\n  *) exit 1 ;;\nesac\n",
-        )?;
-        directory.write(
-            "toolchains",
-            "nightly-2026-08-27-x86_64-unknown-linux-gnu (default)\n",
-        )?;
-        directory.create_dir("bin")?;
-        directory.write(
-            "bin/mold",
-            "#!/bin/sh\nprintf 'mold %s (compatible with GNU ld)\\n' \"$FAKE_MOLD_VERSION\"\n",
-        )?;
-        directory.symlink("mold", "bin/ld.mold")?;
-        directory.write(
-            "clang",
-            "#!/bin/sh\nselected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\ncase \" $* \
-             \" in\n  *' -print-prog-name=ld.mold '*) printf '%s\\n' \"$selected\" ;;\n  *' -### \
-             '*) printf ' \"%s\" \"--hash-style=gnu\"\\n' \"$selected\" >&2 ;;\n  *) exit 0 \
-             ;;\nesac\n",
-        )?;
-        directory.write("ld.lld", "#!/bin/sh\nexit 0\n")?;
-        for executable in ["rustup", "bin/mold", "clang", "ld.lld"] {
-            directory.set_permissions(executable, Permissions::from_mode(0o700))?;
-        }
-        let fixture = Self {
-            parent,
-            directory,
-            path: parent_path.join(&name),
-            name,
-        };
-        fixture.write_components(None)?;
-        Ok(fixture)
-    }
-
-    fn write_components(&self, omitted: Option<&str>) -> Read<()> {
-        let root = Dir::open_ambient_dir(
-            Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
-            ambient_authority(),
-        )?;
-        let source = root.read_to_string("rust-toolchain.toml")?;
-        let document: toml::Value = toml::from_str(&source)?;
-        let components = document
-            .get("toolchain")
-            .and_then(|toolchain| toolchain.get("components"))
-            .and_then(toml::Value::as_array)
-            .ok_or("toolchain components must be an array")?;
-        let mut contents = String::new();
-        for component in components
-            .iter()
-            .filter_map(toml::Value::as_str)
-            .filter(|component| Some(*component) != omitted)
-        {
-            let alias = component.strip_suffix("-preview").unwrap_or(component);
-            writeln!(&mut contents, "{alias}-x86_64-unknown-linux-gnu")?;
-        }
-        self.directory.write("components", contents)?;
-        Ok(())
-    }
-
-    fn check(
-        &self,
-        coverage: bool,
-        missing: Option<&str>,
-        override_var: Option<(&str, &str)>,
-    ) -> io::Result<Output> {
-        let root = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
-        let mut command = Command::new("bash");
-        command.arg(root.join("scripts/check-build-tools.sh"));
-        if coverage {
-            command.arg("--coverage");
-        }
-        command
-            .env("PATH", format!("{}:/usr/bin:/bin", self.path))
-            .env("FAKE_COMPONENTS", self.path.join("components").as_str())
-            .env("FAKE_TOOLCHAINS", self.path.join("toolchains").as_str())
-            .env("FAKE_MOLD_VERSION", "2.41.0")
-            .env("BUILD_TOOLS_PREFIX", self.path.as_str())
-            .env("CLANG_COMMAND", self.path.join("clang").as_str())
-            .env("LLD_COMMAND", self.path.join("ld.lld").as_str());
-        if let Some(variable) = missing {
-            command.env(variable, "missing-build-tool");
-        }
-        if let Some((variable, value)) = override_var {
-            command.env(variable, value);
-        }
-        command.output()
-    }
-}
-
-impl Drop for ToolFixture {
-    fn drop(&mut self) { drop(self.parent.remove_dir_all(&self.name)); }
+#[test]
+fn preflight_child_accepts_default_development_tools() {
+    let fixture = ToolFixture::new().expect("create fake build tools");
+    let output = fixture
+        .check(false, None, None)
+        .expect("run default development preflight");
+    assert!(
+        output.status.success(),
+        "default development preflight must pass: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
