@@ -6,8 +6,8 @@ project.
 The [technical design](peregrine-design.md) describes the proposed framework;
 [ADR 001](adr-001-resource-aware-lifecycle.md) remains proposed. Consult the
 [repository layout](repository-layout.md) for file ownership and the
-[potential roadmap](roadmap.md) for delivery sequencing. The current library
-is a generated stub, so these proposals are not available APIs.
+[potential roadmap](roadmap.md) for delivery sequencing. The current library is
+a generated stub, so these proposals are not available APIs.
 
 The [compiler ownership experiment](polonius-ownership-experiment.md) records
 explicit four-way compiler probes. Its flags are experimental; this proposal
@@ -17,24 +17,26 @@ Implementation must validate downstream and analyser compatibility before
 
 The [extension case study](actix-v2a-middleware-case-study.md) and
 [ADR 003](adr-003-http-integration-boundaries.md) distinguish HTTP lifecycle
-integration from application services. Prefer metadata parsers and response/body
-helpers for value-level work. Durable mutation completion must not depend on
-response hooks. These are proposed internal contracts, not implemented helpers.
+integration from application services. Prefer metadata parsers and
+response/body helpers for value-level work. Durable mutation completion must
+not depend on response hooks. These are proposed internal contracts, not
+implemented helpers.
 
 The [hexagonal application case study](hexagonal-application-case-study.md) and
-[ADR 004](adr-004-application-port-boundaries.md) define proposed application
-integration contracts. Construct resource dependencies explicitly; keep
-application ports free of framework types, and permit concrete adapters only
-at composition roots and their own implementation boundaries. Examples must
-separate request middleware from unit-of-work and application lifespan owners.
-Boundary checks complement behavioural port tests; they do not replace them.
+[ADR 004](adr-004-application-port-boundaries.md)
+define proposed application integration contracts. Construct resource
+dependencies explicitly; keep application ports free of framework types, and
+permit concrete adapters only at composition roots and their own implementation
+boundaries. Examples must separate request middleware from unit-of-work and
+application lifespan owners. Boundary checks complement behavioural port tests;
+they do not replace them.
 
 The [extension design](pachislot-extension-design.md) and proposed
-[ADR 005](adr-005-extension-and-upgrade-boundaries.md) separate correlation policy
-from propagation adapters and HTTP upgrade from Pachislot message processing.
-An upgrade plan must own everything that outlives the HTTP request. Keep
-connection and message lifetimes explicit in examples and verify compatibility
-against pinned source behaviour before describing it as supported.
+[ADR 005](adr-005-extension-and-upgrade-boundaries.md) separate correlation
+policy from propagation adapters and HTTP upgrade from Pachislot message
+processing. An upgrade plan must own everything that outlives the HTTP request.
+Keep connection and message lifetimes explicit in examples and verify
+compatibility against pinned source behaviour before describing it as supported.
 
 ## Local Workflow
 
@@ -42,16 +44,17 @@ Use `make all` as the public entrypoint for formatting, linting, and tests.
 `make lint` runs rustdoc, Clippy, and Whitaker. `make test` prefers
 `cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
 available. `make check-fmt` verifies Rust formatting with
-`cargo fmt --all -- --check`, and `make fmt` formats Rust sources with nightly
-`rustfmt` and Markdown with `mdformat`. `make typecheck` type-checks without
-building via `cargo check`. `make audit` derives the Rust workspace root with
-`cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
-from the workspace root. PR CI skips `make audit` and the audit-only setup when
-`github.actor` is `dependabot[bot]`; that keeps whole-lockfile advisories from
-blocking unrelated Dependabot PRs while human PRs retain the audit gate. The
-compensating control is `.github/workflows/audit.yml`, which runs weekly and
-can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
-`lld`.
+`cargo fmt --all -- --check` and Markdown formatting with `mdtablefix --check`,
+and `make fmt` formats Rust sources with nightly `rustfmt` and Markdown with
+`mdtablefix --in-place` followed by `markdownlint-cli2 --fix`. `make typecheck`
+type-checks without building via `cargo check`. `make audit` derives the Rust
+workspace root with `cargo metadata`, logs workspace member manifests, and runs
+`cargo audit` once from the workspace root. PR CI skips `make audit` and the
+audit-only setup when `github.actor` is `dependabot[bot]`; that keeps
+whole-lockfile advisories from blocking unrelated Dependabot PRs while human
+PRs retain the audit gate. The compensating control is
+`.github/workflows/audit.yml`, which runs weekly and can also be triggered
+manually. `make coverage` uses `cargo llvm-cov` with `lld`.
 
 GitHub Actions Act validation lives in `.github/workflows/act-validation.yml`.
 The main `.github/workflows/ci.yml` workflow deliberately does not run
@@ -68,9 +71,9 @@ inside those nested environments cannot fix a linker missing from the host. The
 outer Cargo tests link successfully, `make test WITH_ACT=1` runs the real CI
 workflow through Act. A local run needs Docker, Act, and the same host linker
 prerequisites, plus a GitHub token for nested actions; it does not replace a
-fresh GitHub-hosted Ubuntu run.
-The Act harness skips CI's coverage action because its hosted cache and
-coverage-object collection services are not available in local containers.
+fresh GitHub-hosted Ubuntu run. The Act harness skips CI's coverage action
+because its hosted cache and coverage-object collection services are not
+available in local containers.
 
 A scheduled `.github/workflows/mutation-testing.yml` workflow also runs
 `cargo-mutants` via the shared reusable workflow, daily and on manual dispatch.
@@ -102,8 +105,8 @@ publishes nothing until a dispatch from `main` or the next push.
 Development builds use Cranelift for debug code generation. On Linux targets,
 `.cargo/config.toml` configures clang to link with `mold` so debug builds link
 quickly. Coverage generation switches the dev profile back to LLVM and uses
-`lld` because LLVM coverage tooling expects LLVM-compatible code generation
-and linker behaviour.
+`lld` because LLVM coverage tooling expects LLVM-compatible code generation and
+linker behaviour.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
@@ -173,3 +176,34 @@ as a test assertion on the SHA string. The sole exception is the
 `RUSTFLAGS_PASSTHROUGH_REVISION` boundary above: until an independent probe can
 confirm that `setup-rust` supports `rustflags`, document and assert the first
 capable revision. Remove that literal revision assertion once the probe exists.
+
+## Markdown formatting
+
+Markdown follows the estate's `markdown-formatting-baseline` rule.
+
+- `make fmt` rewrites Markdown with
+  `mdtablefix --in-place --git --include-untracked --wrap --renumber --breaks
+  --ellipsis --fences`,
+  then runs `markdownlint-cli2 --fix "**/*.md"`.
+- `make check-fmt` runs the same mdtablefix command with `--check` in place of
+  `--in-place`, and fails when any file would change.
+- `--git --include-untracked` selects the Markdown files Git tracks plus the
+  untracked files Git does not ignore, so a new document is checked before it
+  is staged.
+- `.markdownlint-cli2.jsonc` carries the canonical markdownlint configuration.
+  Keep its `config` entries and `ignores` globs; add repository-specific rules
+  or globs beside them.
+- CI installs mdtablefix 0.6.0 with the shared `install-mdtablefix` action
+  before `make check-fmt`, and lints Markdown with
+  `DavidAnson/markdownlint-cli2-action` over `**/*.md`.
+- `tests/markdown_wiring.rs` holds that wiring by contract: `check-fmt` must
+  run `mdtablefix --check --git --include-untracked` with its exit status
+  reaching Make, the CI job must install mdtablefix before `make check-fmt`,
+  and every lint action step must lint `**/*.md`. Each clause is also tested
+  against weakened and equivalent fixtures.
+
+Install mdtablefix 0.6.0 or later locally with
+`cargo binstall --no-confirm mdtablefix@0.6.0`, or
+`cargo install --locked mdtablefix@0.6.0`. Install markdownlint-cli2 with
+`bun add --global markdownlint-cli2` or
+`npm install --global markdownlint-cli2`.

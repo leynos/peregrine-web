@@ -145,9 +145,18 @@ project:
 
     ```sh
     cargo fmt --workspace -- --check
+    mdtablefix --check --git --include-untracked \
+      --wrap --renumber --breaks --ellipsis --fences
     ```
 
-    validating formatting across the entire workspace without modifying files.
+    validating Rust formatting across the entire workspace and Markdown
+    formatting across the files Git tracks, plus untracked files Git does not
+    ignore, without modifying files. The Markdown check needs mdtablefix 0.6.0
+    or later on `PATH`; install it with
+    `cargo binstall --no-confirm mdtablefix@0.6.0` (or
+    `cargo install --locked mdtablefix@0.6.0`), the version CI pins. `make fmt`
+    rewrites the same files with `mdtablefix --in-place` and then runs
+    `markdownlint-cli2 --fix`.
   - `make lint` executes:
 
     ```makefile
@@ -285,11 +294,10 @@ project:
 
 - **Mandate caret requirements for all dependencies.** All crate versions
   specified in `Cargo.toml` must use SemVer-compatible caret requirements (e.g.,
-   `some-crate = "1.2.3"` (equivalent to `^1.2.3`). This is Cargo's default and
-   allows for safe,
-  non-breaking updates to minor and patch versions while preventing breaking
-  changes from new major versions. This approach is critical for ensuring build
-  stability and reproducibility.
+  `some-crate = "1.2.3"` (equivalent to `^1.2.3`). This is Cargo's default and
+  allows for safe, non-breaking updates to minor and patch versions while
+  preventing breaking changes from new major versions. This approach is
+  critical for ensuring build stability and reproducibility.
 - **Prohibit unstable version specifiers.** The use of wildcard (`*`) or
   open-ended inequality (`>=`) version requirements is strictly forbidden, as
   they introduce unacceptable risk and unpredictability. Tilde requirements (
@@ -323,7 +331,7 @@ project:
 
 - Use `tracing` for logging and diagnostics. Prefer structured
   `tracing::{trace, debug, info, warn, error}` events and spans over `println!`,
-   `eprintln!`, or direct `log` macros. Add fields for identifiers, state, and
+  `eprintln!`, or direct `log` macros. Add fields for identifiers, state, and
   error context so downstream subscribers can filter and correlate events
   without parsing message text.
 - Use `#[tracing::instrument]` or explicit spans around request handling,

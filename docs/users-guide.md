@@ -5,8 +5,7 @@ rendering it from the template.
 
 ## First Steps After Rendering
 
-Initialize version control and stage the rendered files before running any
-gate:
+Initialize version control and stage the rendered files before running any gate:
 
 ```sh
 git init
@@ -14,16 +13,20 @@ git add -A
 make all
 ```
 
-The spelling gate enumerates its inputs with `git ls-files`, so `make all`,
-`make markdownlint` and `make spelling` have nothing to check until the
-project is a Git repository with its files staged.
+Each gate selects its Markdown differently. `make check-fmt` runs
+`mdtablefix --check --git --include-untracked`, which reads the tracked files
+and the untracked files Git does not ignore, so it needs a Git repository but
+not staged files. `make markdownlint` runs `markdownlint-cli2 '**/*.md'` over
+every matching file, staged or not, and then runs `make spelling`. The spelling
+gate enumerates its inputs with `git ls-files`, so it checks only files Git
+already tracks: stage new Markdown before relying on it.
 
 ## Generated Tooling
 
 Generated projects use Rust 2024, a pinned nightly toolchain, strict lint
 settings, and documented starter code. Library projects render `src/lib.rs`.
-Application projects render `src/main.rs`, `src/lib.rs`, release automation,
-and `[package.metadata.binstall]` metadata for binary installation.
+Application projects render `src/main.rs`, `src/lib.rs`, release automation, and
+`[package.metadata.binstall]` metadata for binary installation.
 
 Development builds use Cranelift for debug code generation. On Linux targets,
 `.cargo/config.toml` configures clang to link with `mold` so local debug builds
@@ -32,8 +35,8 @@ tools expect LLVM-compatible linker behaviour.
 
 ## Validation and Environment Policy
 
-This project denies `unknown_lints`, `renamed_and_removed_lints`, `unsafe_code`,
-and `missing_docs`. Rustdoc denies `missing_crate_level_docs`,
+This project denies `unknown_lints`, `renamed_and_removed_lints`,
+`unsafe_code`, and `missing_docs`. Rustdoc denies `missing_crate_level_docs`,
 `broken_intra_doc_links`, `private_intra_doc_links`, `bare_urls`,
 `invalid_html_tags`, `invalid_codeblock_attributes`, and `unescaped_backticks`.
 Clippy denies `missing_assert_message` and uses `disallowed_methods` to reject
@@ -80,7 +83,8 @@ doctest therefore fails the command.
 The generated `Makefile` exposes these public targets:
 
 - `make all` runs formatting checks, linting, tests, and spelling checks.
-- `make check-fmt` verifies Rust formatting.
+- `make check-fmt` verifies Rust formatting and, with
+  `mdtablefix --check --git --include-untracked`, Markdown formatting.
 - `make fmt` formats Rust and Markdown sources.
 - `make lint` builds documentation, then runs Clippy and Whitaker, with every
   warning denied.
@@ -92,20 +96,23 @@ The generated `Makefile` exposes these public targets:
 - `make release` builds the release target.
 - `make coverage` writes `lcov.info` using `cargo llvm-cov` and `lld`.
 - `make audit` derives the Rust workspace root with `cargo metadata` and runs
-  `cargo audit` once from that root. In PR CI, Dependabot runs skip `make
-  audit` and the audit-only setup when `github.actor` is `dependabot[bot]`, so
-  whole-lockfile advisories do not block unrelated dependency updates. Human PRs
-  still retain the audit gate, and `.github/workflows/audit.yml` runs weekly and
-  can also be triggered manually as the compensating control.
+  `cargo audit` once from that root. In PR CI, Dependabot runs skip
+  `make audit` and the audit-only setup when `github.actor` is
+  `dependabot[bot]`, so whole-lockfile advisories do not block unrelated
+  dependency updates. Human PRs still retain the audit gate, and
+  `.github/workflows/audit.yml` runs weekly and can also be triggered manually
+  as the compensating control.
 - `make markdownlint` checks Markdown files and enforces en-GB-oxendict
   spelling.
 - `make spelling` runs the shared `typos-config-builder` gate. It regenerates
   `typos.toml` from the live shared dictionary and the `typos.local.toml`
   overlay, then checks Markdown prose, so `typos.toml` is never drift checked
   in CI. The gate enumerates its inputs with `git ls-files`, so the project
-  must be a Git repository with its files staged; `make spelling` fails with
-  that instruction when it is not. The first run writes `typos.toml`, which is
-  generated but tracked output: commit it alongside the rest of the project.
+  must be a Git repository in which Git already tracks some files;
+  `make spelling` fails with that instruction when `git ls-files` lists
+  nothing, and checks only the files Git tracks. The first run writes
+  `typos.toml`, which is generated but tracked output: commit it alongside the
+  rest of the project.
 - `make nixie` validates Mermaid diagrams.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
@@ -113,10 +120,10 @@ full generated workflow locally on Linux.
 
 ## Scheduled Mutation Testing
 
-Generated projects include `.github/workflows/mutation-testing.yml`, a scheduled
-GitHub Actions workflow that runs mutation testing with `cargo-mutants`. It is a
-thin caller of the shared `leynos/shared-actions` `mutation-cargo` reusable
-workflow.
+Generated projects include `.github/workflows/mutation-testing.yml`, a
+scheduled GitHub Actions workflow that runs mutation testing with
+`cargo-mutants`. It is a thin caller of the shared `leynos/shared-actions`
+`mutation-cargo` reusable workflow.
 
 Mutation testing measures test-suite quality. It introduces small changes
 (mutants) into the source and confirms the tests fail in response. A surviving
