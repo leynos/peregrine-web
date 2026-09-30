@@ -14,8 +14,18 @@ use cap_std::{
     fs_utf8::Dir,
 };
 
+#[path = "support/make_gate_order_whitaker.rs"]
+mod whitaker;
+
 type Read<T> = Result<T, Box<dyn Error>>;
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+/// A caller environment that is either clean or carries the coverage route.
+#[derive(Clone, Copy)]
+enum CallerEnvironment {
+    Clean,
+    Coverage,
+}
 
 /// Private fake tools write their observed order without compiling the crate.
 struct GateProbe {
@@ -57,18 +67,7 @@ impl GateProbe {
             "#!/bin/sh\nprintf '%s\\n' preflight >> \"$GATE_LOG\"\n[ \"${GATE_FAIL_AT:-}\" != \
              preflight ]\n",
         )?;
-        Self::script(
-            &directory,
-            "probe-whitaker",
-            concat!(
-                "#!/bin/sh\n",
-                "printf 'RUSTFLAGS=%s\\nENCODED=%s\\nBACKEND=%s\\n' ",
-                "\"${RUSTFLAGS-<unset>}\" \"${CARGO_ENCODED_RUSTFLAGS-<unset>}\" ",
-                "\"${CARGO_PROFILE_DEV_CODEGEN_BACKEND-<unset>}\" > \"$WHITAKER_ENV_LOG\"\n",
-                "printf '%s\\n' whitaker >> \"$GATE_LOG\"\n",
-                "[ \"${GATE_FAIL_AT:-}\" != whitaker ]\n",
-            ),
-        )?;
+        Self::script(&directory, "probe-whitaker", whitaker::PROBE_SCRIPT)?;
         Self::script(
             &directory,
             "probe-spelling",
@@ -96,6 +95,15 @@ impl GateProbe {
     }
 
     fn run(&self, target: &str, failure: Option<&str>) -> io::Result<std::process::Output> {
+        self.run_with_environment(target, failure, CallerEnvironment::Coverage)
+    }
+
+    fn run_with_environment(
+        &self,
+        target: &str,
+        failure: Option<&str>,
+        caller_environment: CallerEnvironment,
+    ) -> io::Result<std::process::Output> {
         let mut command = Command::new("make");
         command
             .args(["-j", "4", target])
@@ -117,8 +125,34 @@ impl GateProbe {
                 "WHITAKER_ENV_LOG",
                 self.path.join("whitaker-env.log").as_str(),
             )
-            .env("RUSTFLAGS", "-Zthreads=8 -C link-arg=-fuse-ld=mold")
-            .env("CARGO_ENCODED_RUSTFLAGS", "-Zthreads=8");
+            .env(
+                "DYLINT_DRIVER_PATH",
+                self.path.join("dylint-drivers").as_str(),
+            );
+        for variable in [
+            "RUSTFLAGS",
+            "CARGO_ENCODED_RUSTFLAGS",
+            "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
+            "CARGO_BUILD_TARGET",
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+            "CFLAGS",
+            "LDFLAGS",
+        ] {
+            command.env_remove(variable);
+        }
+        if let CallerEnvironment::Coverage = caller_environment {
+            command
+                .env("RUSTFLAGS", "-D warnings -C link-arg=-fuse-ld=lld")
+                .env(
+                    "CARGO_ENCODED_RUSTFLAGS",
+                    "-D\u{1f}warnings\u{1f}-C\u{1f}link-arg=-fuse-ld=lld",
+                )
+                .env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm")
+                .env("CARGO_BUILD_TARGET", "x86_64-unknown-linux-gnu")
+                .env("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "clang")
+                .env("CFLAGS", "-fuse-ld=lld")
+                .env("LDFLAGS", "-fuse-ld=lld");
+        }
         if let Some(stage) = failure {
             command.env("GATE_FAIL_AT", stage);
         }
@@ -257,7 +291,7 @@ fn parallel_all_stops_after_the_first_failing_gate() {
 }
 
 #[test]
-fn parallel_lint_is_sequential_and_whitaker_clears_inherited_flags() {
+fn parallel_lint_preserves_repository_route_for_clean_and_coverage_callers() {
     let probe = GateProbe::new().expect("create private gate probes");
     let output = probe.run("lint", None).expect("execute parallel Make lint");
     assert!(
@@ -270,14 +304,26 @@ fn parallel_lint_is_sequential_and_whitaker_clears_inherited_flags() {
         ["preflight", "doc", "clippy", "preflight", "whitaker"],
         "make -j lint must finish Clippy before Whitaker"
     );
-    assert_eq!(
-        probe
-            .directory
-            .read_to_string("whitaker-env.log")
-            .expect("read Whitaker environment"),
-        "RUSTFLAGS=\nENCODED=<unset>\nBACKEND=llvm\n",
-        "Whitaker must not inherit development or encoded flags and must use LLVM"
+    let cold = probe
+        .directory
+        .read_to_string("whitaker-env.log")
+        .expect("read cold-cache Whitaker invocation");
+    whitaker::assert_repository_route(&cold, "cold");
+
+    let clean_output = probe
+        .run_with_environment("lint", None, CallerEnvironment::Clean)
+        .expect("execute Make lint from a clean caller environment");
+    assert!(
+        clean_output.status.success(),
+        "lint must pass with a clean caller environment: {}",
+        String::from_utf8_lossy(&clean_output.stderr)
     );
+    let cold_and_warm = probe
+        .directory
+        .read_to_string("whitaker-env.log")
+        .expect("read cold- and warm-cache Whitaker invocations");
+    whitaker::assert_repository_route(&cold_and_warm, "cold");
+    whitaker::assert_repository_route(&cold_and_warm, "warm");
 }
 
 #[test]

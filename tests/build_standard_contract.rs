@@ -34,6 +34,7 @@ use support::{
     THREADS_FLAG,
     check_development_targets,
     make_rustflags,
+    make_whitaker_recipe,
     sources,
 };
 
@@ -145,6 +146,51 @@ fn development_targets_keep_the_standard_under_inherited_rustflags() {
 fn development_targets_keep_the_frontend_but_not_mold_elsewhere() {
     let problems = check_development_targets(Host::Darwin, None).expect("read `make -n` output");
     assert!(problems.is_empty(), "{problems:#?}");
+}
+
+#[test]
+fn whitaker_clears_driver_overrides_and_checks_with_repository_defaults() {
+    let recipe = make_whitaker_recipe(Host::Linux).expect("read `make -n lint-whitaker` output");
+    let check = recipe
+        .lines()
+        .find(|line| line.contains("check-build-tools.sh"))
+        .expect("Whitaker must preflight the development build tools");
+    let whitaker = recipe
+        .lines()
+        .find(|line| line.contains(" --all -- "))
+        .expect("Make must invoke the Whitaker workspace check");
+
+    for setting in [
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
+        "CARGO_BUILD_TARGET",
+        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+        "CFLAGS",
+        "LDFLAGS",
+    ] {
+        assert!(
+            whitaker.contains(&format!("-u {setting}")),
+            "Whitaker must remove inherited {setting}: {whitaker}"
+        );
+        assert!(
+            check.contains(&format!("-u {setting}")),
+            "Whitaker's preflight must inspect the same clean route for {setting}: {check}"
+        );
+    }
+    assert!(
+        !whitaker.contains(" RUSTFLAGS=\"") && !whitaker.contains("=llvm"),
+        "Whitaker must not replace Cargo defaults with empty flags or LLVM: {whitaker}"
+    );
+    assert!(
+        whitaker.contains("DYLINT_RUSTFLAGS=\"-D warnings"),
+        "warnings-as-errors must reach the repository check through Dylint's supported input: \
+         {whitaker}"
+    );
+    assert!(
+        whitaker.ends_with("--all -- --all-targets --all-features"),
+        "the repository check must retain all targets and features: {whitaker}"
+    );
 }
 
 #[test]

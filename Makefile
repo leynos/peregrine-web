@@ -121,10 +121,14 @@ lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 
-lint-whitaker: ## Run Whitaker without Cargo's inherited or development flags
-	@env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS -u CARGO_PROFILE_DEV_CODEGEN_BACKEND $(CHECK_BUILD_TOOLS)
+WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
+	-u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
+	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER -u CFLAGS -u LDFLAGS
+
+lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo defaults
+	@$(WHITAKER_CLEAN_ENV) $(CHECK_BUILD_TOOLS)
 	@echo "Whitaker binary: $(WHITAKER)"
-	env -u CARGO_ENCODED_RUSTFLAGS PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="" CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm $(WHITAKER) --all -- $(CARGO_FLAGS)
+	$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: check-build-tools ## Type-check without building
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
