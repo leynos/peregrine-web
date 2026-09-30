@@ -97,7 +97,10 @@ fn record_installer(
 
 fn record_lint(step: &Value, index: usize, lint: &mut Option<usize>) -> Result<(), String> {
     let run = step.get("run").and_then(Value::as_str).unwrap_or("");
-    if run.trim() == "make lint" {
+    if matches!(
+        run.trim(),
+        "make lint" | "mkdir -p \"$DYLINT_DRIVER_PATH\"\nmake lint"
+    ) {
         if lint.replace(index).is_some() {
             return Err("more than one CI lint gate".into());
         }
@@ -201,8 +204,8 @@ fn missing_or_late_whitaker_installer_is_rejected() {
         "a missing installer must fail"
     );
     let misplaced = removed.replacen(
-        "      - name: Lint\n        run: make lint\n",
-        &format!("      - name: Lint\n        run: make lint\n{install_step}"),
+        "          make lint\n",
+        &format!("          make lint\n{install_step}"),
         1,
     );
     assert_ne!(misplaced, removed, "the lint step fixture must exist");

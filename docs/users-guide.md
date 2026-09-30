@@ -116,10 +116,11 @@ The generated `Makefile` exposes these public targets:
   rest of the project.
 - `make nixie` validates Mermaid diagrams.
 
-Install `clang`, `lld`, `python3`, and `cargo-audit` before running the full
-generated workflow locally on Linux. Run `make install-build-tools` to install
-the pinned `mold` linker and Rust toolchain, then `make check-build-tools` to
-verify them before building.
+Run `make install-build-tools` to install the pinned `mold` linker and Rust
+toolchain, then `make check-build-tools` to verify them before building. The
+hosted `build-test` job is the authoritative repository validation. Running the
+optional full Act integration locally on Linux also needs Docker, Act, `clang`,
+`lld`, `python3`, and `cargo-audit`, plus a GitHub token for nested actions.
 
 Development builds, including `make build`, `make test`, `make lint`, and
 `make typecheck`, use the parallel `rustc` frontend (`-Zthreads=8`) and, on

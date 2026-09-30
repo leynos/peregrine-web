@@ -184,9 +184,15 @@ project:
       RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
     RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
     env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
-      -u CARGO_PROFILE_DEV_CODEGEN_BACKEND $(CHECK_BUILD_TOOLS)
-    env -u CARGO_ENCODED_RUSTFLAGS RUSTFLAGS="" \
-      CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm whitaker --all -- --all-targets --all-features
+      -u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
+      -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER -u CFLAGS -u LDFLAGS \
+      $(CHECK_BUILD_TOOLS)
+    env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
+      -u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
+      -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER -u CFLAGS -u LDFLAGS \
+      PATH="$(USER_BIN_PATH):$(PATH)" \
+      DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" \
+      $(WHITAKER) --all -- $(CARGO_FLAGS)
     ```
 
     building documentation before linting every target with all features
@@ -210,6 +216,20 @@ project:
     ```
 
     Use `make fmt` to apply Rust and Markdown formatting fixes.
+
+  The hosted `build-test` job is the authoritative repository gate. Every PR
+  runs workflow-structure and command-contract tests through `make test`.
+  `.github/workflows/act-validation.yml` is manual-dispatch only; its full Act
+  run checks local runner compatibility and does not prove parity with hosted
+  GitHub Actions. `make test WITH_ACT=1` remains available for that local
+  integration check. Keep the cold Whitaker driver integration check: the
+  contract stubs verify command wiring, while the hosted lint route constructs
+  the real driver and checks the repository. `make act-contract-smoke` runs the
+  focused Act test against a derived CI workflow with fixture actions and
+  controlled executors. Use `make whitaker-driver-integration` to run real
+  `make lint-whitaker` checks with a private cold driver cache and then the
+  same warm cache; hosted CI also forces a cold driver directory for each lint
+  job.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.

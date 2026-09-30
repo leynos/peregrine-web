@@ -1,48 +1,45 @@
 //! Regression tests for the Linux Act-validation workflow contract.
 
-use std::collections::BTreeMap;
+/// Executes source workflow shell commands with a bounded Make fixture.
+#[path = "support/act_workflow_command.rs"]
+mod command;
+/// Hosted and manual workflow static and command contracts.
+#[path = "support/act_workflow_contract.rs"]
+mod contract;
+/// Typed workflow fields used by the focused Act contracts.
+#[path = "support/act_workflow_model.rs"]
+mod model;
+/// Optional real Act compatibility test over derived fixture actions.
+#[path = "support/act_workflow_smoke.rs"]
+mod smoke;
+use model::{Step, Workflow};
 
-use serde::Deserialize;
-
+/// Committed manual Act validation workflow.
 const ACT_VALIDATION_WORKFLOW: &str = include_str!("../.github/workflows/act-validation.yml");
+/// Committed hosted CI workflow.
 const CI_WORKFLOW: &str = include_str!("../.github/workflows/ci.yml");
 
 /// Workflow YAML awaiting strict mapping validation and typed parsing.
 #[derive(Clone, Copy)]
 struct WorkflowSource<'a>(&'a str);
 
-#[derive(Deserialize)]
-struct Workflow {
-    jobs: BTreeMap<String, Job>,
-}
-
-#[derive(Deserialize)]
-struct Job {
-    steps: Vec<Step>,
-}
-
-#[derive(Deserialize)]
-struct Step {
-    name: Option<String>,
-    #[serde(rename = "if")]
-    condition: Option<String>,
-    run: Option<String>,
-    uses: Option<String>,
-    #[serde(default)]
-    with: BTreeMap<String, serde_yaml::Value>,
-}
-
+/// Approved full-SHA mdtablefix installer.
 const MDTABLEFIX_ACTION: &str = "leynos/shared-actions/.github/actions/install-mdtablefix@\
                                  4fb8eb7ad52454678a0662865d81d3cd17aa6e0e";
+/// Invalid floating installer reference used by a mutation test.
 const UNPINNED_MDTABLEFIX_ACTION: &str =
     "leynos/shared-actions/.github/actions/install-mdtablefix@main";
+/// Approved mdtablefix version for the Act route.
 const MDTABLEFIX_VERSION: &str = "0.6.0";
 
 /// The ACT values relevant to hosted coverage and its local test fallback.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ActValue {
+    /// Act explicitly enabled.
     True,
+    /// Act explicitly disabled.
     False,
+    /// No Act override was supplied.
     Unset,
 }
 
@@ -118,31 +115,6 @@ fn rejects_duplicate_act_validation_jobs() {
     let duplicate_jobs =
         "jobs:\n  act-validation:\n    steps: []\n  act-validation:\n    steps: []\n";
     parse_workflow_source(WorkflowSource(duplicate_jobs));
-}
-
-/// Rejects comments, malformed continuations, and later shell commands.
-#[test]
-fn ignores_inert_package_references() {
-    assert!(
-        !is_linker_install_command("# sudo apt-get install clang mold"),
-        "comments must not satisfy the linker prerequisite contract"
-    );
-    assert!(
-        !is_linker_install_command("echo sudo apt-get install clang mold"),
-        "echo commands must not satisfy the linker prerequisite contract"
-    );
-    assert!(
-        !is_linker_install_command("sudo apt-get install clang # mold"),
-        "shell comments must not add packages to an installation command"
-    );
-    assert!(
-        !is_linker_install_command("sudo apt-get install other || echo clang mold"),
-        "packages in a later shell command must not satisfy the contract"
-    );
-    assert!(
-        !is_linker_install_command("sudo apt-get install clang mold\\ "),
-        "whitespace after a continuation backslash must be rejected"
-    );
 }
 
 /// Preserves the hosted-coverage guard for nested Act.
@@ -326,6 +298,7 @@ fn workflow_has_mdtablefix_before_act_validation(workflow: &Workflow) -> bool {
     })
 }
 
+/// Builds a small workflow with one formatter action ordering mutation.
 fn mdtablefix_workflow_fixture(
     action: Option<&str>,
     version: &str,
