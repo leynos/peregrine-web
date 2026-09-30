@@ -215,9 +215,11 @@ Install mdtablefix 0.6.0 or later locally with
 ## Act validation linker prerequisites
 
 The Act validation workflow installs and then probes `clang` and `mold` on its
-Ubuntu runner before `make test WITH_ACT=1`; the ordering contract is covered by
-`tests/act_workflow.rs`. The nested Act run disables the shared `setup-rust`
-sccache accelerator, because Act containers cannot provide the GitHub Actions
-cache, and replaces the hosted coverage step with `make test`, because the
-coverage action also needs runtime-token services. Normal CI retains both
-sccache and coverage.
+Ubuntu runner before `make test WITH_ACT=1`. The nested Act run disables the
+shared `setup-rust` sccache accelerator, because Act containers cannot provide
+the GitHub Actions cache, and replaces the hosted coverage step with
+`make test`, because the coverage action also needs runtime-token services.
+`tests/act_workflow.rs` covers both contracts: the linker ordering above, and
+the complementary gate under which exactly one of the coverage step and the Act
+fallback runs the suite for every value of `env.ACT`, so a nested run cannot
+finish with linting alone. Normal CI retains both sccache and coverage.
