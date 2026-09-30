@@ -43,16 +43,19 @@ compatibility against pinned source behaviour before describing it as supported.
 Use `make all` as the public entrypoint for formatting, linting, tests, and
 spelling. It runs these gates one at a time even when invoked with `make -j`.
 `make lint` runs `lint-clippy` (rustdoc, then Clippy) before `lint-whitaker`,
-also under `make -j`. Whitaker clears inherited `RUSTFLAGS` and
-`CARGO_ENCODED_RUSTFLAGS`, and uses LLVM instead of the development backend;
-its Dylint compilation must not inherit the application's frontend or linker
-flags. `make test` prefers `cargo nextest run` and falls back to `cargo test`
-when cargo-nextest is not available. `make check-fmt` verifies Rust formatting
-with `cargo fmt --all -- --check` and Markdown formatting via
-`mdtablefix --check` using the configured selection and formatting rules.
-`make fmt` formats Rust with the pinned `rustfmt`, then applies the Markdown
-formatter and `markdownlint-cli2 --fix`. `make typecheck` type-checks without
-building via `cargo check`. `make audit` derives the Rust workspace root with
+also under `make -j`. Whitaker's temporary Dylint driver is built outside the
+repository, so the recipe removes inherited compiler and linker overrides
+before starting it. Dylint then checks the repository from its root and
+discovers `.cargo/config.toml`; that check uses the development backend and
+linker defaults. The recipe sends warnings-as-errors to the repository check
+through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
+`cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
+available. `make check-fmt` verifies Rust formatting with
+`cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
+using the configured selection and formatting rules. `make fmt` formats Rust
+with the pinned `rustfmt`, then applies the Markdown formatter and
+`markdownlint-cli2 --fix`. `make typecheck` type-checks without building via
+`cargo check`. `make audit` derives the Rust workspace root with
 `cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
 from the workspace root. PR CI skips `make audit` and the audit-only setup when
 `github.actor` is `dependabot[bot]`; that keeps whole-lockfile advisories from
@@ -129,6 +132,14 @@ verification build therefore needs the same explicit production route. Direct
 selects LLVM for the dev profile, and uses `lld` because LLVM coverage tooling
 expects LLVM-compatible code generation and linker behaviour.
 `tests/build_standard_contract.rs` checks the configuration sources and recipes.
+
+Whitaker keeps its two Cargo operations separate. Dylint builds its temporary
+driver outside the repository and receives no application `RUSTFLAGS`, encoded
+flags, backend override, target, or linker override. The repository check runs
+from the repository root, where Cargo reads the defaults above; Dylint adds
+`-D warnings` and the configured Polonius flags only to that check through
+`DYLINT_RUSTFLAGS`. This preserves Cranelift, `-Zthreads=8`, and the native
+wrapper/mold route for lint while leaving the coverage route on LLVM and `lld`.
 
 Run `make install-build-tools` after checking out the project. On native x86_64
 GNU Linux, it installs the pinned `mold` release and verifies its archive

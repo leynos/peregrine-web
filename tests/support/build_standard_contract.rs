@@ -161,21 +161,31 @@ fn dry_run(target: &str, host: Host, inherited: Option<&str>) -> Read<String> {
 
 /// Reads one command's assignment, rejecting unrecognized spellings.
 fn assignment(line: &str, inherited: Option<&str>) -> Read<Option<Flags>> {
-    let Some((_, rest)) = line.split_once("RUSTFLAGS=\"") else {
+    let mut remaining = line;
+    let mut value = None;
+    while let Some((prefix, rest)) = remaining.split_once("RUSTFLAGS=\"") {
+        if prefix.chars().last().is_none_or(char::is_whitespace) {
+            value = Some(rest);
+            break;
+        }
+        remaining = rest;
+    }
+    let Some(rest) = value else {
         return if line.contains("RUSTFLAGS=") {
             Err(format!("unreadable RUSTFLAGS assignment in `{line}`").into())
         } else {
             Ok(None)
         };
     };
-    let (value, _) = rest
+    let (assigned_flags, _) = rest
         .split_once('"')
         .ok_or_else(|| format!("unterminated RUSTFLAGS in `{line}`"))?;
-    expanded(value, inherited).map(Some)
+    expanded(assigned_flags, inherited).map(Some)
 }
 
 /// Returns each Cargo command's assigned flags, or `None` for Cargo's config.
-/// Whitaker deliberately runs with empty flags and LLVM outside this route.
+/// Whitaker is probed separately because Dylint builds its driver away from
+/// the repository but checks repository crates from the Make working directory.
 pub(super) fn make_rustflags(
     target: &str,
     host: Host,
@@ -183,13 +193,21 @@ pub(super) fn make_rustflags(
 ) -> Read<Vec<Option<Flags>>> {
     let commands = dry_run(target, host, inherited)?
         .lines()
-        .filter(|line| line.contains("cargo") && !line.contains("whitaker"))
+        .filter(|line| {
+            line.split_whitespace()
+                .any(|word| word == "cargo" || word.ends_with("/cargo"))
+        })
         .map(|line| assignment(line, inherited))
         .collect::<Read<Vec<_>>>()?;
     if commands.is_empty() {
         return Err(format!("`make -n {target}` runs no cargo command").into());
     }
     Ok(commands)
+}
+
+/// Returns the evaluated Whitaker recipes so its separate Cargo route is tested directly.
+pub(super) fn make_whitaker_recipe(host: Host) -> Read<String> {
+    dry_run("lint-whitaker", host, None)
 }
 
 /// Describes missing standard flags in one assigned development command.
