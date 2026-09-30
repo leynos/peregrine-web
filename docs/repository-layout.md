@@ -57,8 +57,9 @@ compact and omits build output such as `target/`.
 - `.cargo/config.toml`: Configures Cargo defaults for local development,
   including Linux linker and code-generation settings.
 - `.github/dependabot.yml`: Configures automated dependency update checks.
-- `.github/workflows/act-validation.yml`: Runs the generated workflow
-  validation through `act` separately from main CI.
+- `.github/workflows/act-validation.yml`: Runs the full workflow through Act
+  on manual dispatch to check local runner compatibility. Pull requests use
+  workflow and command contract tests in the hosted `build-test` gate.
 - `.github/workflows/ci.yml`: Runs the generated project's continuous
   integration checks.
 - `.github/workflows/mutation-testing.yml`: Runs scheduled mutation testing

@@ -64,24 +64,36 @@ compensating control is `.github/workflows/audit.yml`, which runs weekly and
 can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
 `lld`.
 
-GitHub Actions Act validation lives in `.github/workflows/act-validation.yml`.
-The main `.github/workflows/ci.yml` workflow deliberately does not run
-`make test WITH_ACT=1`; the separate Act workflow runs those slower
-container-backed checks in parallel.
+Every pull request runs the hosted `build-test` job as the authoritative
+repository gate. Its Rust test suite includes workflow-structure and command
+contract tests: workflow YAML and pins are checked from source, while real Make
+recipes and shell scripts run with controlled external executors. These tests
+prove invocation shape, configuration, ordering, and failure propagation
+without compiling the repository again for each contract.
 
-Act validation has two dependency boundaries. The GitHub Actions host first
-builds the repository's Rust test binaries for `make test WITH_ACT=1`. On
-Linux, Cargo reads `.cargo/config.toml`, which selects `clang` and `mold`, so
-the host must install both packages before Cargo starts. Only after that outer
-test process reaches Act do nested containers and workflows run. Packages
-inside those nested environments cannot fix a linker missing from the host. The
-`act-validation` workflow is the Linux runner-level acceptance path. After
-outer Cargo tests link successfully, `make test WITH_ACT=1` runs the real CI
-workflow through Act. A local run needs Docker, Act, and the same host linker
-prerequisites, plus a GitHub token for nested actions; it does not replace a
-fresh GitHub-hosted Ubuntu run. The Act harness skips CI's coverage action
-because its hosted cache and coverage-object collection services are not
-available in local containers.
+The separate `.github/workflows/act-validation.yml` workflow runs only on
+manual dispatch. It exercises the full workflow through Act in Docker to check
+local Act compatibility, including step routing, action execution, shell
+availability, and runner protocols. That result does not establish parity with
+GitHub-hosted runners; the hosted `build-test` job remains the repository gate.
+Contributors can also opt into this local integration run with
+`make test WITH_ACT=1`. It first runs the outer Rust tests, then Act runs the
+CI workflow with its ordinary test step and without hosted coverage collection.
+The host needs Docker, Act, the pinned linker prerequisites, and a GitHub token
+for nested actions. The ordinary PR contracts and hosted lint retain the cold
+Whitaker driver construction and real repository check, so the stubbed command
+contracts do not replace compiler integration evidence.
+
+Use `make act-contract-smoke` for the focused Act compatibility check. It runs
+an ignored Rust test against a derived copy of the CI workflow, with explicit
+fixture actions and controlled command executors; it checks step routing and
+failure propagation without rerunning the full repository suite in Docker. Use
+`make act-validation` or `make test WITH_ACT=1` when you need the full local
+Act run. To exercise actual Dylint driver construction on both cache states, run
+`make whitaker-driver-integration`; it creates a private driver directory and
+runs `make lint-whitaker` cold, then warm. Hosted CI's lint step also uses a
+fresh runner-temporary driver directory for each job, preserving cold driver
+construction as part of the real repository gate.
 
 A scheduled `.github/workflows/mutation-testing.yml` workflow also runs
 `cargo-mutants` via the shared reusable workflow, daily and on manual dispatch.
@@ -140,6 +152,20 @@ from the repository root, where Cargo reads the defaults above; Dylint adds
 `-D warnings` and the configured Polonius flags only to that check through
 `DYLINT_RUSTFLAGS`. This preserves Cranelift, `-Zthreads=8`, and the native
 wrapper/mold route for lint while leaving the coverage route on LLVM and `lld`.
+
+## Lint baseline
+
+The single-crate lint tables live in the root `Cargo.toml`; new packages in a
+future workspace must inherit the workspace lint tables. `clippy.toml` sets
+cognitive complexity to 9, argument count to 4, function length to 70 lines,
+and nesting depth to 4. Fix findings at their source. Keep exceptions narrow,
+documented, and reasoned; do not use lint allowances to defer work. Code that
+reads environment values should receive an injected `mockable::Env` or a narrow
+equivalent, and tests should use `MockEnv` or a child process with controlled
+`Command::env` settings. The pinned nightly in `rust-toolchain.toml` supplies
+`clippy`, `rustfmt`, `rust-analyzer`, `rustc-codegen-cranelift-preview`, and
+`llvm-tools-preview` for the required lint, formatting, analysis, development,
+and coverage routes.
 
 Run `make install-build-tools` after checking out the project. On native x86_64
 GNU Linux, it installs the pinned `mold` release and verifies its archive

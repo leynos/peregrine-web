@@ -17,7 +17,7 @@ pub(super) const LINUX_TARGET: &str = "x86_64-unknown-linux-gnu";
 /// Makefile targets that build for development. A command in one either
 /// assigns `RUSTFLAGS` with the standard flags or assigns none and so takes
 /// the configuration's.
-const DEVELOPMENT_TARGETS: [&str; 4] = ["test", "typecheck", "lint", "build"];
+const DEVELOPMENT_TARGETS: [&str; 5] = ["test", "typecheck", "lint", "build", "act-contract-smoke"];
 
 /// Makefile targets that measure or ship, so every command assigns
 /// `RUSTFLAGS` and none carries a standard flag.
@@ -25,7 +25,8 @@ pub(super) const HELD_OUT_TARGETS: [&str; 3] = ["coverage", "release", "package"
 
 /// Development targets that must assign `RUSTFLAGS` in at least one command,
 /// so the restatement checks above cannot pass by finding nothing to check.
-pub(super) const ASSIGNING_TARGETS: [&str; 4] = ["test", "typecheck", "lint", "build"];
+pub(super) const ASSIGNING_TARGETS: [&str; 5] =
+    ["test", "typecheck", "lint", "build", "act-contract-smoke"];
 
 /// A caller's own flags, distinct from anything a recipe adds, to prove a
 /// recipe composes an exported `RUSTFLAGS` with the standard flags rather than

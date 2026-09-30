@@ -81,7 +81,13 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         run: make audit
       - name: Lint
-        run: make lint
+        # A private path exercises Dylint's cold driver construction on each
+        # hosted run before the repository lint check.
+        env:
+          DYLINT_DRIVER_PATH: ${{ runner.temp }}/peregrine-whitaker-driver
+        run: |
+          mkdir -p "$DYLINT_DRIVER_PATH"
+          make lint
       - name: Log coverage linker configuration
         run: |
           echo "Coverage linker: clang"

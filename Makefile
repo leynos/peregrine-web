@@ -7,7 +7,7 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
-.PHONY: help all clean test act-validation build release package coverage \
+.PHONY: help all clean test act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker fmt check-fmt markdownlint spelling nixie \
   audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
@@ -94,6 +94,16 @@ act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 		--env ACT=true \
 		--platform "ubuntu-latest=$(ACT_RUNNER_IMAGE)" \
 		--workflows .github/workflows/ci.yml --job build-test
+
+act-contract-smoke: check-build-tools ## Check Act step routing with local action and command fixtures
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) test --test act_workflow smoke::real_act_runs_derived_workflow_and_propagates_failure -- --ignored --exact
+
+whitaker-driver-integration: ## Check cold then warm Dylint driver construction
+	@set -euo pipefail; mkdir -p target; \
+		cache_dir="$$(mktemp -d "$(CURDIR)/target/whitaker-driver.XXXXXX")"; \
+		trap 'rm -rf "$$cache_dir"' EXIT; \
+		DYLINT_DRIVER_PATH="$$cache_dir" $(MAKE) lint-whitaker; \
+		DYLINT_DRIVER_PATH="$$cache_dir" $(MAKE) lint-whitaker
 
 target/debug/$(TARGET): check-build-tools ## Build debug binary
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) build $(BUILD_JOBS)
