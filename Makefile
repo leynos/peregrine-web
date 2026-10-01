@@ -177,7 +177,9 @@ spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
 		echo "make spelling found no tracked files: the gate enumerates tracked files with git ls-files. Run: git add -A" >&2; \
 		exit 1; \
 	fi
-	$(TYPOS_CONFIG_BUILDER) gate
+# The managed session injects GitHub URL rewrites through an identity helper.
+# The public pinned tool and local git ls-files input need no injected config.
+	env -u GIT_CONFIG_COUNT $(TYPOS_CONFIG_BUILDER) gate
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
