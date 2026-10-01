@@ -157,27 +157,24 @@ fn assert_whitaker_command(invocation: &Invocation, expected_cache_state: &str) 
 
 /// Checks inherited build overrides are absent from driver construction.
 fn assert_driver_environment(invocation: &Invocation) {
-    assert_env(
-        invocation,
-        "RUSTFLAGS",
-        &EnvironmentValue::Unset,
-        "Whitaker must not receive caller RUSTFLAGS for its driver build",
-    );
-    for variable in [
-        "CARGO_ENCODED_RUSTFLAGS",
-        "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-        "CARGO_BUILD_TARGET",
-        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
-        "CFLAGS",
-        "LDFLAGS",
-    ] {
-        assert_env(
-            invocation,
-            variable,
-            &EnvironmentValue::Unset,
-            "Whitaker must not inherit caller build-selection overrides",
-        );
-    }
+    /// Common diagnostic for caller build-routing overrides.
+    const OVERRIDE_REASON: &str = "Whitaker must not inherit caller build-selection overrides";
+    let expectations = [
+        (
+            "RUSTFLAGS",
+            "Whitaker must not receive caller RUSTFLAGS for its driver build",
+        ),
+        ("CARGO_ENCODED_RUSTFLAGS", OVERRIDE_REASON),
+        ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", OVERRIDE_REASON),
+        ("CARGO_BUILD_TARGET", OVERRIDE_REASON),
+        (
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+            OVERRIDE_REASON,
+        ),
+        ("CFLAGS", OVERRIDE_REASON),
+        ("LDFLAGS", OVERRIDE_REASON),
+    ];
+    assert_unset_environment(invocation, &expectations);
 }
 
 /// Checks warnings-as-errors are forwarded through the supported driver input.
@@ -261,23 +258,33 @@ fn assert_config_query(invocation: &Invocation, expected_query: &(&str, &str)) {
 
 /// Checks Cargo probes cannot inherit the caller build route.
 fn assert_config_environment(invocation: &Invocation) {
-    assert_env(
-        invocation,
-        "RUSTFLAGS",
-        &EnvironmentValue::Unset,
-        "the repository configuration query must not inherit development flags",
-    );
-    for variable in [
-        "CARGO_ENCODED_RUSTFLAGS",
-        "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-        "CARGO_BUILD_TARGET",
-        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
-    ] {
-        assert_env(
-            invocation,
-            variable,
-            &EnvironmentValue::Unset,
-            "Cargo configuration probes must not inherit caller route overrides",
-        );
+    /// Common diagnostic for caller build-routing overrides.
+    const OVERRIDE_REASON: &str =
+        "Cargo configuration probes must not inherit caller route overrides";
+    let expectations = [
+        (
+            "RUSTFLAGS",
+            "the repository configuration query must not inherit development flags",
+        ),
+        ("CARGO_ENCODED_RUSTFLAGS", OVERRIDE_REASON),
+        ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", OVERRIDE_REASON),
+        ("CARGO_BUILD_TARGET", OVERRIDE_REASON),
+        (
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+            OVERRIDE_REASON,
+        ),
+    ];
+    assert_unset_environment(invocation, &expectations);
+}
+
+/// Checks each named observation is explicitly unset at its contract boundary.
+fn assert_unset_environment(invocation: &Invocation, expectations: &[(&str, &str)]) {
+    for (variable, reason) in expectations {
+        assert_env(invocation, variable, &EnvironmentValue::Unset, reason);
     }
 }
+
+/// Regression coverage for explicit unset observations and later contamination.
+#[cfg(test)]
+#[path = "make_gate_order_environment_tests.rs"]
+mod environment_tests;

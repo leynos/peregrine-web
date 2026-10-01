@@ -13,6 +13,11 @@ pub(super) fn known_step(item: &Value) -> bool {
     if !valid_step_env(item, name) {
         return false;
     }
+    valid_step_condition(item, name) && valid_step_command(item, name)
+}
+
+/// Pins each guarded step's textual condition and explicit condition presence.
+fn valid_step_condition(item: &Value, name: Option<&str>) -> bool {
     let condition = text(item, &["if"]);
     let expected_condition = match name {
         Some("Install linker prerequisites") => Some("runner.os == 'Linux'"),
@@ -25,11 +30,11 @@ pub(super) fn known_step(item: &Value) -> bool {
         Some("Test under Act") => Some("env.ACT == 'true'"),
         _ => None,
     };
-    if condition != expected_condition
-        || at(item, &["if"]).is_some() != expected_condition.is_some()
-    {
-        return false;
-    }
+    condition == expected_condition && at(item, &["if"]).is_some() == expected_condition.is_some()
+}
+
+/// Matches known scripts, retaining the textual action fallback for nontext runs.
+fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
     let Some(script) = text(item, &["run"]) else {
         return text(item, &["uses"]).is_some();
     };

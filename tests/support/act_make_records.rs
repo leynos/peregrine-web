@@ -41,24 +41,26 @@ pub(super) struct Invocation {
 
 /// Parses one or more versioned executor records from the NUL-delimited log.
 pub(super) fn parse_invocations(text: &str) -> io::Result<Vec<Invocation>> {
-    let fields = text.split_terminator('\0').collect::<Vec<_>>();
-    let mut index = 0;
+    let mut cursor = RecordCursor {
+        fields: text.split_terminator('\0').collect(),
+        index: 0,
+    };
     let mut invocations = Vec::new();
-    while index < fields.len() {
-        invocations.push(parse_invocation(&fields, &mut index)?);
+    while cursor.index < cursor.fields.len() {
+        invocations.push(parse_invocation(&mut cursor)?);
     }
     Ok(invocations)
 }
 
 /// Parses one complete invocation and requires its closing marker.
-fn parse_invocation(fields: &[&str], index: &mut usize) -> io::Result<Invocation> {
-    require_field(fields, index, "invocation-v1")?;
-    let executable = next_field(fields, index)?.to_owned();
-    let working_directory = next_field(fields, index)?.to_owned();
-    let environment = parse_environment(fields, index)?;
-    let github_token = parse_token(fields, index)?;
-    let arguments = parse_arguments(fields, index)?;
-    require_field(fields, index, "end-invocation")?;
+fn parse_invocation(cursor: &mut RecordCursor<'_>) -> io::Result<Invocation> {
+    cursor.require_field("invocation-v1")?;
+    let executable = cursor.next_field()?.to_owned();
+    let working_directory = cursor.next_field()?.to_owned();
+    let environment = parse_environment(cursor)?;
+    let github_token = parse_token(cursor)?;
+    let arguments = parse_arguments(cursor)?;
+    cursor.require_field("end-invocation")?;
     Ok(Invocation {
         executable,
         arguments,
@@ -70,8 +72,7 @@ fn parse_invocation(fields: &[&str], index: &mut usize) -> io::Result<Invocation
 
 /// Parses the fixed environment sequence without losing absent or empty values.
 fn parse_environment(
-    fields: &[&str],
-    index: &mut usize,
+    cursor: &mut RecordCursor<'_>,
 ) -> io::Result<BTreeMap<String, EnvironmentValue>> {
     let mut environment = BTreeMap::new();
     for expected_name in [
@@ -83,15 +84,15 @@ fn parse_environment(
         "CARGO_BUILD_TARGET",
         "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
     ] {
-        require_field(fields, index, "env")?;
-        let name = next_field(fields, index)?;
+        cursor.require_field("env")?;
+        let name = cursor.next_field()?;
         if name != expected_name {
             return Err(io::Error::other(format!(
                 "expected environment record {expected_name}, found {name}"
             )));
         }
-        let state = next_field(fields, index)?;
-        let raw_value = next_field(fields, index)?;
+        let state = cursor.next_field()?;
+        let raw_value = cursor.next_field()?;
         let environment_value = parse_environment_value(state, raw_value)?;
         environment.insert(name.to_owned(), environment_value);
     }
@@ -114,10 +115,10 @@ fn parse_environment_value(state: &str, raw_value: &str) -> io::Result<Environme
 }
 
 /// Parses the redacted GitHub token-presence field.
-fn parse_token(fields: &[&str], index: &mut usize) -> io::Result<GitHubToken> {
-    require_field(fields, index, "secret")?;
-    require_field(fields, index, "GITHUB_TOKEN")?;
-    let token = match next_field(fields, index)? {
+fn parse_token(cursor: &mut RecordCursor<'_>) -> io::Result<GitHubToken> {
+    cursor.require_field("secret")?;
+    cursor.require_field("GITHUB_TOKEN")?;
+    let token = match cursor.next_field()? {
         "unset" => GitHubToken::Unset,
         "empty" => GitHubToken::Empty,
         "present" => GitHubToken::Present,
@@ -127,36 +128,52 @@ fn parse_token(fields: &[&str], index: &mut usize) -> io::Result<GitHubToken> {
 }
 
 /// Parses exactly the declared argument count and preserves internal empty fields.
-fn parse_arguments(fields: &[&str], index: &mut usize) -> io::Result<Vec<String>> {
-    require_field(fields, index, "argc")?;
-    let argument_count = next_field(fields, index)?
+fn parse_arguments(cursor: &mut RecordCursor<'_>) -> io::Result<Vec<String>> {
+    cursor.require_field("argc")?;
+    let argument_count = cursor
+        .next_field()?
         .parse::<usize>()
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    require_field(fields, index, "argv")?;
+    cursor.require_field("argv")?;
     let mut arguments = Vec::with_capacity(argument_count);
     for _ in 0..argument_count {
-        arguments.push(next_field(fields, index)?.to_owned());
+        arguments.push(cursor.next_field()?.to_owned());
     }
     Ok(arguments)
 }
 
-/// Reads the next NUL-delimited field and advances the parser position.
-fn next_field<'a>(fields: &[&'a str], index: &mut usize) -> io::Result<&'a str> {
-    let field = fields
-        .get(*index)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete command record"))?;
-    *index += 1;
-    Ok(field)
+/// Owns borrowed log fields and their current parsing position.
+struct RecordCursor<'a> {
+    /// Fields split with the existing NUL terminator semantics.
+    fields: Vec<&'a str>,
+    /// Position of the next unconsumed field.
+    index: usize,
 }
 
-/// Requires a field marker and advances the parser position on success.
-fn require_field(fields: &[&str], index: &mut usize, expected: &str) -> io::Result<()> {
-    let found = next_field(fields, index)?;
-    if found == expected {
-        Ok(())
-    } else {
-        Err(io::Error::other(format!(
-            "expected command record marker {expected}, found {found}"
-        )))
+impl<'a> RecordCursor<'a> {
+    /// Reads an existing field and advances; exhaustion leaves the position intact.
+    fn next_field(&mut self) -> io::Result<&'a str> {
+        let field = self.fields.get(self.index).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete command record")
+        })?;
+        self.index += 1;
+        Ok(field)
+    }
+
+    /// Consumes a marker, including an existing marker that fails comparison.
+    fn require_field(&mut self, expected: &str) -> io::Result<()> {
+        let found = self.next_field()?;
+        if found == expected {
+            Ok(())
+        } else {
+            Err(io::Error::other(format!(
+                "expected command record marker {expected}, found {found}"
+            )))
+        }
     }
 }
+
+/// Protocol and cursor contracts beside their private parser implementation.
+#[cfg(test)]
+#[path = "act_make_parser_tests.rs"]
+mod parser_tests;

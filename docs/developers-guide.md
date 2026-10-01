@@ -71,6 +71,18 @@ recipes and shell scripts run with controlled external executors. These tests
 prove invocation shape, configuration, ordering, and failure propagation
 without compiling the repository again for each contract.
 
+Table-driven contract regressions use the `rstest` dev dependency with its
+optional asynchronous-timeout and crate-renaming features disabled. Private
+test-support helpers remain owned by their named contract modules. Workflow
+predicates compose event, action-input, and step-policy checks without changing
+their YAML acceptance rules. `MakeOptions` applies caller settings and executor
+controls after the harness removes baseline child overrides. `RecordCursor`
+belongs only to the Act Make record parser and preserves its existing NUL field
+protocol. The unset-environment assertion is shared only by the driver and
+configuration boundaries and their regression tests; each boundary owns its
+variable names and diagnostics. These helpers are not a cross-suite validation
+framework.
+
 The separate `.github/workflows/act-validation.yml` workflow runs only on
 manual dispatch. It exercises the full workflow through Act in Docker to check
 local Act compatibility, including step routing, action execution, shell

@@ -142,6 +142,42 @@ pub(super) struct MakeOptions {
     pub(super) caller_linker: Option<&'static str>,
 }
 
+impl MakeOptions {
+    /// Applies caller values after the harness removes unsupported ambient routing.
+    fn apply_caller_environment(&self, command: &mut Command) {
+        if let Some(caller_with_act) = self.caller_with_act {
+            command.env("WITH_ACT", caller_with_act);
+        } else {
+            command.env_remove("WITH_ACT");
+        }
+        if let Some(rustflags) = self.caller_rustflags {
+            command.env("RUSTFLAGS", rustflags);
+        }
+        if let Some(backend) = self.caller_backend {
+            command.env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", backend);
+        }
+        if let Some(linker) = self.caller_linker {
+            command.env("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", linker);
+        }
+    }
+
+    /// Enables only the executor controls selected for this invocation.
+    fn apply_executor_controls(&self, command: &mut Command) {
+        if let Some(invocation) = self.fail_cargo_invocation {
+            command.env("FAIL_CARGO_INVOCATION", invocation.to_string());
+        }
+        if self.failure == Some(ExecutorFailure::Act) {
+            command.env("FAIL_ACT", "1");
+        }
+        if self.failure == Some(ExecutorFailure::Preflight) {
+            command.env("FAIL_PREFLIGHT", "1");
+        }
+        if self.nextest_available {
+            command.env("NEXTTEST_AVAILABLE", "1");
+        }
+    }
+}
+
 /// Runs real Make recipes while replacing their external executors.
 pub(super) struct MakeHarness {
     /// Parent capability used to remove the private fixture directory.
@@ -213,35 +249,11 @@ impl MakeHarness {
             .env_remove("FAIL_ACT")
             .env_remove("FAIL_PREFLIGHT")
             .env_remove("NEXTTEST_AVAILABLE")
-            .env_remove("INVOCATION_EXECUTABLE");
+            .env_remove("INVOCATION_EXECUTABLE")
+            .env_remove("ACT");
 
-        if let Some(caller_with_act) = options.caller_with_act {
-            command.env("WITH_ACT", caller_with_act);
-        } else {
-            command.env_remove("WITH_ACT");
-        }
-        command.env_remove("ACT");
-        if let Some(invocation) = options.fail_cargo_invocation {
-            command.env("FAIL_CARGO_INVOCATION", invocation.to_string());
-        }
-        if options.failure == Some(ExecutorFailure::Act) {
-            command.env("FAIL_ACT", "1");
-        }
-        if options.failure == Some(ExecutorFailure::Preflight) {
-            command.env("FAIL_PREFLIGHT", "1");
-        }
-        if options.nextest_available {
-            command.env("NEXTTEST_AVAILABLE", "1");
-        }
-        if let Some(rustflags) = options.caller_rustflags {
-            command.env("RUSTFLAGS", rustflags);
-        }
-        if let Some(backend) = options.caller_backend {
-            command.env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", backend);
-        }
-        if let Some(linker) = options.caller_linker {
-            command.env("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", linker);
-        }
+        options.apply_caller_environment(&mut command);
+        options.apply_executor_controls(&mut command);
         command.output()
     }
 
@@ -315,3 +327,8 @@ fn write_executable(directory: &Dir, file_name: &str, contents: &str) -> io::Res
     directory.write(file_name, contents)?;
     directory.set_permissions(file_name, Permissions::from_mode(0o700))
 }
+
+/// Direct configuration contracts for the private option helpers.
+#[cfg(test)]
+#[path = "act_make_options_tests.rs"]
+mod options_tests;
