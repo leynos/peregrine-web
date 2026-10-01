@@ -1,5 +1,12 @@
 //! Mutation tests for hosted workflow and manual Act route contracts.
 
+/// Direct regression corpus for the independent event predicates.
+#[path = "act_workflow_event_tests.rs"]
+mod events;
+/// Direct regression corpus for step conditions, scripts, and action interfaces.
+#[path = "act_workflow_policy_tests.rs"]
+mod step_policy;
+
 use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, contracts_hold};
 
 #[test]
@@ -49,6 +56,10 @@ fn workflow_mutations_break_the_contract() {
             CI_WORKFLOW.replace("          make lint", "          custom-lint"),
         ),
     ] {
+        assert_ne!(
+            changed, CI_WORKFLOW,
+            "mutation must change source: {reason}"
+        );
         assert!(
             !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
             "contract must detect {reason}"
@@ -102,6 +113,10 @@ fn workflow_execution_mutations_break_the_contract() {
             ),
         ),
     ] {
+        assert_ne!(
+            changed, CI_WORKFLOW,
+            "mutation must change source: {reason}"
+        );
         assert!(
             !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
             "contract must detect {reason}"
@@ -142,6 +157,10 @@ fn workflow_environment_mutations_break_the_contract() {
             CI_WORKFLOW.replace("- name: Lint\n", "- name: Lint\n        shell: sh\n"),
         ),
     ] {
+        assert_ne!(
+            changed, CI_WORKFLOW,
+            "mutation must change source: {reason}"
+        );
         assert!(
             !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
             "contract must detect {reason}"
@@ -151,12 +170,20 @@ fn workflow_environment_mutations_break_the_contract() {
         "  workflow_dispatch:",
         "  pull_request:\n  workflow_dispatch:",
     );
+    assert_ne!(
+        enabled_pr_act, ACT_VALIDATION_WORKFLOW,
+        "PR Act mutation must change source"
+    );
     assert!(
         !contracts_hold(CI_WORKFLOW, &enabled_pr_act),
         "Act must not repeat full validation on pull requests"
     );
     let wrong_manual_pin =
         ACT_VALIDATION_WORKFLOW.replace("47b337e4f230b591891656534d4ffad868131740", "main");
+    assert_ne!(
+        wrong_manual_pin, ACT_VALIDATION_WORKFLOW,
+        "manual pin mutation must change source"
+    );
     assert!(
         !contracts_hold(CI_WORKFLOW, &wrong_manual_pin),
         "manual Act's action revision must stay pinned"

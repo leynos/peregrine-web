@@ -15,6 +15,7 @@ categories = ["network"]
 [dev-dependencies]
 camino = "1.2.0"
 cap-std = { version = "3.4.6", features = ["fs_utf8"] }
+rstest = { version = "0.27.0", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 toml = "1.1.3"

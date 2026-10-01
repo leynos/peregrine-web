@@ -110,33 +110,43 @@ pub(super) fn step<'a>(document: &'a Value, name: &str) -> Option<(usize, &'a Va
         .find(|(_, item)| text(item, &["name"]) == Some(name))
 }
 
-/// Checks the two event routes and the one manually requested Act route.
+/// Checks the independent hosted and manually requested event boundaries.
 fn valid_triggers(ci: &Value, act: &Value) -> bool {
-    let Some(ci_events) = at(ci, &["on"]).and_then(Value::as_mapping) else {
+    valid_hosted_events(ci) && valid_manual_events(act)
+}
+
+/// Requires exactly the hosted PR and null manual-dispatch event entries.
+fn valid_hosted_events(ci: &Value) -> bool {
+    let Some(events) = at(ci, &["on"]).and_then(Value::as_mapping) else {
         return false;
     };
-    let Some(act_events) = at(act, &["on"]).and_then(Value::as_mapping) else {
-        return false;
-    };
+    events.len() == 2
+        && at(ci, &["on", "workflow_dispatch"]).is_some_and(Value::is_null)
+        && valid_pull_request_types(ci)
+}
+
+/// Pins the sole PR field and its ordered textual update-event types.
+fn valid_pull_request_types(ci: &Value) -> bool {
     let Some(pr) = at(ci, &["on", "pull_request"]).and_then(Value::as_mapping) else {
         return false;
     };
-    let expected_types = ["opened", "synchronize", "reopened"];
     let Some(types) = at(ci, &["on", "pull_request", "types"]).and_then(Value::as_sequence) else {
         return false;
     };
-    ci_events.len() == 2
-        && ci_events.contains_key(Value::String("pull_request".into()))
-        && ci_events.contains_key(Value::String("workflow_dispatch".into()))
-        && pr.len() == 1
-        && types
-            .iter()
-            .map(Value::as_str)
-            .eq(expected_types.into_iter().map(Some))
-        && at(ci, &["on", "workflow_dispatch"]).is_some_and(Value::is_null)
-        && act_events.len() == 1
-        && act_events.contains_key(Value::String("workflow_dispatch".into()))
-        && at(act, &["on", "workflow_dispatch"]).is_some_and(Value::is_null)
+    pr.len() == 1
+        && types.iter().map(Value::as_str).eq([
+            Some("opened"),
+            Some("synchronize"),
+            Some("reopened"),
+        ])
+}
+
+/// Requires the optional full Act workflow to expose only null manual dispatch.
+fn valid_manual_events(act: &Value) -> bool {
+    let Some(events) = at(act, &["on"]).and_then(Value::as_mapping) else {
+        return false;
+    };
+    events.len() == 1 && at(act, &["on", "workflow_dispatch"]).is_some_and(Value::is_null)
 }
 
 /// Checks the known action set before a fixture could replace any action.
@@ -152,17 +162,26 @@ pub(super) fn valid_actions(ci: &Value) -> bool {
         && actions
             .iter()
             .zip(ACTIONS)
-            .all(|(item, (revision, name, inputs))| {
-                text(item, &["uses"]) == Some(*revision)
-                    && (name == &"checkout" || text(item, &["name"]) == Some(*name))
-                    && inputs
-                        .iter()
-                        .all(|(key, value)| action_input(item, key).as_deref() == Some(*value))
-                    && at(item, &["with"])
-                        .and_then(Value::as_mapping)
-                        .map_or(0, serde_yaml::Mapping::len)
-                        == inputs.len()
-            })
+            .all(|(item, expected)| matches_hosted_action(item, expected))
+}
+
+/// Matches one hosted action revision, its name exception, and consumed inputs.
+fn matches_hosted_action(item: &Value, expected: &ActionContract) -> bool {
+    let (revision, name, inputs) = expected;
+    text(item, &["uses"]) == Some(*revision)
+        && (*name == "checkout" || text(item, &["name"]) == Some(*name))
+        && action_inputs_match(item, inputs)
+}
+
+/// Matches scalar input values and count, retaining absent non-mapping semantics.
+fn action_inputs_match(item: &Value, expected: &[(&str, &str)]) -> bool {
+    expected
+        .iter()
+        .all(|(key, value)| action_input(item, key).as_deref() == Some(*value))
+        && at(item, &["with"])
+            .and_then(Value::as_mapping)
+            .map_or(0, serde_yaml::Mapping::len)
+            == expected.len()
 }
 
 /// Checks the hosted suite path, step order, guards, and failure semantics.
@@ -298,37 +317,7 @@ fn valid_manual_act_route(act: &Value) -> bool {
     if !valid_manual_job_policy(act, steps) {
         return false;
     }
-    let expected_actions = [
-        (
-            "actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231",
-            "persist-credentials",
-            "false",
-        ),
-        (
-            "leynos/shared-actions/.github/actions/install-mdtablefix@\
-             4fb8eb7ad52454678a0662865d81d3cd17aa6e0e",
-            "version",
-            "0.6.0",
-        ),
-        (
-            "leynos/shared-actions/.github/actions/setup-rust@\
-             47b337e4f230b591891656534d4ffad868131740",
-            "rustflags",
-            "",
-        ),
-    ];
-    if !steps
-        .iter()
-        .take(3)
-        .zip(expected_actions)
-        .all(|(item, (revision, key, value))| {
-            text(item, &["uses"]) == Some(revision)
-                && action_input(item, key).as_deref() == Some(value)
-                && at(item, &["with"])
-                    .and_then(Value::as_mapping)
-                    .is_some_and(|mapping| mapping.len() == 1)
-        })
-    {
+    if !valid_manual_action_prefix(steps) {
         return false;
     }
     let Some(index) = steps
@@ -352,4 +341,34 @@ pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> bool {
         && valid_actions(&ci)
         && valid_ci_route(&ci)
         && valid_manual_act_route(&act)
+}
+
+/// Pins the three provisioning actions before the manual full Act command.
+fn valid_manual_action_prefix(steps: &[Value]) -> bool {
+    let expected_actions = [
+        (
+            "actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231",
+            "persist-credentials",
+            "false",
+        ),
+        (
+            "leynos/shared-actions/.github/actions/install-mdtablefix@\
+             4fb8eb7ad52454678a0662865d81d3cd17aa6e0e",
+            "version",
+            "0.6.0",
+        ),
+        (
+            "leynos/shared-actions/.github/actions/setup-rust@\
+             47b337e4f230b591891656534d4ffad868131740",
+            "rustflags",
+            "",
+        ),
+    ];
+    steps
+        .iter()
+        .take(3)
+        .zip(expected_actions)
+        .all(|(item, (revision, key, value))| {
+            text(item, &["uses"]) == Some(revision) && action_inputs_match(item, &[(key, value)])
+        })
 }
