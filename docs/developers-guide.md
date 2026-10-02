@@ -190,6 +190,29 @@ selects LLVM for the dev profile, and uses `lld` because LLVM coverage tooling
 expects LLVM-compatible code generation and linker behaviour.
 `tests/build_standard_contract.rs` checks the configuration sources and recipes.
 
+Figure 1 shows how Cargo and Make select compiler and linker settings for the
+main build routes. Bare Cargo and development Make builds use Cranelift and the
+parallel frontend; supported native x86_64 GNU Linux builds use the Clang
+wrapper and pinned `mold`. Coverage uses LLVM and `lld`; release and package
+builds use LLVM and the platform linker. This diagram excludes the separate
+Whitaker clean-environment route described below.
+
+```mermaid
+flowchart TD
+    Start[Build or test command] --> Route{Build route?}
+    Route -->|Bare Cargo| Config[Cargo config defaults]
+    Route -->|Development Make| Compose[Compose inherited flags with DEV_RUST_FLAGS]
+    Route -->|Coverage| Coverage[Use COVERAGE_RUST_FLAGS and LLVM]
+    Route -->|Release or package| Release[Use RELEASE_RUST_FLAGS and LLVM]
+    Config --> Dev[Cranelift and parallel rustc frontend with -Zthreads=8]
+    Compose --> Dev
+    Dev --> Linux{Supported native x86_64 GNU Linux?}
+    Linux -->|Yes| Mold[Clang wrapper selects pinned mold]
+    Linux -->|No| Platform[Use platform linker]
+    Coverage --> Lld[Use lld]
+    Release --> Platform
+```
+
 Whitaker keeps its two Cargo operations separate. Dylint builds its temporary
 driver outside the repository and receives no application `RUSTFLAGS`, encoded
 flags, backend override, target, or linker override. The repository check runs
