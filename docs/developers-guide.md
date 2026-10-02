@@ -40,6 +40,17 @@ compatibility against pinned source behaviour before describing it as supported.
 
 ## Local Workflow
 
+After rendering a project, initialize version control and stage its files
+before running repository gates:
+
+```sh
+git init
+git add -A
+```
+
+The following workflow describes contributor checks and their file-selection
+rules.
+
 Use `make all` as the public entrypoint for formatting, linting, tests, and
 spelling. It runs these gates one at a time even when invoked with `make -j`.
 `make lint` runs `lint-clippy` (rustdoc, then Clippy) before `lint-whitaker`,
@@ -63,6 +74,16 @@ blocking unrelated Dependabot PRs while human PRs retain the audit gate. The
 compensating control is `.github/workflows/audit.yml`, which runs weekly and
 can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
 `lld`.
+
+`make check-fmt` checks Git-tracked Markdown and untracked files Git does not
+ignore; files need not be staged. Markdown lint covers every matching file. The
+spelling gate enumerates files with `git ls-files`, so it checks tracked files
+only. Stage new documentation before relying on spelling results.
+
+The first `make spelling` run regenerates the tracked `typos.toml`; commit that
+generated file with the change. The gate derives it from the shared dictionary
+and `typos.local.toml`, so add repository-specific exceptions to the local
+overlay instead of editing generated output.
 
 Every pull request runs the hosted `build-test` job as the authoritative
 repository gate. Its Rust test suite includes workflow-structure and command
@@ -91,10 +112,11 @@ GitHub-hosted runners; the hosted `build-test` job remains the repository gate.
 Contributors can also opt into this local integration run with
 `make test WITH_ACT=1`. It first runs the outer Rust tests, then Act runs the
 CI workflow with its ordinary test step and without hosted coverage collection.
-The host needs Docker, Act, the pinned linker prerequisites, and a GitHub token
-for nested actions. The ordinary PR contracts and hosted lint retain the cold
-Whitaker driver construction and real repository check, so the stubbed command
-contracts do not replace compiler integration evidence.
+On Linux, the host needs Docker, Act, `clang`, `lld`, `python3`, and
+`cargo-audit`, plus a GitHub token for nested actions. The ordinary PR
+contracts and hosted lint retain the cold Whitaker driver construction and real
+repository check, so the stubbed command contracts do not replace compiler
+integration evidence.
 
 Use `make act-contract-smoke` for the focused Act compatibility check. It runs
 an ignored Rust test against a derived copy of the CI workflow, with explicit
@@ -108,10 +130,21 @@ fresh runner-temporary driver directory for each job, preserving cold driver
 construction as part of the real repository gate.
 
 A scheduled `.github/workflows/mutation-testing.yml` workflow also runs
-`cargo-mutants` via the shared reusable workflow, daily and on manual dispatch.
-It is informational and does not gate pull requests. Dependabot keeps its
-pinned reusable-workflow SHA current. See the user guide's "Scheduled Mutation
-Testing" section for behaviour, and promote surviving mutants into new tests.
+`cargo-mutants` via the shared reusable workflow, daily at 09:15 UTC by default
+and on manual dispatch from the Actions tab. It is informational and does not
+gate pull requests. Dependabot keeps its pinned reusable-workflow SHA current.
+Mutation testing introduces small source changes and checks that tests fail in
+response. Promote surviving mutants into tests that cover the missed behaviour.
+
+Scheduled runs mutate files changed within the detection window; manual runs
+mutate the whole crate across shards. When adopting the workflow in another
+repository, choose an unclaimed daily slot. The `mutation` job uses a
+least-privilege token with `contents: read` and `id-token: write` for workflow
+source resolution. The job summary reports per-target outcomes and surviving
+mutants, while each shard uploads its `mutants.out/` directory as a
+`mutation-report-*` artefact. Runs with no relevant changes finish with a skip
+message. Surviving mutants and timeouts leave the run green; investigate failed
+runs for usage errors, an already-failing test baseline, or internal errors.
 
 `coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
 `main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
@@ -164,6 +197,9 @@ from the repository root, where Cargo reads the defaults above; Dylint adds
 `-D warnings` and the configured Polonius flags only to that check through
 `DYLINT_RUSTFLAGS`. This preserves Cranelift, `-Zthreads=8`, and the native
 wrapper/mold route for lint while leaving the coverage route on LLVM and `lld`.
+The clean driver boundary also removes target-specific Rust flags, which Cargo
+would otherwise append after the configured mold linker argument. Preflight
+rejects `--target` and `--target=<triple>` while allowing `--target-dir`.
 
 ## Lint baseline
 
@@ -178,6 +214,14 @@ equivalent, and tests should use `MockEnv` or a child process with controlled
 `clippy`, `rustfmt`, `rust-analyzer`, `rustc-codegen-cranelift-preview`, and
 `llvm-tools-preview` for the required lint, formatting, analysis, development,
 and coverage routes.
+
+Rust denies unknown, renamed, and removed lints, unsafe code, and missing
+documentation. Rustdoc denies missing crate-level documentation, broken
+intra-doc links, private intra-doc links, bare URLs, invalid HTML tags, invalid
+code-block attributes, and unescaped backticks. Clippy denies assertions
+without diagnostic messages and rejects direct process-environment readers,
+iterators, and mutation functions. Warnings fail documentation, lint, test, and
+doctest gates.
 
 Run `make install-build-tools` after checking out the project. On native x86_64
 GNU Linux, it installs the pinned `mold` release and verifies its archive

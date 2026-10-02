@@ -229,6 +229,7 @@ fn parallel_lint_preserves_repository_route_for_clean_and_coverage_callers() {
         &["cold", "warm"],
         probe.executable("dylint-drivers").as_str(),
     );
+    assert_target_rustflags_isolated(&all_invocations);
     assert_clean_caller(&all_invocations);
     assert_secret_values_redacted(
         &probe.gate_records().expect("read NUL-framed gate records"),
@@ -258,9 +259,37 @@ fn assert_coverage_contamination(invocations: &[Invocation]) {
         );
         assert_env_value(
             invocation,
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+            "-C link-arg=-fuse-ld=lld",
+            "coverage setup must contaminate the child with target-specific lld flags",
+        );
+        assert_env_value(
+            invocation,
             "CARGO_ENCODED_RUSTFLAGS",
             "-D\u{1f}warnings\u{1f}-C\u{1f}link-arg=-fuse-ld=lld",
             "coverage flags must reach the caller child process for the contract probe",
+        );
+    }
+}
+
+/// Confirms target-specific lld flags stop at the repository build boundary.
+fn assert_target_rustflags_isolated(invocations: &[Invocation]) {
+    let checks = invocations
+        .iter()
+        .filter(|invocation| invocation.stage == "whitaker")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        checks.len(),
+        2,
+        "cold and warm Whitaker runs must both be recorded"
+    );
+    for invocation in checks {
+        assert_eq!(
+            invocation
+                .environment
+                .get("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS"),
+            Some(&EnvironmentValue::Unset),
+            "Whitaker must not inherit target-specific lld flags after preflight"
         );
     }
 }

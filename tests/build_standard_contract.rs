@@ -166,6 +166,7 @@ fn whitaker_clears_driver_overrides_and_checks_with_repository_defaults() {
         "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
         "CARGO_BUILD_TARGET",
         "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
         "CFLAGS",
         "LDFLAGS",
     ] {

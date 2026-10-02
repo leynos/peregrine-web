@@ -186,29 +186,21 @@ fn action_inputs_match(item: &Value, expected: &[(&str, &str)]) -> bool {
 
 /// Checks the hosted suite path, step order, guards, and failure semantics.
 fn valid_ci_route(ci: &Value) -> bool {
-    let Some(jobs) = at(ci, &["jobs"]).and_then(Value::as_mapping) else {
-        return false;
-    };
-    if !valid_hosted_job_policy(ci, jobs) {
-        return false;
-    }
     let Some(steps) = at(ci, &["jobs", "build-test", "steps"]).and_then(Value::as_sequence) else {
         return false;
     };
-    if steps.len() != 19 || !steps.iter().all(policy::known_step) {
-        return false;
-    }
-    let Some(job_env) = at(ci, &["jobs", "build-test", "env"]).and_then(Value::as_mapping) else {
-        return false;
-    };
-    if !valid_hosted_environment(ci, job_env) {
-        return false;
-    }
-    valid_ci_order(ci, steps) && valid_ci_commands(ci, steps)
+    valid_hosted_job_policy(ci)
+        && valid_hosted_environment(ci)
+        && valid_hosted_steps(steps)
+        && valid_ci_order(ci, steps)
+        && valid_ci_commands(ci, steps)
 }
 
 /// Requires one enabled hosted job with no shell or directory defaults.
-fn valid_hosted_job_policy(ci: &Value, jobs: &serde_yaml::Mapping) -> bool {
+fn valid_hosted_job_policy(ci: &Value) -> bool {
+    let Some(jobs) = at(ci, &["jobs"]).and_then(Value::as_mapping) else {
+        return false;
+    };
     jobs.len() == 1
         && jobs.contains_key(Value::String("build-test".into()))
         && at(ci, &["jobs", "build-test", "if"]).is_none()
@@ -217,10 +209,19 @@ fn valid_hosted_job_policy(ci: &Value, jobs: &serde_yaml::Mapping) -> bool {
 }
 
 /// Requires exactly the two declared hosted job environment assignments.
-fn valid_hosted_environment(ci: &Value, environment: &serde_yaml::Mapping) -> bool {
+fn valid_hosted_environment(ci: &Value) -> bool {
+    let Some(environment) = at(ci, &["jobs", "build-test", "env"]).and_then(Value::as_mapping)
+    else {
+        return false;
+    };
     environment.len() == 2
         && text(ci, &["jobs", "build-test", "env", "CARGO_TERM_COLOR"]) == Some("always")
         && text(ci, &["jobs", "build-test", "env", "BUILD_PROFILE"]) == Some("debug")
+}
+
+/// Requires every step in the fixed hosted route to satisfy its named policy.
+fn valid_hosted_steps(steps: &[Value]) -> bool {
+    steps.len() == 19 && steps.iter().all(policy::known_step)
 }
 
 /// Pins the full manual Act step count, permission, and runner version.
