@@ -32,28 +32,47 @@ locale = "en-gb"
 extend-ignore-re = [
     "(?s)```.*?```",
     "--[a-zA-Z0-9-]*color[a-zA-Z0-9*-]*",
+    "-fuse-ld=mold\\b",
     "Azure\\s+Architecture\\s+Center\\s*\\|\\s*Microsoft\\s+Learn\\b",
     "GitHub\\s+Flavored\\s+Markdown\\b(?:\\s\\(GFM\\))?",
     "HashiCorp",
     "How to organise your Rust tests",
     "\\b(?:background|theme)_color\\b",
     "\\b(?:carousel|dropdown|footer|indicator|items|navbar|toast)-center\\b",
+    "\\b(?:mold_version|uses_mold|installed_mold_version|verify_native_mold|verify_mold_archive|install_mold|check_mold|mold_pin)\\b",
     "\\bAppFactory<Ser\\b",
+    "\\bMOLD_(?:VERSION_FILE|SHA256SUMS_FILE|RELEASE_BASE_URL)\\b",
+    "\\bPolonius\\b",
     "\\bartifact-(?:name|server-path)\\b",
     "\\bcolor-(?:mix|contrast)\\b",
     "\\bflavor = ",
+    "\\bld\\.mold\\b",
+    "\\bmold (?:directory|installation|release|target|build route|link argument|linker argument|[0-9]+\\.[0-9]+\\.[0-9]+)\\b",
     "\\brust-analyzer\\b",
-    "\\bvar\\.iamge_id\\b",
     "\\{COLOR\\}",
     "\\{color\\}",
-    "`[^`\\n]+`",
+    "`-fuse-ld=mold`",
     "`color`",
+    "`ld\\.mold`",
+    "`mold --version`",
+    "`mold`",
+    "`tools/mold/`",
+    "`var\\.iamge_id` instead of `var\\.image_id`",
     "currentColor",
+    "failing mold propagates its status",
+    "mold \\$installed",
+    "mold \\$version",
+    "mold at \\$resolved",
+    "mold-<version>-<arch>-linux",
+    "mold-\\$version-x86_64-linux\\.tar\\.gz",
+    "selects mold only",
+    "tools/mold/",
+    "use mold at all",
 ]
 
 [default.extend-words]
 "ASO" = "ASO"
-"Polonius" = "Polonius"
+"Polonious" = "Polonius"
 "absolutisable" = "absolutizable"
 "absolutisably" = "absolutizably"
 "absolutisation" = "absolutization"
@@ -1501,7 +1520,6 @@ extend-ignore-re = [
 "modularizers" = "modularizers"
 "modularizes" = "modularizes"
 "modularizing" = "modularizing"
-"mold" = "mold"
 "monetisable" = "monetizable"
 "monetisably" = "monetizably"
 "monetisation" = "monetization"

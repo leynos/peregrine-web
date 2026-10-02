@@ -6,15 +6,37 @@ schema = 1
 stems = []
 
 [words]
-accepted = ["mold", "Polonius"]
+accepted = []
 
 [words.corrections]
+Polonious = "Polonius"
 
 [patterns]
 ignore = [
-  # Inline code spans were masked by the previous dictionary snapshot; kept
-  # until the shared dictionary rules on it.
-  '`[^`\n]+`',
+  # Polonius is the external compiler project name, not a common word.
+  '\bPolonius\b',
+  # These spellings are fixed by the external linker and its executable names.
+  '`mold`',
+  '`mold --version`',
+  '`ld\.mold`',
+  '`-fuse-ld=mold`',
+  '`tools/mold/`',
+  # Build scripts use the linker's fixed names in symbols, flags, and paths.
+  '\bMOLD_(?:VERSION_FILE|SHA256SUMS_FILE|RELEASE_BASE_URL)\b',
+  '\b(?:mold_version|uses_mold|installed_mold_version|verify_native_mold|verify_mold_archive|install_mold|check_mold|mold_pin)\b',
+  '\bld\.mold\b',
+  'tools/mold/',
+  '-fuse-ld=mold\b',
+  'mold-\$version-x86_64-linux\.tar\.gz',
+  'mold-<version>-<arch>-linux',
+  # A bare name here still denotes the linker; ordinary usage remains checked.
+  'failing mold propagates its status',
+  '\bmold (?:directory|installation|release|target|build route|link argument|linker argument|[0-9]+\.[0-9]+\.[0-9]+)\b',
+  'selects mold only',
+  'use mold at all',
+  'mold at \$resolved',
+  'mold \$installed',
+  'mold \$version',
 ]
 
 [files]

@@ -24,7 +24,7 @@
 - **Use consistent spelling and grammar.** Comments must use en-GB-oxendict
   ("-ize" / "-yse" / "-our") spelling and grammar, with the exception of
   references to external APIs. Prose is enforced mechanically by the
-  en-GB-oxendict spelling gate in `make markdownlint` and `make spelling`.
+  en-GB-oxendict spelling gate.
 - **Illustrate with clear examples.** Function documentation must include clear
   examples demonstrating the usage and outcome of the function. Test
   documentation should omit examples where the example serves only to reiterate
@@ -138,6 +138,24 @@ This repository is written in Rust and uses Cargo for building and dependency
 management. Contributors should follow these best practices when working on the
 project:
 
+- `rust-toolchain.toml` pins the nightly, Cranelift, rust-analyzer, rustfmt,
+  Clippy, and LLVM tools. Run `make install-build-tools` to install that
+  toolchain and the checksum-verified `mold` 2.41.0 release. Run
+  `make check-build-tools` to inspect development prerequisites;
+  `make coverage` additionally checks clang and lld.
+- Bare Cargo development builds use Cranelift and the parallel frontend from
+  `.cargo/config.toml`; native x86_64 GNU Linux builds use the repository's
+  Clang wrapper to select pinned `mold` ahead of the system linker. Make
+  targets that assign `RUSTFLAGS` restate the development flags because Cargo
+  does not merge them with its configuration. Use `make release` and
+  `make package` for production artefacts; both set their own flags and select
+  LLVM for the dev and release profiles because package verification uses the
+  dev profile. Measured coverage also selects LLVM. These routes exclude the
+  parallel frontend, Cranelift, and `mold`. Coverage uses lld. Development Make
+  gates reject a non-Cranelift `CARGO_PROFILE_DEV_CODEGEN_BACKEND` override.
+  Cross-target Make builds, x86_64 Linux musl, and encoded Rust flags are
+  unsupported for the `mold` route; native linker overrides must select the
+  repository's Clang wrapper.
 - Run `make check-fmt`, `make lint`, and `make test` before committing. These
   targets wrap the following commands, so contributors understand the exact
   behaviour and policy enforced:
@@ -150,38 +168,70 @@ project:
     ```
 
     validating Rust formatting across the entire workspace and Markdown
-    formatting across the files Git tracks, plus untracked files Git does not
+    formatting across files Git tracks, plus untracked files Git does not
     ignore, without modifying files. The Markdown check needs mdtablefix 0.6.0
     or later on `PATH`; install it with
     `cargo binstall --no-confirm mdtablefix@0.6.0` (or
     `cargo install --locked mdtablefix@0.6.0`), the version CI pins. `make fmt`
     rewrites the same files with `mdtablefix --in-place` and then runs
     `markdownlint-cli2 --fix`.
-  - `make lint` executes:
+  - `make lint` runs `lint-clippy`, then `lint-whitaker` through recursive Make
+    calls so `make -j lint` cannot overlap their Cargo work. Its effective
+    commands are:
 
     ```makefile
-    RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$(DEV_RUST_FLAGS)" cargo doc --no-deps
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
-    RUSTFLAGS="$(DEV_RUST_FLAGS)" whitaker --all -- --all-targets --all-features
+    RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" \
+      RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
+    RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+    env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
+      -u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
+      -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
+      -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -u CFLAGS -u LDFLAGS \
+      $(CHECK_BUILD_TOOLS)
+    env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
+      -u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
+      -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
+      -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -u CFLAGS -u LDFLAGS \
+      PATH="$(USER_BIN_PATH):$(PATH)" \
+      DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" \
+      $(WHITAKER) --all -- $(CARGO_FLAGS)
     ```
 
     building documentation before linting every target with all features
-    enabled. Documentation warnings, Clippy warnings, and Whitaker findings
-    fail the command.
-  - `make test` executes:
+    enabled. Whitaker also clears inherited `RUSTFLAGS` before its preflight.
+    Documentation warnings, Clippy warnings, and Whitaker findings fail the
+    command. `make all` runs formatting, linting, testing, and spelling in
+    order even under `make -j all`.
+  - `make test` checks build prerequisites, uses `cargo-nextest` when available,
+    and falls back to `cargo test`. Both Cargo commands retain caller
+    `RUSTFLAGS` alongside the development flags; doctests also deny Rustdoc
+    warnings. With `WITH_ACT=1`, Make runs Act validation after local tests:
 
     ```makefile
     TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
-    test: export RUSTFLAGS := $(DEV_RUST_FLAGS)
-    $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-    RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+    test: check-build-tools
+        RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+          $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+        RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+          RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+        if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
     ```
 
-    running the full test suite with `cargo-nextest` when available and
-    falling back to `cargo test`, with Rust warnings denied. It then runs
-    all-feature workspace doctests separately with Rustdoc warnings denied.
-    Use `make fmt` (`cargo fmt --workspace`) to apply formatting fixes reported
-    by the formatter check.
+    Use `make fmt` to apply Rust and Markdown formatting fixes.
+
+  The hosted `build-test` job is the authoritative repository gate. Every PR
+  runs workflow-structure and command-contract tests through `make test`.
+  `.github/workflows/act-validation.yml` is manual-dispatch only; its full Act
+  run checks local runner compatibility and does not prove parity with hosted
+  GitHub Actions. `make test WITH_ACT=1` remains available for that local
+  integration check. Keep the cold Whitaker driver integration check: the
+  contract stubs verify command wiring, while the hosted lint route constructs
+  the real driver and checks the repository. `make act-contract-smoke` runs the
+  focused Act test against a derived CI workflow with fixture actions and
+  controlled executors. Use `make whitaker-driver-integration` to run real
+  `make lint-whitaker` checks with a private cold driver cache and then the
+  same warm cache; hosted CI also forces a cold driver directory for each lint
+  job.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.
@@ -355,10 +405,23 @@ project:
 
 - Validate Markdown files using `make markdownlint`. This target also runs the
   en-GB-oxendict spelling gate.
-- Enforce spelling with `make spelling`. It regenerates `typos.toml` from the
-  live shared dictionary and the `typos.local.toml` overlay on every run, so
-  `typos.toml` must not be drift checked in CI. Put narrow repository-specific
-  exceptions in `typos.local.toml`; never edit generated entries by hand.
+
+<!-- typos-config-builder:agents-md:start -->
+
+## Spelling
+
+- `make spelling` runs the pinned `typos-config-builder gate`, which
+  regenerates `typos.toml` from the shared en-GB-oxendict dictionary and
+  `typos.local.toml`, then checks spelling and the shared phrase corrections.
+- `typos.toml` is generated: never edit it by hand. Put narrow
+  repository-specific exceptions in `typos.local.toml`, as exact or full-line
+  patterns rather than bare accepted words.
+- When `make spelling` changes `typos.toml`, commit the regenerated file. If
+  the change is unrelated to your work, commit it in a separate base pull
+  request and stack your branch on it, so each review diff stays focused.
+
+<!-- typos-config-builder:agents-md:end -->
+
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.
