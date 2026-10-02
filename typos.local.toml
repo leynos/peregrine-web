@@ -31,7 +31,7 @@ ignore = [
   'mold-<version>-<arch>-linux',
   # A bare name here still denotes the linker; ordinary usage remains checked.
   'failing mold propagates its status',
-  '\bmold (?:directory|installation|release|target|build route|link argument|[0-9]+\.[0-9]+\.[0-9]+)\b',
+  '\bmold (?:directory|installation|release|target|build route|link argument|linker argument|[0-9]+\.[0-9]+\.[0-9]+)\b',
   'selects mold only',
   'use mold at all',
   'mold at \$resolved',

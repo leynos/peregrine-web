@@ -1,5 +1,8 @@
 //! Behavioural contracts for Make's Cargo substitution and build preflight.
 
+#[path = "support/make_target_option_tests.rs"]
+mod target_options;
+
 use std::{
     error::Error,
     io,

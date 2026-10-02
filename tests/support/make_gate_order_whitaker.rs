@@ -34,6 +34,9 @@ pub(super) const RECORDING_HELPERS: &str = concat!(
     "    record_env_value CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
      \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER+x}\" \
      \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER-}\"\n",
+    "    record_env_value CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS \
+     \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS+x}\" \
+     \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS-}\"\n",
     "    record_env_value CFLAGS \"${CFLAGS+x}\" \"${CFLAGS-}\"\n",
     "    record_env_value LDFLAGS \"${LDFLAGS+x}\" \"${LDFLAGS-}\"\n",
     "    record_env_value DYLINT_RUSTFLAGS \"${DYLINT_RUSTFLAGS+x}\" \"${DYLINT_RUSTFLAGS-}\"\n",

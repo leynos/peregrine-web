@@ -1,5 +1,8 @@
 //! Mutation tests for hosted workflow and manual Act route contracts.
 
+/// Direct regressions for the composed hosted CI route.
+#[path = "act_workflow_route_tests.rs"]
+mod ci_route;
 /// Direct regression corpus for the independent event predicates.
 #[path = "act_workflow_event_tests.rs"]
 mod events;

@@ -133,7 +133,8 @@ lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 
 WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
 	-u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
-	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER -u CFLAGS -u LDFLAGS
+	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
+	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -u CFLAGS -u LDFLAGS
 
 lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo defaults
 	@$(WHITAKER_CLEAN_ENV) $(CHECK_BUILD_TOOLS)
@@ -147,12 +148,12 @@ install-build-tools: ## Install pinned `mold` and the repository toolchain
 	@scripts/install-build-tools.sh
 
 check-build-tools: ## Check pinned development build prerequisites
-	@case " $(CARGO_FLAGS) $(TEST_FLAGS) $(BUILD_JOBS) " in *" --target"*) \
+	@case " $(CARGO_FLAGS) $(TEST_FLAGS) $(BUILD_JOBS) " in *" --target "*|*" --target="*) \
 		echo "build-tools: --target is outside the supported native Make build" >&2; exit 1;; \
 	esac; $(CHECK_BUILD_TOOLS)
 
 check-coverage-tools: ## Check coverage linker prerequisites
-	@case " $(TEST_FLAGS) " in *" --target"*) \
+	@case " $(TEST_FLAGS) " in *" --target "*|*" --target="*) \
 		echo "build-tools: --target is outside the supported native Make coverage" >&2; exit 1;; \
 	esac; $(CHECK_BUILD_TOOLS) --coverage
 

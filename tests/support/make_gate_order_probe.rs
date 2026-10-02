@@ -32,6 +32,7 @@ const CONTROLLED_CALLER_VARIABLES: &[&str] = &[
     "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
     "CARGO_BUILD_TARGET",
     "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
     "CFLAGS",
     "LDFLAGS",
 ];
@@ -173,6 +174,10 @@ impl GateProbe {
                 .env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm")
                 .env("CARGO_BUILD_TARGET", "x86_64-unknown-linux-gnu")
                 .env("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "clang")
+                .env(
+                    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+                    "-C link-arg=-fuse-ld=lld",
+                )
                 .env("CFLAGS", "-fuse-ld=lld")
                 .env("LDFLAGS", "-fuse-ld=lld");
         } else {
