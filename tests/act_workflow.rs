@@ -104,6 +104,48 @@ fn preserves_ci_coverage_guard_for_nested_act() {
     );
 }
 
+/// Preserves the Act-only fallback that replaces hosted coverage.
+#[test]
+fn preserves_ci_act_test_fallback_for_nested_act() {
+    assert_eq!(
+        act_test_step_runs(&parse_ci_workflow(CI_WORKFLOW), Some("true")),
+        Some(true),
+        "the Act-only fallback must run the suite when ACT is true"
+    );
+    assert_eq!(
+        act_test_step_runs(&parse_ci_workflow(CI_WORKFLOW), None),
+        Some(false),
+        "the Act-only fallback must stay skipped when ACT is unset"
+    );
+    assert_eq!(
+        act_test_step_runs(&parse_ci_workflow(CI_WORKFLOW), Some("false")),
+        Some(false),
+        "the Act-only fallback must stay skipped when ACT is not true"
+    );
+}
+
+/// Requires exactly one test path for every value of `env.ACT`.
+#[test]
+fn runs_ci_tests_under_act_and_on_the_host() {
+    let workflow = parse_ci_workflow(CI_WORKFLOW);
+
+    for act_value in [Some("true"), Some("false"), None] {
+        let test_paths = [
+            coverage_step_runs(&workflow, act_value),
+            act_test_step_runs(&workflow, act_value),
+        ];
+        let executing = test_paths
+            .iter()
+            .filter(|outcome| **outcome == Some(true))
+            .count();
+
+        assert_eq!(
+            executing, 1,
+            "build-test must run the suite exactly once when ACT is {act_value:?}"
+        );
+    }
+}
+
 /// Rejects coverage guards missing from the coverage step.
 #[test]
 fn rejects_missing_coverage_guard() {
@@ -127,6 +169,44 @@ fn rejects_coverage_guard_on_wrong_step() {
     );
 }
 
+/// Rejects a workflow that loses the Act-only fallback.
+#[test]
+fn rejects_missing_act_test_fallback() {
+    let fixture = concat!(
+        "jobs:\n  build-test:\n    steps:\n",
+        "      - name: Test and Measure Coverage\n        if: env.ACT != 'true'\n",
+    );
+    assert_eq!(
+        act_test_step_runs(&parse_ci_workflow(fixture), Some("true")),
+        None,
+        "without the fallback, ACT=true would execute no tests at all"
+    );
+}
+
+/// Rejects a fallback that runs outside Act or skips the suite.
+#[test]
+fn rejects_wrong_act_test_fallback() {
+    let wrong_condition = concat!(
+        "jobs:\n  build-test:\n    steps:\n",
+        "      - name: Test in Act\n        if: env.ACT != 'true'\n        run: make test\n",
+    );
+    assert_eq!(
+        act_test_step_runs(&parse_ci_workflow(wrong_condition), Some("true")),
+        None,
+        "a fallback that never matches ACT=true must fail the contract"
+    );
+
+    let wrong_command = concat!(
+        "jobs:\n  build-test:\n    steps:\n",
+        "      - name: Test in Act\n        if: env.ACT == 'true'\n        run: make lint\n",
+    );
+    assert_eq!(
+        act_test_step_runs(&parse_ci_workflow(wrong_command), Some("true")),
+        None,
+        "a fallback that does not run the suite must fail the contract"
+    );
+}
+
 /// Parses the CI workflow after validating its YAML mapping keys.
 fn parse_ci_workflow(source: &str) -> Workflow {
     if let Err(error) = validate_mapping_keys(source) {
@@ -147,6 +227,34 @@ fn coverage_step_runs(workflow: &Workflow, act_value: Option<&str>) -> Option<bo
         .find(|step| step.name.as_deref() == Some("Test and Measure Coverage"))?;
     let condition = coverage_step.condition.as_deref()?;
     (condition.trim() == "env.ACT != 'true'").then_some(act_value != Some("true"))
+}
+
+/// Evaluates the build-test Act-only test fallback for one `env.ACT` value.
+fn act_test_step_runs(workflow: &Workflow, act_value: Option<&str>) -> Option<bool> {
+    let job = workflow.jobs.get("build-test")?;
+    let act_step = job
+        .steps
+        .iter()
+        .find(|step| step.name.as_deref() == Some("Test in Act"))?;
+    let condition = act_step.condition.as_deref()?;
+    let runs_suite = act_step
+        .run
+        .as_deref()?
+        .lines()
+        .map(normalise_command)
+        .any(is_make_test_command);
+
+    (condition.trim() == "env.ACT == 'true'" && runs_suite).then_some(act_value == Some("true"))
+}
+
+/// Matches the Make invocation that runs tests without re-entering Act.
+fn is_make_test_command(raw_command: &str) -> bool {
+    let mut words = raw_command.split_whitespace();
+
+    matches!(
+        (words.next(), words.next(), words.next()),
+        (Some("make"), Some("test"), None)
+    )
 }
 
 /// Parses the committed Act workflow.
