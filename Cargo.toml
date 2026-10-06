@@ -14,7 +14,7 @@ categories = ["network"]
 
 [dev-dependencies]
 camino = "1.2.0"
-cap-std = "3.4.6"
+cap-std = "4.0.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 
