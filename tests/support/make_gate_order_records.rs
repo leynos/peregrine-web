@@ -229,3 +229,72 @@ const ENVIRONMENT_NAMES: &[&str] = &[
     "ACT",
     "TYPOS_CONFIG_BUILDER",
 ];
+
+#[cfg(test)]
+mod property_tests {
+    //! Generated wire records exercise strict framing and bounded round trips.
+
+    use proptest::prelude::*;
+
+    use super::{ENVIRONMENT_NAMES, EnvironmentValue, SecretPresence, parse_invocations};
+
+    /// Encodes one complete gate observation using the recorder's field order.
+    fn record(arguments: &[String], state: &str, raw: &str, secret: &str) -> Vec<u8> {
+        let mut fields = vec![
+            "invocation-v1".to_owned(),
+            "executor".to_owned(),
+            "/workspace".to_owned(),
+        ];
+        for name in ENVIRONMENT_NAMES {
+            fields.extend(["env", name, state, raw].map(str::to_owned));
+        }
+        for name in ["CS_ACCESS_TOKEN", "GITHUB_TOKEN"] {
+            fields.extend(["secret", name, secret].map(str::to_owned));
+        }
+        fields.extend(["stage", "test", "cache-state", "unused", "argc"].map(str::to_owned));
+        fields.push(arguments.len().to_string());
+        fields.push("argv".to_owned());
+        fields.extend(arguments.iter().cloned());
+        fields.extend(["result-state", "none", "result", "", "end-invocation"].map(str::to_owned));
+        format!("{}\0", fields.join("\0")).into_bytes()
+    }
+
+    proptest! {
+        /// Valid records retain arguments, selected environment states and redacted secrets.
+        #[test]
+        fn generated_gate_records_round_trip(
+            arguments in proptest::collection::vec("[^\\x00]{0,32}", 0..12),
+            value in "[^\\x00]{1,32}",
+            environment_state in 0u8..3,
+            secret_present in any::<bool>(),
+            copies in 1usize..4,
+        ) {
+            let (state, raw, expected_environment) = match environment_state {
+                0 => ("unset", "", EnvironmentValue::Unset),
+                1 => ("empty", "", EnvironmentValue::Empty),
+                _ => ("value", value.as_str(), EnvironmentValue::Value(value.clone())),
+            };
+            let (secret, expected_secret) = if secret_present {
+                ("present", SecretPresence::Present)
+            } else {
+                ("absent", SecretPresence::Absent)
+            };
+            let encoded = record(&arguments, state, raw, secret).repeat(copies);
+            let records = parse_invocations(&encoded).expect("generated gate records must parse");
+            prop_assert_eq!(records.len(), copies, "every concatenated gate record must remain");
+            for observation in records {
+                prop_assert_eq!(&observation.arguments, &arguments, "argument boundaries must round-trip");
+                prop_assert_eq!(observation.environment.len(), ENVIRONMENT_NAMES.len(), "every selected variable must remain");
+                for observed in observation.environment.values() {
+                    prop_assert_eq!(observed, &expected_environment, "environment states must remain distinct");
+                }
+                for observed in observation.secrets.values() {
+                    prop_assert_eq!(observed, &expected_secret, "secret presence must remain redacted");
+                }
+            }
+            let mut unterminated = encoded;
+            unterminated.pop();
+            prop_assert!(parse_invocations(&unterminated).is_err(), "gate records must retain mandatory final NUL framing");
+        }
+    }
+}

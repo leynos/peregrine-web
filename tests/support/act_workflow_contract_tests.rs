@@ -85,8 +85,11 @@ fn workflow_execution_mutations_break_the_contract() {
             "duplicate PR job",
             CI_WORKFLOW.replace(
                 "jobs:\n",
-                "jobs:\n  duplicate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make \
-                 test WITH_ACT=1\n",
+                concat!(
+                    "jobs:\n  duplicate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: \
+                     make ",
+                    "test WITH_ACT=1\n"
+                ),
             ),
         ),
         (
@@ -111,8 +114,10 @@ fn workflow_execution_mutations_break_the_contract() {
             "lint backend override",
             CI_WORKFLOW.replace(
                 "DYLINT_DRIVER_PATH: ${{ runner.temp }}/peregrine-whitaker-driver",
-                "DYLINT_DRIVER_PATH: ${{ runner.temp }}/peregrine-whitaker-driver\n          \
-                 CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm",
+                concat!(
+                    "DYLINT_DRIVER_PATH: ${{ runner.temp }}/peregrine-whitaker-driver\n          ",
+                    "CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm"
+                ),
             ),
         ),
     ] {

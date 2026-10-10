@@ -133,6 +133,14 @@ fn inherited_with_act_does_not_reach_nested_make_all() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    assert!(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .any(|line| line.starts_with("test result: ok. 1 passed; 0 failed;")),
+        "the exact nested filter must execute exactly one passing test: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 /// Checks Make stops at each representative failing stage without hiding errors.

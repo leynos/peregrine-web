@@ -25,26 +25,40 @@ pub(super) const RECORDING_HELPERS: &str = concat!(
     "    record_env_value WITH_ACT \"${WITH_ACT+x}\" \"${WITH_ACT-}\"\n",
     "    record_env_value RUSTFLAGS \"${RUSTFLAGS+x}\" \"${RUSTFLAGS-}\"\n",
     "    record_env_value RUSTDOCFLAGS \"${RUSTDOCFLAGS+x}\" \"${RUSTDOCFLAGS-}\"\n",
-    "    record_env_value CARGO_ENCODED_RUSTFLAGS \"${CARGO_ENCODED_RUSTFLAGS+x}\" \
-     \"${CARGO_ENCODED_RUSTFLAGS-}\"\n",
-    "    record_env_value CARGO_PROFILE_DEV_CODEGEN_BACKEND \
-     \"${CARGO_PROFILE_DEV_CODEGEN_BACKEND+x}\" \"${CARGO_PROFILE_DEV_CODEGEN_BACKEND-}\"\n",
-    "    record_env_value CARGO_BUILD_TARGET \"${CARGO_BUILD_TARGET+x}\" \
-     \"${CARGO_BUILD_TARGET-}\"\n",
-    "    record_env_value CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
-     \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER+x}\" \
-     \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER-}\"\n",
-    "    record_env_value CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS \
-     \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS+x}\" \
-     \"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS-}\"\n",
+    concat!(
+        "    record_env_value CARGO_ENCODED_RUSTFLAGS \"${CARGO_ENCODED_RUSTFLAGS+x}\" ",
+        "\"${CARGO_ENCODED_RUSTFLAGS-}\"\n"
+    ),
+    concat!(
+        "    record_env_value CARGO_PROFILE_DEV_CODEGEN_BACKEND ",
+        "\"${CARGO_PROFILE_DEV_CODEGEN_BACKEND+x}\" \"${CARGO_PROFILE_DEV_CODEGEN_BACKEND-}\"\n"
+    ),
+    concat!(
+        "    record_env_value CARGO_BUILD_TARGET \"${CARGO_BUILD_TARGET+x}\" ",
+        "\"${CARGO_BUILD_TARGET-}\"\n"
+    ),
+    concat!(
+        "    record_env_value CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER ",
+        "\"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER+x}\" ",
+        "\"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER-}\"\n"
+    ),
+    concat!(
+        "    record_env_value CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS ",
+        "\"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS+x}\" ",
+        "\"${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS-}\"\n"
+    ),
     "    record_env_value CFLAGS \"${CFLAGS+x}\" \"${CFLAGS-}\"\n",
     "    record_env_value LDFLAGS \"${LDFLAGS+x}\" \"${LDFLAGS-}\"\n",
     "    record_env_value DYLINT_RUSTFLAGS \"${DYLINT_RUSTFLAGS+x}\" \"${DYLINT_RUSTFLAGS-}\"\n",
-    "    record_env_value DYLINT_DRIVER_PATH \"${DYLINT_DRIVER_PATH+x}\" \
-     \"${DYLINT_DRIVER_PATH-}\"\n",
+    concat!(
+        "    record_env_value DYLINT_DRIVER_PATH \"${DYLINT_DRIVER_PATH+x}\" ",
+        "\"${DYLINT_DRIVER_PATH-}\"\n"
+    ),
     "    record_env_value PATH \"${PATH+x}\" \"${PATH-}\"\n",
-    "    record_env_value BUILD_TOOLS_PREFIX \"${BUILD_TOOLS_PREFIX+x}\" \
-     \"${BUILD_TOOLS_PREFIX-}\"\n",
+    concat!(
+        "    record_env_value BUILD_TOOLS_PREFIX \"${BUILD_TOOLS_PREFIX+x}\" ",
+        "\"${BUILD_TOOLS_PREFIX-}\"\n"
+    ),
     "    record_env_value CURDIR \"${CURDIR+x}\" \"${CURDIR-}\"\n",
     "    record_env_value GATE_FAIL_AT \"${GATE_FAIL_AT+x}\" \"${GATE_FAIL_AT-}\"\n",
     "    record_env_value CARGO \"${CARGO+x}\" \"${CARGO-}\"\n",
@@ -53,8 +67,10 @@ pub(super) const RECORDING_HELPERS: &str = concat!(
     "    record_env_value MDTABLEFIX \"${MDTABLEFIX+x}\" \"${MDTABLEFIX-}\"\n",
     "    record_env_value MDLINT \"${MDLINT+x}\" \"${MDLINT-}\"\n",
     "    record_env_value ACT \"${ACT+x}\" \"${ACT-}\"\n",
-    "    record_env_value TYPOS_CONFIG_BUILDER \"${TYPOS_CONFIG_BUILDER+x}\" \
-     \"${TYPOS_CONFIG_BUILDER-}\"\n",
+    concat!(
+        "    record_env_value TYPOS_CONFIG_BUILDER \"${TYPOS_CONFIG_BUILDER+x}\" ",
+        "\"${TYPOS_CONFIG_BUILDER-}\"\n"
+    ),
     "    record_secret_presence CS_ACCESS_TOKEN \"${CS_ACCESS_TOKEN+x}\"\n",
     "    record_secret_presence GITHUB_TOKEN \"${GITHUB_TOKEN+x}\"\n",
     "    printf 'stage\\0%s\\0cache-state\\0%s\\0argc\\0%s\\0argv\\0' \\\n",
@@ -105,8 +121,10 @@ fn assert_repository_config(config_invocations: &[Invocation], run_count: usize)
         ),
         (
             "target.x86_64-unknown-linux-gnu.rustflags",
-            "target.x86_64-unknown-linux-gnu.rustflags = [\"-Zthreads=8\", \"-C\", \
-             \"link-arg=-fuse-ld=mold\"]",
+            concat!(
+                "target.x86_64-unknown-linux-gnu.rustflags = [\"-Zthreads=8\", \"-C\", ",
+                "\"link-arg=-fuse-ld=mold\"]"
+            ),
         ),
     ];
     assert_eq!(

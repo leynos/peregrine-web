@@ -2,6 +2,7 @@
 
 use std::io;
 
+use proptest::prelude::*;
 use rstest::rstest;
 
 use super::{EnvironmentValue, GitHubToken, RecordCursor, parse_invocations};
@@ -274,4 +275,41 @@ fn numeric_argument_count_mismatches_are_rejected(
         message,
         "argument count mismatches must retain their exact diagnostic"
     );
+}
+
+proptest! {
+    /// NUL-free arguments and values round-trip without losing record boundaries.
+    #[test]
+    fn generated_records_preserve_arguments_and_states(
+        arguments in proptest::collection::vec("[^\\x00]{0,32}", 0..12),
+        raw in "[^\\x00]{0,32}",
+        environment_state in 0u8..3,
+        token_state in 0u8..3,
+        copies in 1usize..4,
+        final_nul in any::<bool>(),
+    ) {
+        let (state, expected_environment) = match environment_state {
+            0 => ("unset", EnvironmentValue::Unset),
+            1 => ("empty", EnvironmentValue::Empty),
+            _ => ("value", EnvironmentValue::Value(raw.clone())),
+        };
+        let (token, expected_token) = match token_state {
+            0 => ("unset", GitHubToken::Unset),
+            1 => ("empty", GitHubToken::Empty),
+            _ => ("present", GitHubToken::Present),
+        };
+        let borrowed_arguments = arguments.iter().map(String::as_str).collect::<Vec<_>>();
+        let encoded = log(&fields(state, &raw, token, &borrowed_arguments)).repeat(copies);
+        let input = if final_nul { encoded.as_str() } else { encoded.trim_end_matches('\0') };
+        let records = parse_invocations(input).expect("generated valid records must parse");
+        prop_assert_eq!(records.len(), copies, "every concatenated record must be retained");
+        for record in records {
+            prop_assert_eq!(&record.arguments, &arguments, "all argument boundaries must round-trip");
+            prop_assert_eq!(&record.github_token, &expected_token, "token states must remain redacted");
+            prop_assert_eq!(record.environment.len(), 7, "all ordered environment records must remain");
+            for observed in record.environment.values() {
+                prop_assert_eq!(observed, &expected_environment, "environment states must retain raw-value semantics");
+            }
+        }
+    }
 }

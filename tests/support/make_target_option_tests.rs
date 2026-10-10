@@ -35,7 +35,7 @@ fn rejects_target_options_but_allows_target_directories() {
         (
             "check-coverage-tools",
             "TEST_FLAGS",
-            "--target aarch64-unknown-linux-gnu",
+            "--target=aarch64-unknown-linux-gnu",
             "native Make coverage",
         ),
     ] {

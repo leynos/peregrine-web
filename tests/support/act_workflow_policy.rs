@@ -46,8 +46,8 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
         Some("Install linker prerequisites") => concat!(
             "set -euo pipefail\n",
             "export DEBIAN_FRONTEND=noninteractive\n",
-            "sudo apt-get update \\\n  && sudo apt-get install --yes --no-install-recommends \
-             clang lld mold"
+            "sudo apt-get update \\\n  && sudo apt-get install --yes --no-install-recommends ",
+            "clang lld mold"
         ),
         Some("Install the build standard") => "make install-build-tools",
         Some("Format") => "make check-fmt",

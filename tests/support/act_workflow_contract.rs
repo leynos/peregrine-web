@@ -264,28 +264,22 @@ fn valid_ci_order(ci: &Value, steps: &[Value]) -> bool {
             .all(|item| at(item, &["continue-on-error"]).is_none())
 }
 
+/// Reads a named step's textual field, failing closed when the step is absent.
+fn step_text<'a>(ci: &'a Value, name: &str, path: &[&str]) -> Option<&'a str> {
+    text(step(ci, name)?.1, path)
+}
+
 /// Pins the command, cache, coverage, and Act recursion boundaries.
 fn valid_ci_commands(ci: &Value, steps: &[Value]) -> bool {
-    text(step(ci, "Format").map_or(ci, |(_, item)| item), &["run"]) == Some("make check-fmt")
-        && text(step(ci, "Lint").map_or(ci, |(_, item)| item), &["run"]).is_some_and(|script| {
+    step_text(ci, "Format", &["run"]) == Some("make check-fmt")
+        && step_text(ci, "Lint", &["run"]).is_some_and(|script| {
             script.trim_end() == "mkdir -p \"$DYLINT_DRIVER_PATH\"\nmake lint"
         })
-        && text(
-            step(ci, "Lint").map_or(ci, |(_, item)| item),
-            &["env", "DYLINT_DRIVER_PATH"],
-        ) == Some("${{ runner.temp }}/peregrine-whitaker-driver")
-        && text(
-            step(ci, "Test under Act").map_or(ci, |(_, item)| item),
-            &["run"],
-        ) == Some("make test")
-        && text(
-            step(ci, "Test under Act").map_or(ci, |(_, item)| item),
-            &["env", "WITH_ACT"],
-        ) == Some("0")
-        && text(
-            step(ci, "Test under Act").map_or(ci, |(_, item)| item),
-            &["if"],
-        ) == Some("env.ACT == 'true'")
+        && step_text(ci, "Lint", &["env", "DYLINT_DRIVER_PATH"])
+            == Some("${{ runner.temp }}/peregrine-whitaker-driver")
+        && step_text(ci, "Test under Act", &["run"]) == Some("make test")
+        && step_text(ci, "Test under Act", &["env", "WITH_ACT"]) == Some("0")
+        && step_text(ci, "Test under Act", &["if"]) == Some("env.ACT == 'true'")
         && valid_coverage_route(ci)
         && !steps
             .iter()
@@ -295,16 +289,15 @@ fn valid_ci_commands(ci: &Value, steps: &[Value]) -> bool {
 
 /// Requires hosted coverage to use LLVM and remain skipped in Act.
 fn valid_coverage_route(ci: &Value) -> bool {
-    text(
-        step(ci, "Test and Measure Coverage").map_or(ci, |(_, item)| item),
-        &["if"],
-    ) == Some("env.ACT != 'true'")
-        && text(
-            step(ci, "Test and Measure Coverage").map_or(ci, |(_, item)| item),
+    step_text(ci, "Test and Measure Coverage", &["if"]) == Some("env.ACT != 'true'")
+        && step_text(
+            ci,
+            "Test and Measure Coverage",
             &["env", "CARGO_PROFILE_DEV_CODEGEN_BACKEND"],
         ) == Some("llvm")
-        && text(
-            step(ci, "Test and Measure Coverage").map_or(ci, |(_, item)| item),
+        && step_text(
+            ci,
+            "Test and Measure Coverage",
             &["with", "publish-artefact"],
         ) == Some("false")
 }

@@ -417,8 +417,8 @@ project:
   repository-specific exceptions in `typos.local.toml`, as exact or full-line
   patterns rather than bare accepted words.
 - When `make spelling` changes `typos.toml`, commit the regenerated file. If
-  the change is unrelated to your work, commit it in a separate base pull
-  request and stack your branch on it, so each review diff stays focused.
+  the change is unrelated, put it in a separate base pull request and stack
+  this branch on it, so each review diff stays focused.
 
 <!-- typos-config-builder:agents-md:end -->
 

@@ -230,13 +230,21 @@ const STUB: &str = concat!(
     "\"${WITH_ACT-<unset>}\" \"${DYLINT_DRIVER_PATH-<unset>}\" \"$@\" ",
     "'__END__' >> \"$GITHUB_WORKSPACE/smoke.log\"\n",
     "case \"$name:$*\" in\n",
-    "  'make:install-build-tools'|'make:check-fmt'|'make:spelling'|'make:audit'|'make:lint'|'make:\
-     test') ;;\n",
-    "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm \
-     cargo-audit') ;;\n",
+    concat!(
+        "  'make:install-build-tools'|'make:check-fmt'|'make:spelling'|'make:audit'|'make:lint'|'\
+         make:",
+        "test') ;;\n"
+    ),
+    concat!(
+        "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm ",
+        "cargo-audit') ;;\n"
+    ),
     "  'rustc:--version') printf '%s\\n' 'rustc fixture'; exit 0 ;;\n",
-    "  'sudo:apt-get update'|'sudo:apt-get install --yes --no-install-recommends clang lld mold') \
-     ;;\n",
+    concat!(
+        "  'sudo:apt-get update'|'sudo:apt-get install --yes --no-install-recommends clang lld \
+         mold') ",
+        ";;\n"
+    ),
     "  *) exit 97 ;;\n",
     "esac\n",
     "if [ \"$name:$1\" = make:lint ]; then [ -d \"$DYLINT_DRIVER_PATH\" ] || exit 98; fi\n",

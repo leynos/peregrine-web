@@ -476,10 +476,9 @@ feature-gated items in the generated documentation. This is achieved with the
 `#[doc(cfg(...))]` attribute, which requires enabling the
 `#![feature(doc_cfg)]` feature gate at the crate root. Both the attribute and
 the feature gate are nightly-only; the example below does not compile on stable
-Rust, and it does not compile under this repository's default
-`RUST_CHANNEL=stable`. It is retained here purely as a reference for projects
-that build their documentation on nightly (for example, via `docs.rs`, which
-runs nightly `rustdoc`).
+Rust. This repository pins `nightly-2026-08-27`; the example is retained here
+purely as a reference for projects that build their documentation on nightly
+(for example, via `docs.rs`, which runs nightly `rustdoc`).
 
 ```rust
 // At the crate root (lib.rs)

@@ -48,8 +48,8 @@ fn run_make_step(
             "\"${CARGO_PROFILE_DEV_CODEGEN_BACKEND+x}\" \"${CARGO_PROFILE_DEV_CODEGEN_BACKEND-}\" ",
             "\"$token\" \"${DYLINT_DRIVER_PATH+x}\" \"${DYLINT_DRIVER_PATH-}\" ",
             "\"$#\" \"$@\" '__END__' >> \"$STEP_LOG\"\n",
-            "case \"$*\" in 'check-fmt'|'spelling'|'audit'|'lint'|'test'|'install-build-tools') \
-             ;; *) exit 97;; esac\n",
+            "case \"$*\" in 'check-fmt'|'spelling'|'audit'|'lint'|'test'|'install-build-tools') ",
+            ";; *) exit 97;; esac\n",
             "[ \"${FAIL_MAKE_TARGET:-}\" != \"$1\" ]\n",
         ),
     )?;

@@ -102,7 +102,9 @@ belongs only to the Act Make record parser and preserves its existing NUL field
 protocol. The unset-environment assertion is shared only by the driver and
 configuration boundaries and their regression tests; each boundary owns its
 variable names and diagnostics. These helpers are not a cross-suite validation
-framework.
+framework. The private `step_text` helper is limited to named CI workflow step
+text lookup for `valid_ci_commands` and `valid_coverage_route`; it is not a
+general validator.
 
 The separate `.github/workflows/act-validation.yml` workflow runs only on
 manual dispatch. It exercises the full workflow through Act in Docker to check
@@ -122,8 +124,8 @@ Use `make act-contract-smoke` for the focused Act compatibility check. It runs
 an ignored Rust test against a derived copy of the CI workflow, with explicit
 fixture actions and controlled command executors; it checks step routing and
 failure propagation without rerunning the full repository suite in Docker. Use
-`make act-validation` or `make test WITH_ACT=1` when you need the full local
-Act run. To exercise actual Dylint driver construction on both cache states, run
+`make act-validation` or `make test WITH_ACT=1` for a full local Act run. To
+exercise actual Dylint driver construction on both cache states, run
 `make whitaker-driver-integration`; it creates a private driver directory and
 runs `make lint-whitaker` cold, then warm. Hosted CI's lint step also uses a
 fresh runner-temporary driver directory for each job, preserving cold driver
@@ -243,8 +245,9 @@ documentation. Rustdoc denies missing crate-level documentation, broken
 intra-doc links, private intra-doc links, bare URLs, invalid HTML tags, invalid
 code-block attributes, and unescaped backticks. Clippy denies assertions
 without diagnostic messages and rejects direct process-environment readers,
-iterators, and mutation functions. Warnings fail documentation, lint, test, and
-doctest gates.
+iterators, and mutation functions. Its `missing_docs_in_private_items` lint is
+denied, so private items also require Rustdoc documentation. Warnings fail
+documentation, lint, test, and doctest gates.
 
 Run `make install-build-tools` after checking out the project. On native x86_64
 GNU Linux, it installs the pinned `mold` release and verifies its archive

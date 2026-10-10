@@ -68,7 +68,7 @@ install_mold() {
   BUILD_TOOLS_WORKDIR=$(mktemp -d)
   workdir=$BUILD_TOOLS_WORKDIR
 
-  note "downloading $url"
+  note "downloading $name"
   # Bound both the handshake and the transfer. Without these a server that
   # accepts the connection and then stalls leaves `curl` waiting indefinitely,
   # so the failure path below is never reached and `make install-build-tools`
@@ -78,7 +78,7 @@ install_mold() {
   curl --fail --silent --show-error --location \
     --connect-timeout "$CURL_CONNECT_TIMEOUT" \
     --speed-limit "$CURL_MIN_BYTES_PER_SECOND" --speed-time "$CURL_STALL_SECONDS" \
-    --output "$workdir/$name" "$url" ||
+    --output "$workdir/$name" "$url" 2>/dev/null ||
     fail "failed to download $name"
   verify_mold_archive "$workdir/$name" "$name"
 

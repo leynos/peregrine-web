@@ -26,8 +26,10 @@ const MANUAL: &str = "on: {workflow_dispatch: null}";
 #[case::missing_pr("on: {workflow_dispatch: null}", false)]
 #[case::missing_dispatch("on: {pull_request: {types: [opened, synchronize, reopened]}}", false)]
 #[case::extra_event(
-    "on: {pull_request: {types: [opened, synchronize, reopened]}, workflow_dispatch: null, push: \
-     null}",
+    concat!(
+        "on: {pull_request: {types: [opened, synchronize, reopened]}, workflow_dispatch: null, push: ",
+        "null}"
+    ),
     false
 )]
 #[case::nonnull_dispatch(
@@ -40,8 +42,10 @@ const MANUAL: &str = "on: {workflow_dispatch: null}";
     false
 )]
 #[case::extra_pr_field(
-    "on: {pull_request: {types: [opened, synchronize, reopened], branches: []}, \
-     workflow_dispatch: null}",
+    concat!(
+        "on: {pull_request: {types: [opened, synchronize, reopened], branches: []}, ",
+        "workflow_dispatch: null}"
+    ),
     false
 )]
 #[case::scalar_dispatch(
