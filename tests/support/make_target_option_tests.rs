@@ -4,9 +4,9 @@ use std::{io, process::Command};
 
 use camino::Utf8Path;
 
-/// Target selection is rejected in every Make variable inspected by preflight.
+/// Rejects cross-target selection in the native build routes.
 #[test]
-fn rejects_target_options_but_allows_target_directories() {
+fn rejects_native_target_options() {
     for (target, variable, option, diagnostic) in [
         (
             "check-build-tools",
@@ -23,6 +23,18 @@ fn rejects_target_options_but_allows_target_directories() {
         (
             "check-build-tools",
             "BUILD_JOBS",
+            "--target=aarch64-unknown-linux-gnu",
+            "native Make build",
+        ),
+        (
+            "lint-whitaker",
+            "CARGO_FLAGS",
+            "--target aarch64-unknown-linux-gnu",
+            "native Make build",
+        ),
+        (
+            "lint-whitaker",
+            "CARGO_FLAGS",
             "--target=aarch64-unknown-linux-gnu",
             "native Make build",
         ),
@@ -51,15 +63,45 @@ fn rejects_target_options_but_allows_target_directories() {
             String::from_utf8_lossy(&output.stderr)
         );
     }
+}
 
-    for (target, option) in [
-        ("check-build-tools", "--target-dir=target/cargo-output"),
-        ("check-build-tools", "--target-dir target/cargo-output"),
-        ("check-coverage-tools", "--target-dir=target/cargo-output"),
-        ("check-coverage-tools", "--target-dir target/cargo-output"),
+/// Keeps Cargo's build-artifact directory option available on native routes.
+#[test]
+fn allows_target_directories() {
+    for (target, variable, option) in [
+        (
+            "check-build-tools",
+            "TEST_FLAGS",
+            "--target-dir=target/cargo-output",
+        ),
+        (
+            "check-build-tools",
+            "TEST_FLAGS",
+            "--target-dir target/cargo-output",
+        ),
+        (
+            "check-coverage-tools",
+            "TEST_FLAGS",
+            "--target-dir=target/cargo-output",
+        ),
+        (
+            "check-coverage-tools",
+            "TEST_FLAGS",
+            "--target-dir target/cargo-output",
+        ),
+        (
+            "lint-whitaker",
+            "CARGO_FLAGS",
+            "--target-dir=target/cargo-output",
+        ),
+        (
+            "lint-whitaker",
+            "CARGO_FLAGS",
+            "--target-dir target/cargo-output",
+        ),
     ] {
         let output =
-            run_make(target, "TEST_FLAGS", option).expect("run the real Make preflight target");
+            run_make(target, variable, option).expect("run the real Make preflight target");
         assert!(
             output.status.success(),
             "{target} must allow the Cargo artifact directory option {option}: {}",
@@ -72,6 +114,7 @@ fn run_make(target: &str, variable: &str, value: &str) -> io::Result<std::proces
     Command::new("make")
         .arg(target)
         .arg("CHECK_BUILD_TOOLS=true")
+        .arg("WHITAKER=true")
         .arg(format!("{variable}={value}"))
         .current_dir(Utf8Path::new(env!("CARGO_MANIFEST_DIR")))
         .output()

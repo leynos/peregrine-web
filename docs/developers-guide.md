@@ -230,8 +230,9 @@ from the repository root, where Cargo reads the defaults above; Dylint adds
 `DYLINT_RUSTFLAGS`. This preserves Cranelift, `-Zthreads=8`, and the native
 wrapper/mold route for lint while leaving the coverage route on LLVM and `lld`.
 The clean driver boundary also removes target-specific Rust flags, which Cargo
-would otherwise append after the configured mold linker argument. Preflight
-rejects `--target` and `--target=<triple>` while allowing `--target-dir`.
+would otherwise append after the configured mold linker argument. The native
+build preflight also runs for direct `make lint-whitaker` calls, rejecting
+`--target` and `--target=<triple>` while allowing `--target-dir`.
 
 ## Lint baseline
 

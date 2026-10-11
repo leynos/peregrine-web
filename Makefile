@@ -9,7 +9,7 @@ MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
 .PHONY: help all clean test act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker fmt check-fmt markdownlint spelling nixie \
-  audit rust-audit install-build-tools check-build-tools check-coverage-tools
+  audit rust-audit install-build-tools check-build-tools check-build-target-flags check-coverage-tools
 
 SHELL := bash
 
@@ -136,7 +136,7 @@ WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
 	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
 	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -u CFLAGS -u LDFLAGS
 
-lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo defaults
+lint-whitaker: check-build-target-flags ## Run Whitaker with clean driver inputs and repository Cargo defaults
 	@$(WHITAKER_CLEAN_ENV) $(CHECK_BUILD_TOOLS)
 	@echo "Whitaker binary: $(WHITAKER)"
 	$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
@@ -147,10 +147,13 @@ typecheck: check-build-tools ## Type-check without building
 install-build-tools: ## Install pinned `mold` and the repository toolchain
 	@scripts/install-build-tools.sh
 
-check-build-tools: ## Check pinned development build prerequisites
+check-build-tools: check-build-target-flags ## Check pinned development build prerequisites
+	@$(CHECK_BUILD_TOOLS)
+
+check-build-target-flags: ## Reject cross-target flags on native Make routes
 	@case " $(CARGO_FLAGS) $(TEST_FLAGS) $(BUILD_JOBS) " in *" --target "*|*" --target="*) \
 		echo "build-tools: --target is outside the supported native Make build" >&2; exit 1;; \
-	esac; $(CHECK_BUILD_TOOLS)
+	esac
 
 check-coverage-tools: ## Check coverage linker prerequisites
 	@case " $(TEST_FLAGS) " in *" --target "*|*" --target="*) \
