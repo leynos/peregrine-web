@@ -100,6 +100,16 @@ impl GateProbe {
             .output()
     }
 
+    /// Runs spelling with an injected Git config count that its tool must not inherit.
+    pub(super) fn run_spelling_with_git_config(&self) -> io::Result<Output> {
+        let mut command = self.make_command("spelling", None, CallerEnvironment::Clean);
+        command
+            .env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", "user.name")
+            .env("GIT_CONFIG_VALUE_0", "injected-spelling-test-value");
+        command.output()
+    }
+
     /// Runs a real Make target from the fixture root with a private Makefile copy.
     pub(super) fn run_in_private_scratch(
         &self,

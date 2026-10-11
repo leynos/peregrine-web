@@ -72,6 +72,11 @@ exit 64
 /// Spelling fixture validates the builder's binding `gate` command.
 pub(super) const SPELLING_SCRIPT: &str = r#"
 stage=spelling
+if [ "${GIT_CONFIG_COUNT+x}" = x ]; then
+  stage=unexpected-spelling-git-config
+  record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
+  exit 64
+fi
 if [ "$#" -ne 1 ] || [ "$1" != gate ]; then
   stage=unexpected-spelling
   record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"

@@ -56,6 +56,55 @@ fn parallel_all_runs_each_gate_in_order() {
     );
 }
 
+/// Proves the spelling recipe removes injected Git configuration before execution.
+#[test]
+fn spelling_drops_injected_git_config_count() {
+    let probe = GateProbe::new().expect("create private gate probes");
+    let output = probe
+        .run_spelling_with_git_config()
+        .expect("run spelling with injected Git configuration");
+    assert!(
+        output.status.success(),
+        "make spelling must remove GIT_CONFIG_COUNT before invoking its tool: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    GateProbe::assert_command(
+        &probe.invocations().expect("parse spelling invocation"),
+        "spelling",
+        "probe-spelling",
+        &["gate"],
+    );
+}
+
+/// Pins the default spelling tool route and keeps the local input implicit.
+#[test]
+fn spelling_uses_the_pinned_builder_route() {
+    let output = Command::new("make")
+        .args(["--no-print-directory", "--dry-run", "spelling"])
+        .env_remove("MAKEFLAGS")
+        .env_remove("MFLAGS")
+        .env_remove("GNUMAKEFLAGS")
+        .env_remove("MAKEOVERRIDES")
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("dry-run the default spelling route");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let expected = "env -u GIT_CONFIG_COUNT uv tool run --from \"git+https://github.com/leynos/typos-config-builder.git@v0.1.3\" typos-config-builder gate";
+    assert!(
+        output.status.success(),
+        "make spelling dry-run must succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.lines().any(|line| line == expected),
+        "make spelling must preserve its pinned builder route; dry-run output was:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("--repository ."),
+        "make spelling must let the builder discover tracked files from Git"
+    );
+}
+
 /// Checks the real Make target and confirms every selected executor call.
 fn assert_all_commands(invocations: &[Invocation]) {
     for (stage, executable, arguments) in [
