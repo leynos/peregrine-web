@@ -2,6 +2,7 @@
 
 use std::error::Error;
 
+use rstest::rstest;
 use serde_yaml::{Mapping, Value};
 
 use super::super::{
@@ -10,6 +11,22 @@ use super::super::{
     document,
     valid_ci_route,
 };
+
+/// A malformed build-test field and the reason its route must reject it.
+#[derive(Debug)]
+struct JobFieldValueCase {
+    field: &'static str,
+    replacement: Value,
+    reason: &'static str,
+}
+
+/// Missing and mistyped variants for one required hosted job field.
+#[derive(Debug)]
+struct RequiredJobFieldCase {
+    field: &'static str,
+    missing_reason: &'static str,
+    wrong_types: Vec<JobFieldValueCase>,
+}
 
 /// The committed route must satisfy both its direct boundary and composition.
 #[test]
@@ -36,19 +53,18 @@ fn route_rejects_missing_and_wrongly_typed_jobs() {
         "the jobs removal must alter the fixture"
     );
     rejects_changed_route(&original, &missing_jobs, "missing jobs");
-    rejects_route_value(&original, "jobs", Value::Null, "null jobs");
-    rejects_route_value(
-        &original,
-        "jobs",
-        Value::String("build-test".to_owned()),
-        "scalar jobs",
-    );
-    rejects_route_value(
-        &original,
-        "jobs",
-        Value::Sequence(Vec::new()),
-        "sequence jobs",
-    );
+    for (replacement, reason) in [
+        (Value::Null, "null jobs"),
+        (Value::String("build-test".to_owned()), "scalar jobs"),
+        (Value::Sequence(Vec::new()), "sequence jobs"),
+    ] {
+        let mut changed = original.clone();
+        assert!(
+            replace_mapping_value(&mut changed, "jobs", replacement).is_some(),
+            "the {reason} mutation must alter the fixture"
+        );
+        rejects_changed_route(&original, &changed, reason);
+    }
 
     let mut missing_job = original.clone();
     assert!(
@@ -74,64 +90,43 @@ fn route_rejects_missing_and_wrongly_typed_jobs() {
     rejects_changed_route(&original, &extra_job, "extra job");
 }
 
-/// Missing and wrongly typed hosted steps fail closed.
-#[test]
-fn route_rejects_missing_and_wrongly_typed_steps() {
+/// Missing and wrongly typed required job fields fail closed.
+#[rstest]
+#[case::steps(RequiredJobFieldCase {
+    field: "steps",
+    missing_reason: "missing steps",
+    wrong_types: vec![
+        JobFieldValueCase { field: "steps", replacement: Value::Null, reason: "null steps" },
+        JobFieldValueCase { field: "steps", replacement: Value::String("not a sequence".to_owned()), reason: "scalar steps" },
+        JobFieldValueCase { field: "steps", replacement: Value::Mapping(Mapping::default()), reason: "mapping steps" },
+    ],
+})]
+#[case::environment(RequiredJobFieldCase {
+    field: "env",
+    missing_reason: "missing hosted environment",
+    wrong_types: vec![
+        JobFieldValueCase { field: "env", replacement: Value::Null, reason: "null hosted environment" },
+        JobFieldValueCase { field: "env", replacement: Value::String("not a mapping".to_owned()), reason: "scalar hosted environment" },
+        JobFieldValueCase { field: "env", replacement: Value::Sequence(Vec::new()), reason: "sequence hosted environment" },
+    ],
+})]
+fn route_rejects_missing_and_wrongly_typed_job_fields(#[case] case: RequiredJobFieldCase) {
     let original = committed_ci().expect("parse committed CI workflow");
-    let mut missing_steps = original.clone();
+    let mut missing_field = original.clone();
     assert!(
         remove_mapping_key(
-            build_test_mut(&mut missing_steps)
+            build_test_mut(&mut missing_field)
                 .expect("the committed build-test job must be a mapping"),
-            "steps",
+            case.field,
         )
         .is_some(),
-        "the steps removal must alter the fixture"
+        "the {} removal must alter the fixture",
+        case.field
     );
-    rejects_changed_route(&original, &missing_steps, "missing steps");
-    rejects_job_field_value(&original, "steps", Value::Null, "null steps");
-    rejects_job_field_value(
-        &original,
-        "steps",
-        Value::String("not a sequence".to_owned()),
-        "scalar steps",
-    );
-    rejects_job_field_value(
-        &original,
-        "steps",
-        Value::Mapping(Mapping::default()),
-        "mapping steps",
-    );
-}
-
-/// Missing and wrongly typed hosted environment declarations fail closed.
-#[test]
-fn route_rejects_missing_and_wrongly_typed_environment() {
-    let original = committed_ci().expect("parse committed CI workflow");
-    let mut missing_env = original.clone();
-    assert!(
-        remove_mapping_key(
-            build_test_mut(&mut missing_env)
-                .expect("the committed build-test job must be a mapping"),
-            "env",
-        )
-        .is_some(),
-        "the env removal must alter the fixture"
-    );
-    rejects_changed_route(&original, &missing_env, "missing hosted environment");
-    rejects_job_field_value(&original, "env", Value::Null, "null hosted environment");
-    rejects_job_field_value(
-        &original,
-        "env",
-        Value::String("not a mapping".to_owned()),
-        "scalar hosted environment",
-    );
-    rejects_job_field_value(
-        &original,
-        "env",
-        Value::Sequence(Vec::new()),
-        "sequence hosted environment",
-    );
+    rejects_changed_route(&original, &missing_field, case.missing_reason);
+    for mutation in case.wrong_types {
+        rejects_job_field_value(&original, mutation);
+    }
 }
 
 /// Exact environment values and cardinality remain fixed.
@@ -286,15 +281,6 @@ fn replace_mapping_value(value: &mut Value, key: &str, replacement: Value) -> Op
     Some(())
 }
 
-fn rejects_route_value(original: &Value, key: &str, replacement: Value, reason: &str) {
-    let mut changed = original.clone();
-    assert!(
-        replace_mapping_value(&mut changed, key, replacement).is_some(),
-        "the {key} replacement must alter the fixture"
-    );
-    rejects_changed_route(original, &changed, reason);
-}
-
 fn rejects_job_value(original: &Value, replacement: Value, reason: &str) {
     let mut changed = original.clone();
     let jobs_field = mapping_value_mut(&mut changed, "jobs");
@@ -309,15 +295,16 @@ fn rejects_job_value(original: &Value, replacement: Value, reason: &str) {
     rejects_changed_route(original, &changed, reason);
 }
 
-fn rejects_job_field_value(original: &Value, key: &str, replacement: Value, reason: &str) {
+fn rejects_job_field_value(original: &Value, mutation: JobFieldValueCase) {
     let mut changed = original.clone();
     assert!(
         build_test_mut(&mut changed)
-            .and_then(|job| replace_mapping_value(job, key, replacement))
+            .and_then(|job| { replace_mapping_value(job, mutation.field, mutation.replacement) })
             .is_some(),
-        "the {key} replacement must alter the fixture"
+        "the {} replacement must alter the fixture",
+        mutation.field
     );
-    rejects_changed_route(original, &changed, reason);
+    rejects_changed_route(original, &changed, mutation.reason);
 }
 
 fn rejects_changed_route(original: &Value, changed: &Value, reason: &str) {

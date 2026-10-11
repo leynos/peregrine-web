@@ -180,22 +180,15 @@ fn assert_whitaker_command(invocation: &Invocation, expected_cache_state: &str) 
 fn assert_driver_environment(invocation: &Invocation) {
     /// Common diagnostic for caller build-routing overrides.
     const OVERRIDE_REASON: &str = "Whitaker must not inherit caller build-selection overrides";
-    let expectations = [
-        (
-            "RUSTFLAGS",
-            "Whitaker must not receive caller RUSTFLAGS for its driver build",
-        ),
-        ("CARGO_ENCODED_RUSTFLAGS", OVERRIDE_REASON),
-        ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", OVERRIDE_REASON),
-        ("CARGO_BUILD_TARGET", OVERRIDE_REASON),
-        (
-            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
-            OVERRIDE_REASON,
-        ),
-        ("CFLAGS", OVERRIDE_REASON),
-        ("LDFLAGS", OVERRIDE_REASON),
-    ];
-    assert_unset_environment(invocation, &expectations);
+    assert_cargo_build_environment(
+        invocation,
+        OVERRIDE_REASON,
+        "Whitaker must not receive caller RUSTFLAGS for its driver build",
+    );
+    assert_unset_environment(
+        invocation,
+        &[("CFLAGS", OVERRIDE_REASON), ("LDFLAGS", OVERRIDE_REASON)],
+    );
 }
 
 /// Checks warnings-as-errors are forwarded through the supported driver input.
@@ -282,17 +275,27 @@ fn assert_config_environment(invocation: &Invocation) {
     /// Common diagnostic for caller build-routing overrides.
     const OVERRIDE_REASON: &str =
         "Cargo configuration probes must not inherit caller route overrides";
+    assert_cargo_build_environment(
+        invocation,
+        OVERRIDE_REASON,
+        "the repository configuration query must not inherit development flags",
+    );
+}
+
+/// Shares Rust build-routing checks while preserving boundary-specific reasons.
+fn assert_cargo_build_environment(
+    invocation: &Invocation,
+    override_reason: &str,
+    rustflags_reason: &str,
+) {
     let expectations = [
-        (
-            "RUSTFLAGS",
-            "the repository configuration query must not inherit development flags",
-        ),
-        ("CARGO_ENCODED_RUSTFLAGS", OVERRIDE_REASON),
-        ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", OVERRIDE_REASON),
-        ("CARGO_BUILD_TARGET", OVERRIDE_REASON),
+        ("RUSTFLAGS", rustflags_reason),
+        ("CARGO_ENCODED_RUSTFLAGS", override_reason),
+        ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", override_reason),
+        ("CARGO_BUILD_TARGET", override_reason),
         (
             "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
-            OVERRIDE_REASON,
+            override_reason,
         ),
     ];
     assert_unset_environment(invocation, &expectations);

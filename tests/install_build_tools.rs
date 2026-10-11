@@ -8,11 +8,12 @@ mod support;
 
 use std::{
     io::{self, Read, Write},
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     thread,
     time::{Duration, Instant},
 };
 
+use rstest::rstest;
 use support::{ChecksumRecord, InstallerFixture};
 
 /// Installs a verified archive before installing the pinned Rust toolchain.
@@ -25,8 +26,10 @@ fn native_install_orders_download_verification_unpack_and_toolchain() {
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
-        output.status.success(),
-        "valid pins and a verified archive must install: {stderr}"
+        output.status.success()
+            && stderr.contains("downloading mold-2.41.0-x86_64-linux.tar.gz")
+            && !stderr.contains("fixture-url-secret"),
+        "valid pins must install with a safe artifact diagnostic: {stderr}"
     );
     assert_eq!(
         fixture
@@ -35,36 +38,20 @@ fn native_install_orders_download_verification_unpack_and_toolchain() {
         "uname-system,uname-machine,rustup-show,curl,tar,rustup-install",
         "the installer must verify the host, archive, and toolchain in order"
     );
-    assert!(
-        fixture
-            .trace_contains("--connect-timeout 2 --speed-limit 1 --speed-time 2")
-            .expect("inspect curl arguments"),
-        "curl must receive bounded connection and stalled-transfer settings"
-    );
-    assert!(
-        fixture
+    let expected_trace = fixture
+        .trace_contains("--connect-timeout 2 --speed-limit 1 --speed-time 2")
+        .expect("inspect curl arguments")
+        && fixture
             .trace_contains("--strip-components=1")
-            .expect("inspect tar arguments"),
-        "tar must strip the release archive root"
-    );
-    assert!(
-        fixture
+            .expect("inspect tar arguments")
+        && fixture
             .trace_contains("--component clippy --component rustfmt")
-            .expect("inspect rustup arguments"),
-        "rustup must receive the pinned toolchain components"
-    );
+            .expect("inspect rustup arguments");
+    let scratch_is_clean = fixture.scratch_entries().expect("inspect scratch cleanup") == 0;
     assert!(
-        stderr.contains("downloading mold-2.41.0-x86_64-linux.tar.gz"),
-        "the installer should identify the artifact in its download diagnostic"
-    );
-    assert!(
-        !stderr.contains("fixture-url-secret"),
-        "the configurable release URL must not appear in diagnostics"
-    );
-    assert_eq!(
-        fixture.scratch_entries().expect("inspect scratch cleanup"),
-        0,
-        "successful installation must remove its temporary download directory"
+        expected_trace && scratch_is_clean,
+        "install must bound curl, strip the archive root, install pinned components, and clean \
+         scratch"
     );
 }
 
@@ -97,40 +84,44 @@ fn real_curl_and_tar_install_archive_from_local_http_server() {
         .expect("local HTTP fixture must serve the archive");
     let stderr = String::from_utf8_lossy(&output.stderr);
 
+    let extracted_payload = fixture
+        .extracted_payload()
+        .expect("read the extracted mold payload");
     assert!(
-        output.status.success(),
-        "real curl and tar should install the checksummed loopback archive: {stderr}"
+        output.status.success() && extracted_payload == "fixture mold executable\n",
+        "real curl and tar must install the checksummed payload: {stderr}; \
+         payload={extracted_payload:?}"
     );
-    assert_eq!(
-        fixture
-            .extracted_payload()
-            .expect("read the extracted mold payload"),
-        "fixture mold executable\n",
-        "real tar must extract the expected file after removing the archive root"
-    );
-    assert_eq!(
-        fixture
-            .command_names()
-            .expect("read installer command order"),
-        "uname-system,uname-machine,rustup-show,rustup-install",
-        "the loopback route must keep toolchain installation under the controlled rustup fixture"
-    );
-    assert_eq!(
-        fixture
-            .scratch_entries()
-            .expect("inspect installer scratch cleanup"),
-        0,
-        "successful real download and extraction must remove temporary archive state"
+    let command_names = fixture
+        .command_names()
+        .expect("read installer command order");
+    let scratch_entries = fixture
+        .scratch_entries()
+        .expect("inspect installer scratch cleanup");
+    assert!(
+        command_names == "uname-system,uname-machine,rustup-show,rustup-install"
+            && scratch_entries == 0,
+        "loopback install must use controlled rustup and clean scratch: commands={command_names}; \
+         scratch_entries={scratch_entries}"
     );
 }
 
 /// Serves one checked installer URL and archive over a loopback connection.
 fn serve_archive(listener: &TcpListener, archive: &[u8]) -> io::Result<()> {
+    let mut stream = accept_archive_connection(listener)?;
+    stream.set_nonblocking(false)?;
+    let request = read_archive_request(&mut stream)?;
+    validate_archive_request(&request)?;
+    write_archive_response(&mut stream, archive)
+}
+
+/// Accepts curl's local connection within the server's fixed deadline.
+fn accept_archive_connection(listener: &TcpListener) -> io::Result<TcpStream> {
     listener.set_nonblocking(true)?;
     let deadline = Instant::now() + Duration::from_secs(5);
-    let (mut stream, _) = loop {
+    loop {
         match listener.accept() {
-            Ok(connection) => break connection,
+            Ok((stream, _)) => return Ok(stream),
             Err(error)
                 if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
             {
@@ -144,8 +135,11 @@ fn serve_archive(listener: &TcpListener, archive: &[u8]) -> io::Result<()> {
             }
             Err(error) => return Err(error),
         }
-    };
-    stream.set_nonblocking(false)?;
+    }
+}
+
+/// Reads one complete HTTP request header from the loopback curl connection.
+fn read_archive_request(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     let mut request = Vec::new();
     let mut buffer = [0_u8; 1024];
@@ -159,14 +153,23 @@ fn serve_archive(listener: &TcpListener, archive: &[u8]) -> io::Result<()> {
         })?;
         request.extend_from_slice(bytes);
         if request.windows(4).any(|window| window == b"\r\n\r\n") {
-            break;
+            return Ok(request);
         }
     }
+}
+
+/// Checks curl requested the exact pinned artifact path.
+fn validate_archive_request(request: &[u8]) -> io::Result<()> {
     if !request.starts_with(b"GET /v2.41.0/mold-2.41.0-x86_64-linux.tar.gz HTTP/") {
         return Err(io::Error::other(
             "curl did not request the pinned mold release path",
         ));
     }
+    Ok(())
+}
+
+/// Sends the archive as a bounded HTTP/1.1 response.
+fn write_archive_response(stream: &mut TcpStream, archive: &[u8]) -> io::Result<()> {
     write!(
         stream,
         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -193,26 +196,19 @@ fn invalid_checksum_records_fail_before_unpacking_or_toolchain_install() {
             .expect("run installer with an invalid checksum fixture");
         let stderr = String::from_utf8_lossy(&output.stderr);
 
-        assert_eq!(
-            output.status.code(),
-            Some(1),
-            "an invalid checksum record must use the installer's controlled failure status"
-        );
         assert!(
-            stderr.contains(diagnostic),
-            "the checksum failure should explain {diagnostic}: {stderr}"
+            output.status.code() == Some(1) && stderr.contains(diagnostic),
+            "invalid checksum must fail with {diagnostic}: status={:?}; stderr={stderr}",
+            output.status.code()
         );
-        assert_eq!(
-            fixture
-                .command_names()
-                .expect("read installer command order"),
-            "uname-system,uname-machine,rustup-show,curl",
-            "checksum rejection must stop before unpacking and toolchain installation"
-        );
-        assert_eq!(
-            fixture.scratch_entries().expect("inspect scratch cleanup"),
-            0,
-            "checksum rejection must remove the downloaded archive"
+        let command_names = fixture
+            .command_names()
+            .expect("read installer command order");
+        let scratch_entries = fixture.scratch_entries().expect("inspect scratch cleanup");
+        assert!(
+            command_names == "uname-system,uname-machine,rustup-show,curl" && scratch_entries == 0,
+            "checksum rejection must stop before unpacking and clean the archive: \
+             commands={command_names}; scratch_entries={scratch_entries}"
         );
     }
 }
@@ -226,94 +222,66 @@ fn download_failure_hides_downloader_details_and_cleans_scratch() {
         .expect("run installer with a failing downloader");
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "download failure must use the installer's controlled failure status"
-    );
     assert!(
-        stderr.contains("failed to download mold-2.41.0-x86_64-linux.tar.gz"),
-        "download failure must retain its controlled artifact diagnostic: {stderr}"
+        output.status.code() == Some(1)
+            && stderr.contains("failed to download mold-2.41.0-x86_64-linux.tar.gz")
+            && !stderr.contains("fixture-curl-secret")
+            && !stderr.contains("fixture-url-secret"),
+        "download failure must be controlled and redact downloader details: status={:?}; \
+         stderr={stderr}",
+        output.status.code()
     );
+    let command_names = fixture
+        .command_names()
+        .expect("read installer command order");
+    let scratch_entries = fixture.scratch_entries().expect("inspect scratch cleanup");
     assert!(
-        !stderr.contains("fixture-curl-secret") && !stderr.contains("fixture-url-secret"),
-        "downloader output and URL credentials must stay out of diagnostics: {stderr}"
-    );
-    assert_eq!(
-        fixture
-            .command_names()
-            .expect("read installer command order"),
-        "uname-system,uname-machine,rustup-show,curl",
-        "download failure must stop before unpacking and toolchain installation"
-    );
-    assert_eq!(
-        fixture.scratch_entries().expect("inspect scratch cleanup"),
-        0,
-        "download failure must remove the temporary directory"
+        command_names == "uname-system,uname-machine,rustup-show,curl" && scratch_entries == 0,
+        "download failure must stop before unpacking and clean scratch: commands={command_names}; \
+         scratch_entries={scratch_entries}"
     );
 }
 
-/// Stops after a failed archive extraction and removes its temporary download.
-#[test]
-fn unpack_failure_stops_before_toolchain_install_and_cleans_scratch() {
+/// Stops at the failed installer stage and removes its temporary download.
+#[rstest]
+#[case::unpack(
+    "tar",
+    "failed to unpack mold-2.41.0-x86_64-linux.tar.gz",
+    "uname-system,uname-machine,rustup-show,curl,tar",
+    "archive extraction failure"
+)]
+#[case::toolchain(
+    "rustup",
+    "failed to install toolchain nightly-2030-01-01",
+    "uname-system,uname-machine,rustup-show,curl,tar,rustup-install",
+    "toolchain installation failure"
+)]
+fn installer_failure_stops_at_the_failed_stage(
+    #[case] failing_command: &str,
+    #[case] diagnostic: &str,
+    #[case] expected_commands: &str,
+    #[case] failure_description: &str,
+) {
     let fixture = InstallerFixture::new().expect("create installer fixture");
     let output = fixture
-        .run("Linux", "x86_64", Some("tar"))
-        .expect("run installer with a failing extractor");
+        .run("Linux", "x86_64", Some(failing_command))
+        .expect("run installer with a failing stage");
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "archive extraction failure must use the controlled failure status"
-    );
     assert!(
-        stderr.contains("failed to unpack mold-2.41.0-x86_64-linux.tar.gz"),
-        "archive extraction failure must identify the controlled failure: {stderr}"
+        output.status.code() == Some(1) && stderr.contains(diagnostic),
+        "{failure_description} must stop with its controlled diagnostic: status={:?}; \
+         stderr={stderr}",
+        output.status.code()
     );
-    assert_eq!(
-        fixture
-            .command_names()
-            .expect("read installer command order"),
-        "uname-system,uname-machine,rustup-show,curl,tar",
-        "unpack failure must stop before installing the Rust toolchain"
-    );
-    assert_eq!(
-        fixture.scratch_entries().expect("inspect scratch cleanup"),
-        0,
-        "unpack failure must remove the temporary directory"
-    );
-}
-
-/// Reports rustup failure after archive verification and extraction.
-#[test]
-fn toolchain_failure_follows_unpack_and_cleans_scratch() {
-    let fixture = InstallerFixture::new().expect("create installer fixture");
-    let output = fixture
-        .run("Linux", "x86_64", Some("rustup"))
-        .expect("run installer with failing rustup installation");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    assert_eq!(
-        output.status.code(),
-        Some(1),
-        "toolchain installation failure must use the controlled failure status"
-    );
+    let command_names = fixture
+        .command_names()
+        .expect("read installer command order");
+    let scratch_entries = fixture.scratch_entries().expect("inspect scratch cleanup");
     assert!(
-        stderr.contains("failed to install toolchain nightly-2030-01-01"),
-        "toolchain failure must identify the pinned toolchain: {stderr}"
-    );
-    assert_eq!(
-        fixture
-            .command_names()
-            .expect("read installer command order"),
-        "uname-system,uname-machine,rustup-show,curl,tar,rustup-install",
-        "the installer must unpack mold before attempting the toolchain install"
-    );
-    assert_eq!(
-        fixture.scratch_entries().expect("inspect scratch cleanup"),
-        0,
-        "toolchain failure must remove the temporary download directory"
+        command_names == expected_commands && scratch_entries == 0,
+        "{failure_description} must stop and clean scratch: commands={command_names}; \
+         scratch_entries={scratch_entries}"
     );
 }
 
@@ -327,8 +295,8 @@ fn non_native_host_skips_mold_but_installs_the_pinned_toolchain() {
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
-        output.status.success(),
-        "a non-native host should retain its platform linker: {stderr}"
+        output.status.success() && stderr.contains("skipping on Darwin arm64"),
+        "a non-native host must skip mold and report why: {stderr}"
     );
     assert_eq!(
         fixture
@@ -336,10 +304,6 @@ fn non_native_host_skips_mold_but_installs_the_pinned_toolchain() {
             .expect("read installer command order"),
         "uname-system,uname-system-machine,rustup-install",
         "non-native hosts must skip rustup host discovery, download, and extraction"
-    );
-    assert!(
-        stderr.contains("skipping on Darwin arm64"),
-        "the installer should explain why mold was skipped: {stderr}"
     );
     assert_eq!(
         fixture.scratch_entries().expect("inspect scratch cleanup"),

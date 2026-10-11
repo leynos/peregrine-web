@@ -99,12 +99,19 @@ predicates compose event, action-input, and step-policy checks without changing
 their YAML acceptance rules. `MakeOptions` applies caller settings and executor
 controls after the harness removes baseline child overrides. `RecordCursor`
 belongs only to the Act Make record parser and preserves its existing NUL field
-protocol. The unset-environment assertion is shared only by the driver and
-configuration boundaries and their regression tests; each boundary owns its
-variable names and diagnostics. These helpers are not a cross-suite validation
-framework. The private `step_text` helper is limited to named CI workflow step
-text lookup for `valid_ci_commands` and `valid_coverage_route`; it is not a
-general validator.
+protocol. `RecordInput` and its cases model emitter-compatible test records;
+they remain private to the parser suite and are not runtime invocation types.
+`RequiredJobFieldCase` keeps malformed workflow values and their expected
+rejection reasons together inside the hosted route suite. The shared Rust
+build-routing expectation and unset-environment assertions are limited to
+driver and configuration probes and their regression tests; each boundary owns
+its variable names and diagnostics. `GateProbe` composes private executor setup
+followed by caller-environment setup, with no general Make harness API. The
+installer loopback server helpers are private to the installer integration test
+and compose connection acceptance, request reading, path validation, and
+response writing. These helpers do not form cross-suite frameworks. The private
+`step_text` helper is limited to named CI workflow step text lookup for
+`valid_ci_commands` and `valid_coverage_route`; it is not a general validator.
 
 The separate `.github/workflows/act-validation.yml` workflow runs only on
 manual dispatch. It exercises the full workflow through Act in Docker to check

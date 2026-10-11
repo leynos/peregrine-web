@@ -120,6 +120,13 @@ impl GateProbe {
         caller_environment: CallerEnvironment,
     ) -> Command {
         let mut command = Command::new("make");
+        self.configure_make_executors(&mut command, target);
+        Self::configure_caller_environment(&mut command, failure, caller_environment);
+        command
+    }
+
+    /// Supplies the controlled executors and their private trace locations.
+    fn configure_make_executors(&self, command: &mut Command, target: &str) {
         command
             .args(["-j", "4", target])
             .arg(format!("CARGO={}", self.executable("probe-cargo")))
@@ -156,6 +163,14 @@ impl GateProbe {
         for variable in CONTROLLED_CALLER_VARIABLES {
             command.env_remove(variable);
         }
+    }
+
+    /// Selects clean or coverage-shaped caller compiler environment inputs.
+    fn configure_caller_environment(
+        command: &mut Command,
+        failure: Option<&str>,
+        caller_environment: CallerEnvironment,
+    ) {
         command
             .env("GATE_FAIL_AT", failure.unwrap_or_default())
             .env("CS_ACCESS_TOKEN", "gate-probe-secret-must-not-be-logged")
@@ -183,7 +198,6 @@ impl GateProbe {
         } else {
             command.env("CARGO_ENCODED_RUSTFLAGS", "");
         }
-        command
     }
 
     /// Copies the production Makefile into this test's capability directory.
