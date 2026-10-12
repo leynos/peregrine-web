@@ -1,6 +1,6 @@
 # Resolve decisions to mitigate API rework (1.1)
 
-Status: DRAFT — awaiting explicit approval before implementation.
+Status: BLOCKED at M1 — execution approved; pilot acceptance is missing.
 
 This ExecPlan is a living document. Keep Constraints, Tolerances, Risks,
 Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
@@ -96,14 +96,37 @@ blockers with evidence rather than lowering acceptance criteria.
   its ownership, streaming, verification, and evidence corrections.
 - [x] (2026-10-12) Passed formatting, Markdown/spelling, Mermaid, lint, and
   test gates sequentially; checked every local document reference.
-- [ ] Publish the validated plan commit and draft PR; delivery metadata belongs
-  in the PR record and handoff, without implying implementation approval.
-- [ ] Obtain explicit plan approval; record approver, date, and evidence link.
+- [x] (2026-10-12) Published planning commit `6414fda` as draft
+  [PR #26](https://github.com/leynos/peregrine-web/pull/26).
+- [x] (2026-10-12) The requesting user explicitly approved execution by
+  invoking `/sdlc-implementation` with this plan slug in
+  [the implementation session](https://lody.ai/leynos/sessions/724e71be-1ca2-49c9-a6c9-3aff69b0aeac).
+  This approves execution only; no individual pilot authority is inferred.
+- [x] (2026-10-12) Inspected the clean checkout, matching PR head/base,
+  ToR §9, and PR comments/reviews. No Q1/Q2/Q6 acceptance evidence was found.
+  Requested the named authority, reviewer/operator, workload/comparator,
+  protocol scope, proxy policy, and upgrade requirements from the user.
 - [ ] M1: accept the pilot, authority, and protocol/release boundary.
 - [ ] M2: agree complete lifecycle, precedence, and configuration contracts.
 - [ ] M3: reconcile documentation, acceptance evidence, and roadmap completion.
 
 ## Surprises & discoveries
+
+Execution approval and pilot acceptance are separate evidence. The user has
+approved this plan, but ToR §9 still assigns only proposed roles. PR #26 has no
+human acceptance of Q1/Q2/Q6. M1 therefore remains blocked under its stated
+tolerance; M2 and M3 cannot proceed on an inferred pilot or operator.
+
+A repeated execution-intake test gate blocked in an inherited Lody Git shim
+inside a build-contract fixture. The gate owner verified and terminated only
+that validation run's process chain; the gate exited 143 and is not a pass.
+Final validation uses the clean Git environment required by the supplied agent
+instructions, preserving compiler admission and shared caches. No daemon or
+unrelated process was signalled. The subsequent clean-environment test run
+failed with a child-process spawn error (`Resource temporarily unavailable`)
+and two build-contract assertions. Preserve that failed log separately; use
+`NEXTEST_TEST_THREADS=2` for the next complete gate run to reduce process
+demand without excluding tests or changing their expectations.
 
 The source design already specifies independent reverse response hooks and
 error precedence, but deliberately leaves all operational defaults to 1.1.2.
@@ -124,6 +147,18 @@ preserving wrapper admission, before attributing acceptance to Polonius.
 
 ## Decision log
 
+- (2026-10-12, execution) Record the user's explicit implementation request
+  as plan approval. Stop at M1 because A1/A2 lack named authority and explicit
+  pilot/deployment acceptance. The user can accept the proposed synthetic
+  scenario with named roles and scope, or supply a real workload and
+  comparator. A synthetic review cannot establish deployment demand. No
+  contract default, ADR acceptance, or roadmap completion follows from
+  execution approval.
+
+- (2026-10-12, execution) Remove inherited Lody Git routing from the
+  final gate environment after observing a blocked Git-backed fixture. Retain
+  the interrupted gate log and validate the final candidate again; do not
+  change product contracts or count the interrupted run as successful.
 - (2026-10-12, planning) Limit this plan to 1.1.1 and 1.1.2. The roadmap assigns
   compilation to 1.1.3 and exhaustive transition proof to 1.2.2. Advancing
   those here would bypass their dependencies and the requested approval gate.
@@ -140,6 +175,17 @@ preserving wrapper admission, before attributing acceptance to Polonius.
   semantics.
 
 ## Outcomes & retrospective
+
+Execution intake verified PR #26 against local head `6414fda` and base
+`de6b900`. Only the execution record has changed; A1–A7 remain incomplete. No
+upstream requirement, runtime interface, dependency, or trust boundary has
+changed. M1 needs the user's separate acceptance evidence before substantive
+documentation delivery can continue. Execution-intake formatting, Markdown and
+spelling, Mermaid, lint, and test gates passed sequentially with exit code
+zero. Tests reported 295 passed and 1 skipped; doctests had no cases. Logs are
+under `/tmp/` with the worktree UUID and branch in their names and the suffix
+`-execution-intake.out`. The planning results below remain historical evidence
+for their original candidate.
 
 The six-perspective review found no blocking design flaw. Its concerns led to
 exact downstream task assignments, body-owner transfer accounting, explicit
@@ -677,3 +723,9 @@ prose where it omitted distinctions or produced suspect section references.
 Revision note (2026-10-12): expert review clarified downstream ownership,
 streaming exits, transfer accounting, non-vacuity checks, and versioned limit
 evidence. These refinements preserve the decision-only scope and approval gate.
+
+Revision note (2026-10-12, execution intake): record explicit execution
+approval and the missing M1 acceptance evidence. Preserve all contract and
+verification requirements; M2/M3 remain dependent on accepted A1/A2. Record the
+interrupted Git-backed gate separately and use the prescribed clean Git
+environment for final validation.
