@@ -67,6 +67,9 @@ compact and omits build output such as `target/`.
 
 - `docs/`: Holds long-lived reference documentation, guides, style rules, and
   design material.
+- `docs/execplans/`: Holds living execution plans, including approval status,
+  implementation milestones, and acceptance evidence. Completed plans retain
+  the historical state at implementation time.
 - `docs/contents.md`: Indexes the documentation set and should be updated when
   documentation files are added, renamed, or removed.
 - `docs/terms-of-reference.md`: Records the product problem, intended users,
