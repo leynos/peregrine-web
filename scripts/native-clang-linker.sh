@@ -11,7 +11,11 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 for argument in "$@"; do
   if [ "$argument" = '-fuse-ld=mold' ]; then
-    uses_mold || fail 'the mold build route requires a native x86_64-unknown-linux-gnu host'
+    host=$(default_host_triple) || {
+      note 'cannot determine the rustup default host; check rustup show'
+      exit 1
+    }
+    uses_mold "$host" || fail 'the mold build route requires a native x86_64-unknown-linux-gnu host'
     pin=$(mold_version) || exit 1
     verify_native_mold "$pin" || exit 1
     break

@@ -95,10 +95,19 @@ pinned_components() {
 is_linux() { [ "$(uname -s)" = 'Linux' ]; }
 
 # The committed target table selects mold only for native x86_64 GNU Linux.
-default_host_triple() { rustup show | sed -n 's/^Default host: //p'; }
+default_host_triple() {
+  local output host
+  output=$(rustup show) || return 1
+  host=$(printf '%s\n' "$output" | sed -n 's/^Default host: //p') || return 1
+  [ -n "$host" ] || return 1
+  printf '%s' "$host"
+}
+
+# The caller resolves rustup's host once, then makes this platform decision.
 uses_mold() {
+  local host=$1
   is_linux && [ "$(uname -m)" = 'x86_64' ] \
-    && [ "$(default_host_triple)" = 'x86_64-unknown-linux-gnu' ]
+    && [ "$host" = 'x86_64-unknown-linux-gnu' ]
 }
 
 # The version of the linker executable Clang resolves, or a non-zero status

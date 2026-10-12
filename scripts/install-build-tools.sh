@@ -57,8 +57,12 @@ verify_mold_archive() {
 # Download, verify, and unpack the pinned mold release for the configured
 # x86_64 GNU Linux target. Other hosts keep their platform linker.
 install_mold() {
-  local version=$1 name url workdir
-  if ! uses_mold; then
+  local version=$1 name url workdir host
+  if ! host=$(default_host_triple); then
+    note 'cannot determine the rustup default host; check rustup show'
+    return 1
+  fi
+  if ! uses_mold "$host"; then
     note "the pinned mold target is x86_64 GNU Linux; skipping on $(uname -sm)"
     return 0
   fi

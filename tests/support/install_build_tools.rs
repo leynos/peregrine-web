@@ -325,6 +325,13 @@ exit 0
 const RUSTUP_FIXTURE: &str = r#"#!/bin/sh
 if [ "$#" -eq 1 ] && [ "$1" = show ]; then
   printf '%s\n' rustup-show >> "$INSTALLER_TRACE"
+  if [ "$INSTALLER_FAILURE" = rustup-show ]; then
+    printf '%s\n' 'fixture rustup show failure' >&2
+    exit 44
+  fi
+  if [ "$INSTALLER_FAILURE" = rustup-show-empty ]; then
+    exit 0
+  fi
   printf '%s\n' 'Default host: x86_64-unknown-linux-gnu'
   exit 0
 fi

@@ -35,7 +35,7 @@ fn native_install_orders_download_verification_unpack_and_toolchain() {
         fixture
             .command_names()
             .expect("read installer command order"),
-        "uname-system,uname-machine,rustup-show,curl,tar,rustup-install",
+        "rustup-show,uname-system,uname-machine,curl,tar,rustup-install",
         "the installer must verify the host, archive, and toolchain in order"
     );
     let expected_trace = fixture
@@ -53,6 +53,37 @@ fn native_install_orders_download_verification_unpack_and_toolchain() {
         "install must bound curl, strip the archive root, install pinned components, and clean \
          scratch"
     );
+}
+
+#[test]
+fn unknown_rustup_host_stops_before_skipping_mold_or_installing_toolchain() {
+    for failure in ["rustup-show", "rustup-show-empty"] {
+        let fixture = InstallerFixture::new().expect("create installer fixture");
+        let output = fixture
+            .run("Linux", "x86_64", Some(failure))
+            .expect("run installer with unavailable rustup host metadata");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(
+            !output.status.success()
+                && stderr.contains("cannot determine the rustup default host; check rustup show"),
+            "unavailable rustup host metadata must fail with an actionable diagnostic: \
+             mode={failure}; status={:?}; stderr={stderr}",
+            output.status.code()
+        );
+        assert_eq!(
+            fixture
+                .command_names()
+                .expect("read installer command order"),
+            "rustup-show",
+            "host discovery failure must stop before mold download or toolchain installation"
+        );
+        assert_eq!(
+            fixture.scratch_entries().expect("inspect scratch cleanup"),
+            0,
+            "host discovery failure must not leave installer scratch directories"
+        );
+    }
 }
 
 /// Exercises the real downloader, checksum verifier, and extractor over loopback.
@@ -99,7 +130,7 @@ fn real_curl_and_tar_install_archive_from_local_http_server() {
         .scratch_entries()
         .expect("inspect installer scratch cleanup");
     assert!(
-        command_names == "uname-system,uname-machine,rustup-show,rustup-install"
+        command_names == "rustup-show,uname-system,uname-machine,rustup-install"
             && scratch_entries == 0,
         "loopback install must use controlled rustup and clean scratch: commands={command_names}; \
          scratch_entries={scratch_entries}"
@@ -206,7 +237,7 @@ fn invalid_checksum_records_fail_before_unpacking_or_toolchain_install() {
             .expect("read installer command order");
         let scratch_entries = fixture.scratch_entries().expect("inspect scratch cleanup");
         assert!(
-            command_names == "uname-system,uname-machine,rustup-show,curl" && scratch_entries == 0,
+            command_names == "rustup-show,uname-system,uname-machine,curl" && scratch_entries == 0,
             "checksum rejection must stop before unpacking and clean the archive: \
              commands={command_names}; scratch_entries={scratch_entries}"
         );
@@ -236,7 +267,7 @@ fn download_failure_hides_downloader_details_and_cleans_scratch() {
         .expect("read installer command order");
     let scratch_entries = fixture.scratch_entries().expect("inspect scratch cleanup");
     assert!(
-        command_names == "uname-system,uname-machine,rustup-show,curl" && scratch_entries == 0,
+        command_names == "rustup-show,uname-system,uname-machine,curl" && scratch_entries == 0,
         "download failure must stop before unpacking and clean scratch: commands={command_names}; \
          scratch_entries={scratch_entries}"
     );
@@ -247,13 +278,13 @@ fn download_failure_hides_downloader_details_and_cleans_scratch() {
 #[case::unpack(
     "tar",
     "failed to unpack mold-2.41.0-x86_64-linux.tar.gz",
-    "uname-system,uname-machine,rustup-show,curl,tar",
+    "rustup-show,uname-system,uname-machine,curl,tar",
     "archive extraction failure"
 )]
 #[case::toolchain(
     "rustup",
     "failed to install toolchain nightly-2030-01-01",
-    "uname-system,uname-machine,rustup-show,curl,tar,rustup-install",
+    "rustup-show,uname-system,uname-machine,curl,tar,rustup-install",
     "toolchain installation failure"
 )]
 fn installer_failure_stops_at_the_failed_stage(
@@ -302,8 +333,8 @@ fn non_native_host_skips_mold_but_installs_the_pinned_toolchain() {
         fixture
             .command_names()
             .expect("read installer command order"),
-        "uname-system,uname-system-machine,rustup-install",
-        "non-native hosts must skip rustup host discovery, download, and extraction"
+        "rustup-show,uname-system,uname-system-machine,rustup-install",
+        "non-native hosts must skip the mold download and extraction"
     );
     assert_eq!(
         fixture.scratch_entries().expect("inspect scratch cleanup"),

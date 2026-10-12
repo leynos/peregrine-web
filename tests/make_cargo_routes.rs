@@ -1,5 +1,7 @@
 //! Behavioural contracts for Make's Cargo substitution and build preflight.
 
+#[path = "support/make_act_contract_smoke_tests.rs"]
+mod act_contract_smoke;
 #[path = "support/make_target_option_tests.rs"]
 mod target_options;
 
@@ -54,7 +56,9 @@ impl CargoProbe {
             "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ \
              \"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' 'cargo-nextest 0.9.0'; exit \
              0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n \
-             \"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\n",
+             \"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\nif [ -n \
+             \"${CARGO_ENV_LOG:-}\" ]; then printf '%s\\n' \"${RUSTFLAGS:-}\" > \
+             \"$CARGO_ENV_LOG\"; fi\nexit \"${CARGO_PROBE_STATUS:-0}\"\n",
         )?;
         directory.set_permissions("probe-cargo", Permissions::from_mode(0o700))?;
         directory.write(
@@ -70,7 +74,7 @@ impl CargoProbe {
         })
     }
 
-    fn make(&self, target: &str, options: MakeOptions<'_>) -> io::Result<std::process::Output> {
+    fn make_command(&self, target: &str, options: MakeOptions<'_>) -> Command {
         let mut command = Command::new("make");
         if options.dry_run {
             command.arg("-n");
@@ -87,8 +91,12 @@ impl CargoProbe {
                 "NEXTEST_AVAILABLE",
                 if options.nextest_available { "0" } else { "1" },
             )
-            .env("CARGO_LOG", self.path.join("cargo.log").as_str())
-            .output()
+            .env("CARGO_LOG", self.path.join("cargo.log").as_str());
+        command
+    }
+
+    fn make(&self, target: &str, options: MakeOptions<'_>) -> io::Result<std::process::Output> {
+        self.make_command(target, options).output()
     }
 }
 
