@@ -2,6 +2,8 @@
 
 use std::{path::PathBuf, process::Command};
 
+use mockable::{DefaultEnv, Env};
+
 /// Runs Clippy against a deliberately undocumented private item.
 #[test]
 fn missing_docs_in_private_items_remains_denied() {
@@ -33,7 +35,10 @@ fn missing_docs_in_private_items_remains_denied() {
         "the compile-fail fixture must use the repository's Clippy lint level"
     );
 
-    let output = Command::new("cargo")
+    let cargo = DefaultEnv
+        .os_string("CARGO")
+        .expect("Cargo must provide the CARGO path");
+    let output = Command::new(cargo)
         .args(["clippy", "--manifest-path"])
         .arg(fixture_manifest_path)
         .args(["--locked", "--offline"])
@@ -47,7 +52,7 @@ fn missing_docs_in_private_items_remains_denied() {
         "Clippy accepted an undocumented private item; stderr: {diagnostics}"
     );
     assert!(
-        diagnostics.contains("missing documentation for a function"),
+        diagnostics.contains("missing_docs_in_private_items"),
         "Clippy must fail for the private-item documentation diagnostic; stderr: {diagnostics}"
     );
 }
