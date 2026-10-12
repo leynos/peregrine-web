@@ -223,7 +223,7 @@ service, measured capacity, or acceptance of every proposed contract.
 | ID  | Question and consequence                                                                             | Closure evidence                                                                                             | Decision owner and status                                  |
 | --- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
 | Q1  | Which service authors and workload should validate the architectural benefit? Gates adoption claims. | Mornington reimplementation, compared against its pinned Actix-based design; review scenarios below.         | `leynos`; pilot selected.                                  |
-| Q2  | Is HTTP/1.1 with external secure ingress an acceptable initial boundary? Gates serving scope.        | Confirmed deployment requirements and an accepted protocol-scope decision.                                   | `leynos`; protocol acceptance pending.                     |
+| Q2  | Is HTTP/1.1 with external secure ingress an acceptable initial boundary? Gates serving scope.        | Confirmed deployment requirements and an accepted protocol-scope decision.                                   | `leynos`; accepted 2026-10-13.                             |
 | Q3  | Which resource-policy interface and enforcement default should be public? Gates API stability.       | A working public/protected example and review of missing-policy behaviour.                                   | `leynos`; open.                                            |
 | Q4  | What latency, allocation, memory, and connection budgets define release readiness?                   | Reproducible measurements and agreed thresholds for the pilot workload.                                      | `leynos`; measurements open.                               |
 | Q5  | What compiler posture, supported platforms, and compatibility policy can be maintained?              | The phase 2 compiler experiment, a downstream build matrix, and a published support policy.                  | `leynos`; open.                                            |
@@ -269,9 +269,16 @@ rather than SSE or WebSocket protocols. Its identity flows are OIDC for humans
 and OAuth for agents, followed by application grant checks; reverse-proxy
 headers are not identity evidence. The proposed Peregrine pilot boundary is
 HTTP/1.1 behind secure ingress, explicit trusted ingress peers for forwarding
-metadata, and no upgrades. Q2 remains pending the owner's protocol acceptance.
-The later implementation and any edits to Mornington belong to separate work;
-this slice records the pilot and the contracts that it will exercise.
+metadata, and no upgrades. The owner explicitly accepted this proving-ground
+boundary on 2026-10-13 in the linked implementation session. HTTP/2 and native
+Transport Layer Security (TLS) are deferred. Traefik may terminate secure
+external connections; Peregrine trusts forwarding metadata only from configured
+ingress peers. Forwarding headers never establish identity. Buffered and
+streaming core bodies remain in scope; Pachislot remains separate. This closes
+Q1/Q2/Q6 for the pilot decision slice, without accepting all ADRs or committing
+to measured release readiness. The later implementation and any edits to
+Mornington belong to separate work; this slice records the pilot and the
+contracts that it will exercise.
 
 ## 10. Source register
 

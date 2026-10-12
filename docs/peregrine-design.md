@@ -39,9 +39,9 @@ operations, and bounded JSON long polling. Mornington has no implemented forum
 to migrate yet; its proposed workload does not establish Peregrine performance.
 Its application services retain authentication, delegated authorization, and
 durable effects. The owner holds the authority, reviewer, and operator roles;
-protocol-scope acceptance remains Q2. No SSE or WebSocket upgrade is required
-by this pilot, and it does not replace ADR 006's independent extension
-consumers.
+the owner accepted the pilot's HTTP/1.1/Traefik boundary on 2026-10-13. No SSE
+or WebSocket upgrade is required by this pilot, and it does not replace ADR
+006's independent extension consumers.
 
 The initial delivery target is a single `peregrine-web` library, in-process
 request execution, and an HTTP/1.1 serving adapter. Buffered convenience and
@@ -49,9 +49,9 @@ streaming belong in the core release. Pachislot is now a named WebSocket
 extension consumer: §9.1 proposes an optional owned HTTP/1.1 upgrade boundary,
 with delivery gated separately from the initial core. HTTP/2, native Transport
 Layer Security (TLS), hot route reload, and a supported Tower adapter remain
-deferred pending the scope decisions in terms of reference §9. A deployment can
-supply secure ingress externally; trusted forwarding configuration remains
-explicit.
+deferred under the accepted pilot scope in terms of reference §9.1. A
+deployment can supply secure ingress externally; trusted forwarding
+configuration remains explicit.
 
 ### 1.1. Reconciliation of the source papers
 

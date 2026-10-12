@@ -1,6 +1,6 @@
 # Resolve decisions to mitigate API rework (1.1)
 
-Status: BLOCKED at M1 — Mornington pilot selected; protocol acceptance pending.
+Status: IN PROGRESS — M1 accepted; M2 contract specification next.
 
 This ExecPlan is a living document. Keep Constraints, Tolerances, Risks,
 Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
@@ -69,7 +69,7 @@ blockers with evidence rather than lowering acceptance criteria.
 - **Unmeasured pilot (high impact, medium likelihood):** the sole owner has
   selected Mornington, whose forum remains at design stage. Compare against the
   pinned Actix-based design; do not claim a deployed comparator or measured
-  capacity. Q2 protocol acceptance and Q4 measurements remain separate evidence.
+  capacity. Q2 acceptance is recorded; Q4 measurements remain separate evidence.
 - **Arbitrary defaults (high impact, medium likelihood):** defaults can imply
   deployment guarantees. Record their workload rationale, enforcement point,
   and owner acceptance; keep performance targets under Q4 separately open.
@@ -111,7 +111,10 @@ blockers with evidence rather than lowering acceptance criteria.
   a Peregrine reimplementation of `leynos/mornington` as the pilot. Recorded
   the authority/reviewer/operator roles and pinned Actix-design comparator in
   ToR §9.1; no separate external customer acceptance is required.
-- [ ] M1: accept the protocol/release boundary for the Mornington pilot.
+- [x] (2026-10-13) M1: the owner explicitly accepted HTTP/1.1 behind
+  Traefik, configured trusted proxy peers, JSON long polling, no upgrades, and
+  deferred HTTP/2/native TLS as a solid proving ground. A1/A2 are recorded in
+  ToR §9.1; buffered/streaming core and separate Pachislot scope are retained.
 - [ ] M2: agree complete lifecycle, precedence, and configuration contracts.
 - [ ] M3: reconcile documentation, acceptance evidence, and roadmap completion.
 
@@ -123,8 +126,9 @@ previously missing human roles and workload without requiring an external
 customer. Mornington revision `43a0046efdf06faaefb7bcc2d37877f059825b88`
 contains scaffolding and an Actix-based design, not an implemented forum. Its
 observation contract uses bounded JSON long polling and explicitly excludes
-SSE/WebSockets. The remaining M1 question is acceptance of the proposed
-HTTP/1.1/secure-ingress boundary and explicit trusted-proxy policy.
+SSE/WebSockets. The owner accepted the HTTP/1.1/secure-ingress boundary and
+explicit trusted-proxy policy on 2026-10-13. No human-role or protocol blocker
+remains.
 
 A repeated execution-intake test gate blocked in an inherited Lody Git shim
 inside a build-contract fixture. The gate owner verified and terminated only
@@ -155,6 +159,11 @@ recommendation; the later spike must use the Rust Router canary through Cargo,
 preserving wrapper admission, before attributing acceptance to Polonius.
 
 ## Decision log
+
+- (2026-10-13, owner acceptance) Close the pilot Q1/Q2/Q6 decision slice
+  using the owner's explicit acceptance in the linked implementation session.
+  Proceed to M2 without inventing a customer, accepting the proposed lifecycle
+  ADR, or claiming measured release readiness.
 
 - (2026-10-12, owner clarification) Select the Mornington reimplementation
   instead of the synthetic task/annotation specimen. The sole project owner
@@ -196,7 +205,7 @@ Execution intake verified PR #26 against local head `6414fda` and base
 `de6b900`. Only the execution record has changed; A1–A7 remain incomplete. No
 upstream requirement, runtime interface, dependency, or trust boundary has
 changed. The owner has since supplied the Mornington pilot and human roles. M1
-now needs only protocol/deployment-scope acceptance before M2 can proceed.
+was accepted on 2026-10-13; M2 can proceed after milestone validation/review.
 Execution-intake formatting, Markdown and spelling, Mermaid, lint, and test
 gates passed sequentially with exit code zero. Tests reported 295 passed and 1
 skipped; doctests had no cases. Logs are under `/tmp/` with the worktree UUID
@@ -207,11 +216,11 @@ The six-perspective review found no blocking design flaw. Its concerns led to
 exact downstream task assignments, body-owner transfer accounting, explicit
 streaming-limit exits, observable transient buffer bounds, versioned upstream
 evidence, and explicit formatter restaging. The scope remains decision closure
-with later proof delivery. No runtime feature, formal proof, pilot approval, or
-roadmap completion is claimed. Record review changes, measured gate results,
-and the draft PR here before handoff. At implementation completion, compare
-M1–M3 evidence to the purpose above and reconcile every affected upstream
-assumption before changing status to COMPLETE.
+with later proof delivery. The pilot boundary is now accepted; no runtime
+feature, formal proof, or roadmap completion is claimed. Record review changes,
+measured gate results, and the draft PR here before handoff. At implementation
+completion, compare M1–M3 evidence to the purpose above and reconcile every
+affected upstream assumption before changing status to COMPLETE.
 
 ## Context and orientation
 
@@ -751,3 +760,7 @@ Revision note (2026-10-12, owner clarification): replace the synthetic specimen
 with the owner-selected Mornington pilot, record the shared human roles, and
 pin the design-stage Actix comparator. Only protocol acceptance remains
 outstanding for M1; workload figures are not measured release budgets.
+
+Revision note (2026-10-13): record explicit owner acceptance of the Mornington
+protocol and deployment boundary. M1 is accepted; M2 can specify lifecycle,
+failure selection, and pilot configuration without the former Q2 blocker.
