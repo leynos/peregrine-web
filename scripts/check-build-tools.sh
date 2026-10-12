@@ -28,7 +28,7 @@ check_mold() {
 # pinned nightly. Any absence is fatal: the standard's parallel frontend is a
 # nightly-only flag, and Cranelift is a pinned toolchain component.
 check_toolchain() {
-  local toolchain=$1 host=$2 host_status=$3 component installed_name component_list installed_components status=0
+  local toolchain=$1 host=$2 host_status=$3 component_list=$4 component installed_name installed_components status=0
   if ! command -v rustup >/dev/null 2>&1; then
     note 'rustup not found on PATH; it is required to select the pinned nightly'
     note 'install it from https://rustup.rs'
@@ -45,7 +45,6 @@ check_toolchain() {
     note "cannot inspect components for $toolchain; run make install-build-tools"
     return 1
   }
-  component_list=$(pinned_components) || return 1
   while IFS= read -r component; do
     # rustup accepts the manifest's preview names but lists these installed
     # components without the suffix (llvm-tools and rustc-codegen-cranelift).
@@ -115,7 +114,7 @@ check_cargo_overrides() {
 # Run both checks unconditionally so a developer sees every missing piece in one
 # pass rather than fixing them one failed run at a time.
 main() {
-  local status=0 mold_pin toolchain_pin coverage=false host= host_status=0
+  local status=0 mold_pin toolchain_pin component_list coverage=false host= host_status=0
   case ${1:-} in
     '') ;;
     --coverage) coverage=true ;;
@@ -127,6 +126,7 @@ main() {
   # nonsensical drift. An assignment propagates the status, so this stops.
   mold_pin=$(mold_version) || return 1
   toolchain_pin=$(pinned_toolchain) || return 1
+  component_list=$(pinned_components) || return 1
   if command -v rustup >/dev/null 2>&1; then
     host=$(default_host_triple) || {
       note 'cannot determine the rustup default host; check rustup show'
@@ -137,7 +137,7 @@ main() {
     host_status=1
   fi
   check_mold "$mold_pin" "$host" "$host_status" || status=1
-  check_toolchain "$toolchain_pin" "$host" "$host_status" || status=1
+  check_toolchain "$toolchain_pin" "$host" "$host_status" "$component_list" || status=1
   check_linkers "$coverage" "$host" "$host_status" || status=1
   check_cargo_overrides "$coverage" "$host" "$host_status" || status=1
   [ "$status" -eq 0 ] || note 'capability check failed; see the messages above'

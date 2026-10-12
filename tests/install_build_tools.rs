@@ -2,6 +2,8 @@
 
 #![cfg(all(target_os = "linux", target_arch = "x86_64"))]
 
+#[path = "support/install_build_tool_pins.rs"]
+mod pin_contracts;
 /// Child executors and pin fixtures for the installer integration tests.
 #[path = "support/install_build_tools.rs"]
 mod support;

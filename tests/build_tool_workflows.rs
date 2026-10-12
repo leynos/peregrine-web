@@ -81,6 +81,50 @@ fn ordered_linux_installation_allows_a_new_suite() {
 }
 
 #[test]
+fn make_route_model_classifies_supported_suites_and_rejects_unknown_goals() {
+    for goal in ["test", "coverage", "all"] {
+        let source = format!(
+            "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make {goal}\n"
+        );
+        let document = workflow(&source).expect("parse a supported Make suite route");
+        let problems = workflow_violations(&[("make-route.yml".to_owned(), document)])
+            .expect("inspect a supported Make route without invoking Make");
+        assert!(
+            !problems.is_empty(),
+            "Make suite goal {goal} must require pinned tools"
+        );
+    }
+    for goal in [
+        "install-build-tools",
+        "check-build-tools",
+        "check-fmt",
+        "lint",
+        "spelling",
+        "audit",
+        "rust-audit",
+    ] {
+        let source = format!(
+            "jobs:\n  setup:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make {goal}\n"
+        );
+        let document = workflow(&source).expect("parse a supported non-suite Make route");
+        let problems = workflow_violations(&[("make-route.yml".to_owned(), document)])
+            .expect("inspect a supported non-suite Make route");
+        assert!(
+            problems == vec!["no suite jobs discovered".to_owned()],
+            "known non-suite Make goal {goal} must not be classified as a test suite"
+        );
+    }
+    let unknown = workflow(
+        "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make unknown-goal\n",
+    )
+    .expect("parse an unknown Make goal");
+    assert!(
+        workflow_violations(&[("unknown.yml".to_owned(), unknown)]).is_err(),
+        "unknown Make goals must fail closed without executing Make"
+    );
+}
+
+#[test]
 fn direct_cargo_and_unresolved_shell_routes_are_checked() {
     for command in ["cargo test", "cargo +nightly test", "cargo --verbose test"] {
         let source = format!(

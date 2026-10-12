@@ -101,11 +101,10 @@ install_mold() {
 # `rust-toolchain.toml` already selects, installed eagerly so a missing one is
 # reported here rather than mid-build.
 install_toolchain() {
-  local toolchain=$1 component component_list
+  local toolchain=$1 component component_list=$2
   local -a component_args=()
   command -v rustup >/dev/null 2>&1 ||
     fail 'rustup not found on PATH; install it from https://rustup.rs'
-  component_list=$(pinned_components) || return 1
   while IFS= read -r component; do
     component_args+=(--component "$component")
   done <<< "$component_list"
@@ -117,15 +116,16 @@ install_toolchain() {
 # Install both halves. The linker step runs first so a checksum failure aborts
 # before spending time on a toolchain download.
 main() {
-  local mold_pin toolchain_pin
+  local mold_pin toolchain_pin component_list
   # Resolve the pins into variables first: `fail` exits, but inside a command
   # substitution that exit kills only the subshell, so an unreadable pin would
   # otherwise reach the installer as an empty string and be built into a
   # download URL.
   mold_pin=$(mold_version) || return 1
   toolchain_pin=$(pinned_toolchain) || return 1
+  component_list=$(pinned_components) || return 1
   install_mold "$mold_pin"
-  install_toolchain "$toolchain_pin"
+  install_toolchain "$toolchain_pin" "$component_list"
   note 'ready; verify with: make check-build-tools'
 }
 

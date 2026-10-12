@@ -7,7 +7,14 @@ mod support;
 
 use std::{env, process::Command};
 
+use rstest::rstest;
 use support::ToolFixture;
+
+#[derive(Clone, Copy, Debug)]
+enum InvalidPin {
+    Mold(Option<&'static str>),
+    Toolchain(&'static str),
+}
 
 #[test]
 fn preflight_ignores_inherited_coverage_build_selection() {
@@ -43,6 +50,87 @@ fn preflight_child_accepts_default_development_tools() {
         output.status.success(),
         "default development preflight must pass: {}",
         String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[rstest]
+#[case::missing_mold(InvalidPin::Mold(None), "missing version pin")]
+#[case::blank_mold(InvalidPin::Mold(Some(" \t \n")), "empty version pin")]
+#[case::multiline_mold(
+    InvalidPin::Mold(Some("2.41.0\n2.41.1\n")),
+    "expected one line in version pin"
+)]
+#[case::internal_whitespace_mold(
+    InvalidPin::Mold(Some("2.41 .0\n")),
+    "version pin contains whitespace"
+)]
+#[case::missing_channel(
+    InvalidPin::Toolchain("[toolchain]\ncomponents = [\"clippy\"]\n"),
+    "no channel found"
+)]
+#[case::malformed_channel(
+    InvalidPin::Toolchain(
+        "[toolchain]\nchannel = nightly-2026-08-27\ncomponents = [\"clippy\"]\n"
+    ),
+    "no channel found"
+)]
+#[case::missing_components(
+    InvalidPin::Toolchain("[toolchain]\nchannel = \"nightly-2026-08-27\"\n"),
+    "no components found"
+)]
+#[case::malformed_components(
+    InvalidPin::Toolchain(
+        "[toolchain]\nchannel = \"nightly-2026-08-27\"\ncomponents = [clippy]\n"
+    ),
+    "no components found"
+)]
+fn preflight_rejects_malformed_pins_before_tool_checks(
+    #[case] pin: InvalidPin,
+    #[case] diagnostic: &str,
+) {
+    let fixture = ToolFixture::new().expect("create fake build tools");
+    match pin {
+        InvalidPin::Mold(contents) => fixture
+            .set_mold_version_pin(contents)
+            .expect("set malformed mold pin fixture"),
+        InvalidPin::Toolchain(contents) => fixture
+            .set_toolchain_pin(contents)
+            .expect("set malformed toolchain pin fixture"),
+    }
+    let output = fixture
+        .check(false, None, None)
+        .expect("run preflight with a malformed pin");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        !output.status.success() && stderr.contains(diagnostic),
+        "malformed pin must fail with {diagnostic:?}: status={:?}; stderr={stderr}",
+        output.status.code()
+    );
+    assert_eq!(
+        fixture.trace().expect("read preflight executor trace"),
+        "",
+        "malformed pin validation must stop before rustup and linker checks"
+    );
+}
+
+#[test]
+fn preflight_rejects_unsupported_options_before_tool_checks() {
+    let fixture = ToolFixture::new().expect("create fake build tools");
+    let output = fixture
+        .check_argument("--unsupported")
+        .expect("run preflight with an unsupported option");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        !output.status.success() && stderr.contains("unsupported check-build-tools option"),
+        "unsupported preflight options need a clear failure: status={:?}; stderr={stderr}",
+        output.status.code()
+    );
+    assert_eq!(
+        fixture.trace().expect("read preflight executor trace"),
+        "",
+        "unsupported options must fail before rustup and linker checks"
     );
 }
 

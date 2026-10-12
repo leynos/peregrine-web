@@ -17,6 +17,17 @@ use cap_std::{
 
 type Read<T> = Result<T, Box<dyn Error>>;
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+const TOOLCHAIN_PIN: &str = concat!(
+    "[toolchain]\n",
+    "channel = \"nightly-2026-08-27\"\n",
+    "components = [\n",
+    "  \"clippy\",\n",
+    "  \"llvm-tools-preview\",\n",
+    "  \"rustc-codegen-cranelift-preview\",\n",
+    "  \"rust-analyzer\",\n",
+    "  \"rustfmt\",\n",
+    "]\n",
+);
 
 /// Owns fake build tools in a private scratch directory.
 pub(super) struct ToolFixture {
@@ -38,9 +49,13 @@ impl ToolFixture {
         );
         parent.create_dir(&name)?;
         let directory = parent.open_dir(&name)?;
+        directory.write("trace", "")?;
+        directory.write("version", "2.41.0\n")?;
+
+        directory.write("toolchain.toml", TOOLCHAIN_PIN)?;
         directory.write(
             "rustup",
-            "#!/bin/sh\ncase \"$1 $2\" in\n  'toolchain list') cat \"$FAKE_TOOLCHAINS\" ;;\n  \
+            "#!/bin/sh\nprintf 'rustup:%s\\n' \"$*\" >> \"$PREFLIGHT_TRACE\"\ncase \"$1 $2\" in\n  'toolchain list') cat \"$FAKE_TOOLCHAINS\" ;;\n  \
              'component list') cat \"$FAKE_COMPONENTS\" ;;\n  'show ') printf '%s\\n' 'Default \
              host: x86_64-unknown-linux-gnu' ;;\n  *) exit 1 ;;\nesac\n",
         )?;
@@ -51,17 +66,33 @@ impl ToolFixture {
         directory.create_dir("bin")?;
         directory.write(
             "bin/mold",
-            "#!/bin/sh\nprintf 'mold %s (compatible with GNU ld)\\n' \"$FAKE_MOLD_VERSION\"\n",
+            concat!(
+                "#!/bin/sh\n",
+                "printf 'mold:%s\\n' \"$*\" >> \"$PREFLIGHT_TRACE\"\n",
+                "printf 'mold %s (compatible with GNU ld)\\n' ",
+                "\"$FAKE_MOLD_VERSION\"\n",
+            ),
         )?;
         directory.symlink("mold", "bin/ld.mold")?;
         directory.write(
             "clang",
-            "#!/bin/sh\nselected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\ncase \" $* \
-             \" in\n  *' -print-prog-name=ld.mold '*) printf '%s\\n' \"$selected\" ;;\n  *' -### \
-             '*) printf ' \"%s\" \"--hash-style=gnu\"\\n' \"$selected\" >&2 ;;\n  *) exit 0 \
-             ;;\nesac\n",
+            concat!(
+                "#!/bin/sh\n",
+                "printf 'clang:%s\\n' \"$*\" >> \"$PREFLIGHT_TRACE\"\n",
+                "selected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\n",
+                "case \" $* \" in\n",
+                "  *' -print-prog-name=ld.mold '*) printf '%s\\n' ",
+                "\"$selected\" ;;\n",
+                "  *' -### '*) printf ' \"%s\" \"--hash-style=gnu\"\\n' ",
+                "\"$selected\" >&2 ;;\n",
+                "  *) exit 0 ;;\n",
+                "esac\n",
+            ),
         )?;
-        directory.write("ld.lld", "#!/bin/sh\nexit 0\n")?;
+        directory.write(
+            "ld.lld",
+            "#!/bin/sh\nprintf 'ld.lld:%s\\n' \"$*\" >> \"$PREFLIGHT_TRACE\"\nexit 0\n",
+        )?;
         for executable in ["rustup", "bin/mold", "clang", "ld.lld"] {
             directory.set_permissions(executable, Permissions::from_mode(0o700))?;
         }
@@ -71,8 +102,7 @@ impl ToolFixture {
             path: parent_path.join(&name),
             name,
         };
-        fixture.write_components(None)?;
-        Ok(fixture)
+        fixture.write_components(None).map(|()| fixture)
     }
 
     pub(super) fn write_components(&self, omitted: Option<&str>) -> Read<()> {
@@ -106,17 +136,38 @@ impl ToolFixture {
         missing: Option<&str>,
         override_var: Option<(&str, &str)>,
     ) -> io::Result<Output> {
-        let root = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
-        let mut command = Command::new("bash");
-        command.arg(root.join("scripts/check-build-tools.sh"));
+        let mut command = self.configured_command();
         if coverage {
             command.arg("--coverage");
         }
+        if let Some(variable) = missing {
+            command.env(variable, "missing-build-tool");
+        }
+        if let Some((variable, value)) = override_var {
+            command.env(variable, value);
+        }
+        command.output()
+    }
+
+    pub(super) fn check_argument(&self, argument: &str) -> io::Result<Output> {
+        self.configured_command().arg(argument).output()
+    }
+
+    fn configured_command(&self) -> Command {
+        let root = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut command = Command::new("bash");
         command
+            .arg(root.join("scripts/check-build-tools.sh"))
             .env("PATH", format!("{}:/usr/bin:/bin", self.path))
             .env("FAKE_COMPONENTS", self.path.join("components").as_str())
             .env("FAKE_TOOLCHAINS", self.path.join("toolchains").as_str())
             .env("FAKE_MOLD_VERSION", "2.41.0")
+            .env("PREFLIGHT_TRACE", self.path.join("trace").as_str())
+            .env("MOLD_VERSION_FILE", self.path.join("version").as_str())
+            .env(
+                "RUST_TOOLCHAIN_FILE",
+                self.path.join("toolchain.toml").as_str(),
+            )
             .env("BUILD_TOOLS_PREFIX", self.path.as_str())
             .env("CLANG_COMMAND", self.path.join("clang").as_str())
             .env("LLD_COMMAND", self.path.join("ld.lld").as_str());
@@ -128,14 +179,23 @@ impl ToolFixture {
         ] {
             command.env_remove(variable);
         }
-        if let Some(variable) = missing {
-            command.env(variable, "missing-build-tool");
-        }
-        if let Some((variable, value)) = override_var {
-            command.env(variable, value);
-        }
-        command.output()
+        command
     }
+
+    pub(super) fn set_mold_version_pin(&self, pin: Option<&str>) -> Read<()> {
+        pin.map_or_else(
+            || self.directory.remove_file("version"),
+            |value| self.directory.write("version", value),
+        )?;
+        Ok(())
+    }
+
+    pub(super) fn set_toolchain_pin(&self, contents: &str) -> Read<()> {
+        self.directory.write("toolchain.toml", contents)?;
+        Ok(())
+    }
+
+    pub(super) fn trace(&self) -> Read<String> { Ok(self.directory.read_to_string("trace")?) }
 }
 
 impl Drop for ToolFixture {

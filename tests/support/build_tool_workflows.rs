@@ -1,6 +1,6 @@
 //! Contract tests for build-tool provisioning across reachable workflow suites.
 
-use std::{error::Error, process::Command};
+use std::error::Error;
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
@@ -116,25 +116,19 @@ fn matrix_runner(expression: &str, job: &Value) -> Option<bool> {
 /// Resolve a supported matrix runner expression against its declared values.
 fn runner_is_linux(job: &Value) -> Option<bool> { runner_label(job.get("runs-on")?, job) }
 
-/// Detect a test suite in a dry-run of a Make goal, including prerequisites.
+/// Classify supported Make routes without executing Make from workflow inspection.
 fn make_goal_runs_suite(goal: &str) -> Read<bool> {
-    let output = Command::new("make")
-        .args([
-            "-n",
-            "-B",
-            "CARGO=probe-cargo",
-            "CHECK_BUILD_TOOLS=true",
-            goal,
-        ])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
-    if !output.status.success() {
-        return Err(format!("cannot inspect Make goal {goal}").into());
+    match goal {
+        "test" | "coverage" | "all" => Ok(true),
+        "install-build-tools"
+        | "check-build-tools"
+        | "check-fmt"
+        | "lint"
+        | "spelling"
+        | "audit"
+        | "rust-audit" => Ok(false),
+        _ => Err(format!("unresolved Make goal in workflow: {goal}").into()),
     }
-    let commands = String::from_utf8_lossy(&output.stdout);
-    Ok(commands.contains("probe-cargo test")
-        || commands.contains("probe-cargo nextest run")
-        || commands.contains("probe-cargo llvm-cov"))
 }
 
 /// Resolve one Make command, failing closed on options or dynamic goals.

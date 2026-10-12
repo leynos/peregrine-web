@@ -67,6 +67,7 @@ impl InstallerFixture {
         let directory = parent.open_dir(&name)?;
         directory.create_dir("bin")?;
         directory.create_dir("scratch")?;
+        directory.write("trace", "")?;
         directory.write("version", "2.41.0\n")?;
         directory.write(
             "toolchain.toml",
@@ -108,6 +109,19 @@ components = [
         failure: Option<&str>,
     ) -> io::Result<Output> {
         self.installer_command(system, machine, failure).output()
+    }
+
+    /// Replaces or removes the fixture's mold version pin.
+    pub(super) fn set_mold_version_pin(&self, pin: Option<&str>) -> io::Result<()> {
+        pin.map_or_else(
+            || self.directory.remove_file("version"),
+            |value| self.directory.write("version", value),
+        )
+    }
+
+    /// Replaces the fixture's toolchain manifest contents.
+    pub(super) fn set_toolchain_pin(&self, contents: &str) -> io::Result<()> {
+        self.directory.write("toolchain.toml", contents)
     }
 
     /// Runs with system curl and tar while keeping rustup under fixture control.
