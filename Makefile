@@ -38,8 +38,11 @@ DEV_THREADS_FLAGS ?= -Zthreads=8
 BUILD_HOST_OS := $(shell uname -s)
 # Only the native x86_64 GNU Linux route has a pinned mold linker.
 BUILD_HOST_ARCH := $(shell uname -m)
-BUILD_HOST_TRIPLE := $(shell rustup show 2>/dev/null | sed -n 's/^Default host: //p')
-DEV_LINKER_FLAGS ?= $(if $(and $(filter Linux,$(BUILD_HOST_OS)),$(filter x86_64,$(BUILD_HOST_ARCH)),$(filter x86_64-unknown-linux-gnu,$(BUILD_HOST_TRIPLE))),-C link-arg=-fuse-ld=mold)
+# Resolve the host only when a development recipe expands its flags, after its
+# preflight. The shared checked query rejects failed or empty rustup output;
+# inspect its status immediately so Make cannot silently omit the linker flag.
+BUILD_HOST_TRIPLE = $(shell bash -c '. scripts/build-tools-common.sh; default_host_triple')$(if $(filter 0,$(.SHELLSTATUS)),,$(error build-tools: cannot determine the rustup default host; check rustup show))
+DEV_LINKER_FLAGS ?= $(if $(and $(filter x86_64-unknown-linux-gnu,$(BUILD_HOST_TRIPLE)),$(filter Linux,$(BUILD_HOST_OS)),$(filter x86_64,$(BUILD_HOST_ARCH))),-C link-arg=-fuse-ld=mold)
 DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_THREADS_FLAGS) $(DEV_LINKER_FLAGS)
 RELEASE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS)
 PACKAGE_FLAGS ?=

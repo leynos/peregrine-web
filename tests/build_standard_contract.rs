@@ -24,6 +24,7 @@ use std::process::Command;
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
+use rstest::rstest;
 use support::{
     ASSIGNING_TARGETS,
     HELD_OUT_TARGETS,
@@ -32,11 +33,35 @@ use support::{
     LINUX_TARGET,
     MOLD_FLAG,
     THREADS_FLAG,
+    build_with_host_probe,
     check_development_targets,
     make_rustflags,
     make_whitaker_recipe,
     sources,
 };
+
+/// A host query must fail closed even if the capability preflight is replaced.
+#[rstest]
+#[case::unavailable(None)]
+#[case::failed(Some("exit 23\n"))]
+#[case::missing_default_host(Some("printf 'rustup has no default host\\n'\n"))]
+fn failed_host_query_prevents_the_development_cargo_command(#[case] rustup_body: Option<&str>) {
+    let (output, cargo_ran) = build_with_host_probe(rustup_body)
+        .expect("run Make with an isolated rustup host-query failure");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "Make must reject an unavailable host before composing development flags: {stderr}"
+    );
+    assert!(
+        stderr.contains("cannot determine the rustup default host"),
+        "Make must identify the failed host lookup: {stderr}"
+    );
+    assert!(
+        !cargo_ran,
+        "a failed host lookup must prevent the Cargo build command"
+    );
+}
 
 #[test]
 fn every_rustflags_source_carries_the_parallel_frontend() {

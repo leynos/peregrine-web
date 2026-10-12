@@ -1,9 +1,92 @@
 //! Probe Cargo configuration and Make recipes for the Rust build contract.
 
-use std::{error::Error, process::Command};
+use std::{
+    error::Error,
+    io,
+    process::{Command, Output},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use camino::Utf8Path;
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use camino::{Utf8Path, Utf8PathBuf};
+use cap_std::{
+    ambient_authority,
+    fs::{Permissions, PermissionsExt},
+    fs_utf8::Dir,
+};
+
+static NEXT_HOST_PROBE: AtomicUsize = AtomicUsize::new(0);
+
+/// Owns subprocess tools for checking Make's host-query failure boundary.
+struct HostProbe {
+    parent: Dir,
+    directory: Dir,
+    path: Utf8PathBuf,
+    name: String,
+}
+
+impl HostProbe {
+    fn new(rustup_body: Option<&str>) -> Read<Self> {
+        let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir()).map_err(|path| {
+            io::Error::other(format!("non-UTF-8 scratch path: {}", path.display()))
+        })?;
+        let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
+        let name = format!(
+            "peregrine-host-probe-{}-{}",
+            std::process::id(),
+            NEXT_HOST_PROBE.fetch_add(1, Ordering::Relaxed)
+        );
+        parent.create_dir(&name)?;
+        let probe = Self {
+            directory: parent.open_dir(&name)?,
+            path: parent_path.join(&name),
+            parent,
+            name,
+        };
+        probe.executable(
+            "cargo",
+            concat!(
+                "[ \"$1\" = nextest ] && exit 1\n",
+                "printf 'cargo ran\\n' > \"$HOST_CARGO_TRACE\"\n",
+            ),
+        )?;
+        if let Some(body) = rustup_body {
+            probe.executable("rustup", body)?;
+        }
+        Ok(probe)
+    }
+
+    fn executable(&self, name: &str, body: &str) -> Read<()> {
+        self.directory.write(name, format!("#!/bin/bash\n{body}"))?;
+        self.directory
+            .set_permissions(name, Permissions::from_mode(0o700))?;
+        Ok(())
+    }
+}
+
+impl Drop for HostProbe {
+    fn drop(&mut self) { drop(self.parent.remove_dir_all(&self.name)); }
+}
+
+/// Bypass the separate capability preflight to isolate flag-selection failure.
+/// The Cargo stub records only a development command, excluding Make's nextest probe.
+pub(super) fn build_with_host_probe(rustup_body: Option<&str>) -> Read<(Output, bool)> {
+    let probe = HostProbe::new(rustup_body)?;
+    let output = Command::new("/usr/bin/make")
+        .args([
+            "build",
+            "CHECK_BUILD_TOOLS=true",
+            &format!("BUILD_TOOLS_PREFIX={}", probe.path),
+            &format!("CARGO={}/cargo", probe.path),
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env("PATH", format!("{}:/usr/bin:/bin", probe.path))
+        .env("HOST_CARGO_TRACE", probe.path.join("cargo-trace"))
+        .env_remove("MAKEFLAGS")
+        .env_remove("MFLAGS")
+        .env_remove("MAKEOVERRIDES")
+        .output()?;
+    Ok((output, probe.directory.try_exists("cargo-trace")?))
+}
 
 /// The parallel-frontend flag every `rustflags` source must carry.
 pub(super) const THREADS_FLAG: &str = "-Zthreads=8";
