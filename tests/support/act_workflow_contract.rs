@@ -326,15 +326,14 @@ fn valid_manual_act_route(act: &Value) -> bool {
             .all(|item| at(item, &["continue-on-error"]).is_none())
 }
 
-/// Combines the independent static clauses for one production workflow pair.
-pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> bool {
-    let (Ok(ci), Ok(act)) = (document(ci_source), document(act_source)) else {
-        return false;
-    };
-    valid_triggers(&ci, &act)
+/// Combines static workflow clauses while preserving source parsing errors.
+pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> Read<bool> {
+    let ci = document(ci_source)?;
+    let act = document(act_source)?;
+    Ok(valid_triggers(&ci, &act)
         && valid_actions(&ci)
         && valid_ci_route(&ci)
-        && valid_manual_act_route(&act)
+        && valid_manual_act_route(&act))
 }
 
 /// Pins the three provisioning actions before the manual full Act command.

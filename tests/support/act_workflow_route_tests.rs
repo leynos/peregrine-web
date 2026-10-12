@@ -37,7 +37,8 @@ fn committed_ci_route_satisfies_its_contract() {
         "the committed hosted route must satisfy its direct policy boundary"
     );
     assert!(
-        contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW),
+        contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW)
+            .expect("committed workflows must parse before policy validation"),
         "the full hosted and manual workflow composition must remain valid"
     );
 }

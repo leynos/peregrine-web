@@ -47,7 +47,7 @@ struct ActSmoke {
 impl ActSmoke {
     /// Constructs fixture actions only after validating all original action interfaces.
     fn new() -> Read<Self> {
-        if !contract::contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW) {
+        if !contract::contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW)? {
             return Err("production workflow has an unmapped command, action, or guard".into());
         }
         validate_mapping_keys(&WorkflowSource(CI_WORKFLOW))?;

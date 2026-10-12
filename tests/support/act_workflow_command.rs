@@ -156,7 +156,8 @@ fn run_make_step_cleans_scratch_after_record_read_failure() {
 #[test]
 fn committed_workflow_make_scripts_execute_exact_targets_and_fail_closed() {
     assert!(
-        contract::contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW),
+        contract::contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW)
+            .expect("committed workflows must parse before policy validation"),
         "unknown workflow scripts must be rejected before execution"
     );
     let ci = contract::document(CI_WORKFLOW).expect("parse committed CI workflow");

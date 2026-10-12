@@ -10,13 +10,43 @@ mod events;
 #[path = "act_workflow_policy_tests.rs"]
 mod step_policy;
 
+use rstest::rstest;
+
 use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, contracts_hold};
 
 #[test]
 fn hosted_gate_and_manual_act_have_distinct_routes() {
     assert!(
-        contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW),
+        contracts_hold(CI_WORKFLOW, ACT_VALIDATION_WORKFLOW)
+            .expect("committed workflows must parse before policy validation"),
         "the committed workflows must retain the hosted gate and manual Act route"
+    );
+}
+
+/// Invalid sources retain their YAML error instead of becoming a policy mismatch.
+#[rstest]
+#[case::malformed_ci("jobs: [\n", true, "line")]
+#[case::malformed_act("jobs: [\n", false, "line")]
+#[case::duplicate_ci("jobs: {}\njobs: {}\n", true, "duplicate entry")]
+#[case::duplicate_act("jobs: {}\njobs: {}\n", false, "duplicate entry")]
+fn workflow_source_errors_survive_contract_validation(
+    #[case] invalid_source: &str,
+    #[case] invalid_ci: bool,
+    #[case] diagnostic_fragment: &str,
+) {
+    let (ci, act) = if invalid_ci {
+        (invalid_source, ACT_VALIDATION_WORKFLOW)
+    } else {
+        (CI_WORKFLOW, invalid_source)
+    };
+    let error = contracts_hold(ci, act).expect_err("invalid workflow YAML must return its error");
+    assert!(
+        error.downcast_ref::<serde_yaml::Error>().is_some(),
+        "the contract boundary must preserve the original YAML error type: {error}"
+    );
+    assert!(
+        error.to_string().contains(diagnostic_fragment),
+        "the YAML diagnostic must retain {diagnostic_fragment:?}: {error}"
     );
 }
 
@@ -64,7 +94,8 @@ fn workflow_mutations_break_the_contract() {
             "mutation must change source: {reason}"
         );
         assert!(
-            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
+            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW)
+                .expect("the policy mutation must retain valid workflow YAML"),
             "contract must detect {reason}"
         );
     }
@@ -126,7 +157,8 @@ fn workflow_execution_mutations_break_the_contract() {
             "mutation must change source: {reason}"
         );
         assert!(
-            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
+            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW)
+                .expect("the policy mutation must retain valid workflow YAML"),
             "contract must detect {reason}"
         );
     }
@@ -170,7 +202,8 @@ fn workflow_environment_mutations_break_the_contract() {
             "mutation must change source: {reason}"
         );
         assert!(
-            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
+            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW)
+                .expect("the policy mutation must retain valid workflow YAML"),
             "contract must detect {reason}"
         );
     }
@@ -183,7 +216,8 @@ fn workflow_environment_mutations_break_the_contract() {
         "PR Act mutation must change source"
     );
     assert!(
-        !contracts_hold(CI_WORKFLOW, &enabled_pr_act),
+        !contracts_hold(CI_WORKFLOW, &enabled_pr_act)
+            .expect("the PR trigger mutation must retain valid workflow YAML"),
         "Act must not repeat full validation on pull requests"
     );
     let wrong_manual_pin =
@@ -193,7 +227,8 @@ fn workflow_environment_mutations_break_the_contract() {
         "manual pin mutation must change source"
     );
     assert!(
-        !contracts_hold(CI_WORKFLOW, &wrong_manual_pin),
+        !contracts_hold(CI_WORKFLOW, &wrong_manual_pin)
+            .expect("the action pin mutation must retain valid workflow YAML"),
         "manual Act's action revision must stay pinned"
     );
 }
