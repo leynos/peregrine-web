@@ -1,6 +1,6 @@
 # Resolve decisions to mitigate API rework (1.1)
 
-Status: IN PROGRESS — M1 accepted; M2 contract specification next.
+Status: IN PROGRESS — M1 complete; M2 defaults await operator acceptance.
 
 This ExecPlan is a living document. Keep Constraints, Tolerances, Risks,
 Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
@@ -115,10 +115,36 @@ blockers with evidence rather than lowering acceptance criteria.
   Traefik, configured trusted proxy peers, JSON long polling, no upgrades, and
   deferred HTTP/2/native TLS as a solid proving ground. A1/A2 are recorded in
   ToR §9.1; buffered/streaming core and separate Pachislot scope are retained.
-- [ ] M2: agree complete lifecycle, precedence, and configuration contracts.
+- [x] (2026-10-13) M1 acceptance and all required gates passed; CodeRabbit
+  0.9.0 completed full coverage and two repair deltas. The final delta at
+  `30d288d` reported zero findings. Original logs and dispositions are retained.
+- [x] (2026-10-13) Prepared L01–L38 ordinary-exit, C01–C12 interruption,
+  E01–E08 precedence, H01–H06 content/framing, and CFG01–CFG33 configuration
+  tables in the design. Linked ADR ownership and V1–V8 future evidence.
+- [x] (2026-10-13) Applied all six expert perspectives and obtained an
+  independent table reading. Four concrete outcomes were derivable; clarified
+  header-count rejection, real suspension points, and encoded diagnostic bounds.
+- [ ] M2: accept the complete proving-ground configuration defaults, then
+  finish contract validation and CLI review. Owner approval was requested for
+  the concrete table; CFG08 was corrected from 256 to 512 KiB and disclosed.
+- [x] (2026-10-13) M3 guide updates are drafted with proposed-contract and
+  runtime/proof limitations explicit. Final conformance and roadmap completion
+  remain dependent on accepted M2 defaults and validation.
 - [ ] M3: reconcile documentation, acceptance evidence, and roadmap completion.
 
 ## Surprises & discoveries
+
+Worst-case JSON escaping of the pilot's 64 KiB Markdown plus 4 KiB metadata
+requires 417,792 octets before other envelope fields. The proposed buffered cap
+is therefore 512 KiB, rather than the initially suggested 256 KiB. This is a
+workload rationale, not a capacity measurement. Static 500/504/admission-503
+bodies contain 59/64/69 octets and fit the minimum 128-octet renderer cap.
+
+Hyper 1.12.0 exposes separate count, aggregate-header/start-line/trailer, and
+parser-buffer controls; its header timer is required, and its buffer minimum is
+8,192. Targeted RFC prose corrected structured extraction of 205 semantics: 205
+must have no content, while zero Content-Length remains allowed. No new
+dependency is installed or pinned by this evidence.
 
 The M1 CLI review dated its observations in UTC and called the local 2026-10-13
 approval premature. The session uses Europe/Berlin: its 2026-10-12 22:50 UTC
@@ -167,6 +193,20 @@ preserving wrapper admission, before attributing acceptance to Polonius.
 
 ## Decision log
 
+- (2026-10-13, M2 specification) Preserve the agreed independent reverse
+  lifecycle and first-cause/public-failure distinction. Use 30,000 ms execution
+  for the pilot's 25,000 ms polls, finite independent admission/body/drain
+  caps, explicit StrictHeaderSafe correlation, and finite core metric
+  vocabularies. CFG01–CFG33 are proposed operator defaults until explicitly
+  accepted.
+- (2026-10-13, review) Apply architecture, alternatives, performance,
+  contracts, reliability, and maintainability lenses. Retain existing owners
+  over a new scheduler; correct JSON buffering and header rejection; separate
+  synchronous non-pre-emption from actual cancellation points. The independent
+  reader derived forward 403, responder 409 then hook-failure 500, HEAD 504,
+  and committed body-cap termination. These are specification oracles, not
+  tests.
+
 - (2026-10-13, M1 CLI review) CodeRabbit 0.9.0 reviewed committed `3cc17d9`
   against `de6b900`, with complete coverage and two minor findings. Fix the
   93-column index link. Reject the future-date premise using the supplied
@@ -213,6 +253,14 @@ preserving wrapper admission, before attributing acceptance to Polonius.
   semantics.
 
 ## Outcomes & retrospective
+
+M1 is complete: A1/A2 have explicit owner evidence, the gates passed, and
+current repairs have complete local CLI coverage with no unresolved valid
+findings. M2 now has concrete A3/A4 tables, proposed A5 defaults, and A6 proof
+sketch/traceability. Guides explain these as future contracts. A5 operator
+acceptance, final M2 validation/review, and A7 remain pending; roadmap 1.1.1
+and 1.1.2 stay unchecked until M1–M3 meet the plan's completion condition. No
+runtime behaviour, executable proof, benchmark, or released API is claimed.
 
 Execution intake verified PR #26 against local head `6414fda` and base
 `de6b900`. Only the execution record has changed; A1–A7 remain incomplete. No
@@ -287,8 +335,10 @@ The baseline is commit `de6b900d08b2a7ffc798dca47e40ea997dcbc267`: terms of
 reference draft v0.3 and technical design proposed v0.5, both dated 2026-09-21,
 plus ADRs 001–006 at that commit. These ADRs remain proposed. Normative HTTP
 semantics come from RFC 9110; the design deliberately defines only a subset.
-Retrieved tooling documentation is research evidence, not a locked or
-compatibility-tested dependency set.
+The current target is ToR v0.4 with accepted Mornington scope and design v0.6
+with the contract tables; ADR 001/003 status remains proposed. Retrieved
+tooling documentation, including Hyper 1.12.0, is research evidence, not a
+locked or compatibility-tested dependency set.
 
 | Source requirement or gap                                     | Milestone | Acceptance evidence                                                   |
 | ------------------------------------------------------------- | --------- | --------------------------------------------------------------------- |
@@ -782,3 +832,9 @@ Revision note (2026-10-13, M1 review): shorten the index link and make the
 local decision-date convention explicit. Preserve actual owner acceptance; the
 UTC date finding does not revoke it. M2 drafts remain outside the checkout
 while the repaired milestone is validated and assessed.
+
+Revision note (2026-10-13, M2 draft): integrate the complete lifecycle,
+precedence, configuration and HTTP tables; refine existing ownership ADRs and
+link guides and V1–V8 evidence owners. M1 is locally validated/reviewed. Keep
+A5 acceptance and final milestone gates/review pending; no roadmap item or
+runtime/proof deliverable is marked complete.

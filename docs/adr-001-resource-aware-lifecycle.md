@@ -58,9 +58,12 @@ for Tower; such an adapter must not replace resource-aware processing. Use boxed
 `Send` futures as the dynamic-dispatch baseline, measuring their cost.
 [ADR 002](adr-002-compiler-ownership-experiment.md) compares narrower phase
 views and typed endpoint composition before selecting the public ownership and
-compiler contract. Both variants retain these lifecycle rules. The detailed
-proposed contracts, including error precedence and the commitment boundary for
-streamed responses, are in the technical design.
+compiler contract. Both variants retain these lifecycle rules. The canonical
+[ordinary-exit and interruption tables](peregrine-design.md#61-ordinary-exit-contract)
+in design §§6.1–6.2 and
+[failure-selection table](peregrine-design.md#72-failure-selection-and-bounded-presentation)
+in §7.2 make these proposed contracts explicit. They are specification
+evidence, not implemented lifecycle traces.
 
 ## Known risks and limitations
 

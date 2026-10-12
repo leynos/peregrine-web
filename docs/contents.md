@@ -56,8 +56,8 @@ documentation set.
   experimental interfaces stabilize.
 
 - [Roadmap 1.1 plan](execplans/1-1-resolve-decisions-to-mitigate-api-rework.md)
-  defines the approval-gated work to resolve the pilot, lifecycle, and
-  configuration decisions in tasks 1.1.1 and 1.1.2.
+  records the accepted Mornington pilot and the lifecycle/configuration
+  specification and acceptance evidence for tasks 1.1.1 and 1.1.2.
 
 ## Rust reference material
 

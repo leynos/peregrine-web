@@ -1,7 +1,7 @@
 # Peregrine Web technical design
 
-- Status: proposed v0.5; describes a target, not implemented functionality.
-- Date: 2026-09-21.
+- Status: proposed v0.6; describes a target, not implemented functionality.
+- Date: 2026-10-13 (Europe/Berlin).
 - Audience: library implementers, API reviewers, and service maintainers.
 - Scope: a resource-oriented HTTP framework with an explicit middleware engine.
 - Authority: [terms of reference](terms-of-reference.md) establishes goals;
@@ -441,13 +441,32 @@ set, then response hooks; there is no routed resource. HEAD suppression applies
 to errors and short circuits, not only successful GET fallbacks.
 
 HTTP rules take precedence over response mutations. A 405 requires `Allow`;
-HEAD, 204, and 304 responses carry no content. Remove prohibited framing
+HEAD, 204, 205, and 304 responses carry no content. Remove prohibited framing
 fields, including `Content-Length` on 204. Preserve a HEAD or 304 length only
 when it correctly describes the corresponding representation. Do not consume a
 stream to calculate that length. Reject informational status codes as final
 application responses.[^6] The optional upgrade endpoint in §9.1 is a separate,
 validated final outcome; it never treats an arbitrary response status of 101 as
 permission to transfer a connection.
+
+### 5.1. Final content and framing matrix
+
+These constraints apply after failure selection to every L row and supervised
+C07 response. The original request method controls HEAD, even on GET fallback.
+The rules follow RFC 9110 §§8.6, 9.3.2, 15, and 15.3.6, inspected on 2026-10-13.
+
+| ID  | Final condition                                               | Body                                       | Content-Length                                                  | Other representation/framing constraints                                                         |
+| --- | ------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| H01 | Original method HEAD                                          | Empty, including errors and short circuits | Retain only a verified corresponding GET length; otherwise omit | Do not poll/collect a stream for length; remove Transfer-Encoding                                |
+| H02 | Status 204                                                    | Empty                                      | Remove                                                          | Remove Transfer-Encoding; retain selected required Allow if applicable                           |
+| H03 | Status 205                                                    | Empty                                      | Set 0                                                           | Remove Transfer-Encoding; RFC 9110 prohibits content, rather than prohibiting zero length        |
+| H04 | Status 304                                                    | Empty                                      | Retain only verified corresponding 200 length; otherwise omit   | Do not poll a stream; remove Transfer-Encoding                                                   |
+| H05 | Other final status in 200..599                                | Selected body                              | Derive from known byte representation or omit for stream        | Transport owns wire framing; failure replacement clears stale metadata                           |
+| H06 | Arbitrary final 1xx including 101, or status outside 100..599 | Replace with sanitized 500 under L36       | Derive for safe replacement                                     | No upgrade or second hook pass; the separate experimental upgrade contract is outside this pilot |
+
+_Table 3a: Finalizer content constraints. For HEAD combined with 204/205, the
+status-specific length rule wins; for HEAD/304 require the applicable verified
+representation length._
 
 ## 6. Middleware lifecycle and completion
 
@@ -486,6 +505,115 @@ failures. Dropping a future, runtime shutdown, or a panic can prevent later
 hooks from running. Cleanup that must occur on cancellation belongs in
 ownership and `Drop`, without asynchronous work. Hooks must not be presented as
 guaranteed audit delivery or transaction rollback.
+
+### 6.1. Ordinary-exit contract
+
+The following rows specify the initial core. They do not claim implemented
+behaviour. `R` means every registered response hook, exactly once in reverse
+order (C, B, A for registration A, B, C); with zero hooks it is empty. `G`
+means bounded private diagnostics and ownership-based synchronous release, with
+no promised durable effect, asynchronous cleanup, or rollback. Each row enters
+response processing with commitment false; after R and finalization it commits
+once if the peer can receive a response. Failure selection follows §7.2, so a
+later response-hook failure can replace every ordinary status below with 500.
+`D` counts responder invocations, including a responder that returns an error.
+Body errors before dispatch and inside a responder are separate rows. Resource
+identity, parameters, and effective responder method freeze at routing; the
+original method remains available for HEAD suppression.
+
+| ID  | Exit and entry phase                                                                   | Resource available                          | Remaining forward work                   | D                  | Response hooks                       | Selected outcome before later hook failures     | Commitment and guarantees                                       |
+| --- | -------------------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------- | ------------------ | ------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------- |
+| L01 | Request-fact initialization or trusted correlation input rejected                      | No                                          | None                                     | 0                  | R                                    | 400                                             | Finalize then commit; G; no valid ID promised                   |
+| L02 | Correlation generator fails or generates invalid output at initialization              | No                                          | None                                     | 0                  | R                                    | 503                                             | Finalize then commit; G; omit ID everywhere                     |
+| L03 | Request hook completes                                                                 | No                                          | None                                     | 0                  | R                                    | Completed draft                                 | Finalize then commit; G                                         |
+| L04 | Request hook returns failure                                                           | No                                          | None                                     | 0                  | R                                    | First typed failure                             | Finalize then commit; G                                         |
+| L05 | Route lookup misses                                                                    | No                                          | None                                     | 0                  | R                                    | 404                                             | Finalize then commit; G                                         |
+| L06 | Resource hook completes                                                                | Frozen                                      | None                                     | 0                  | R                                    | Completed draft                                 | Finalize then commit; G                                         |
+| L07 | Resource policy or resource hook rejects                                               | Frozen                                      | None                                     | 0                  | R                                    | Typed denial, normally 401/403                  | Finalize then commit; G                                         |
+| L08 | Responder succeeds                                                                     | Frozen                                      | None                                     | 1                  | R                                    | Responder draft                                 | Finalize then commit; G                                         |
+| L09 | Responder returns failure                                                              | Frozen                                      | None                                     | 1                  | R                                    | First typed failure                             | Finalize then commit; G; effect may already exist               |
+| L10 | Recognized unsupported method, including disabled TRACE/CONNECT, after resource policy | Frozen                                      | None                                     | 0                  | R                                    | 405 with effective Allow                        | Finalize then commit; G                                         |
+| L11 | Unknown extension method after resource policy                                         | Frozen                                      | None                                     | 0                  | R                                    | 501                                             | Finalize then commit; G                                         |
+| L12 | Automatic resource OPTIONS after resource policy                                       | Frozen                                      | None                                     | 0                  | R                                    | 204 with effective Allow                        | Finalize then commit; G                                         |
+| L13 | Explicit resource OPTIONS after resource policy                                        | Frozen                                      | Invoke declared responder then R         | 1                  | R                                    | Responder result or typed failure               | Finalize then commit; G                                         |
+| L14 | OPTIONS * after request hooks                                                          | No                                          | None; no routing/resource hooks          | 0                  | R                                    | 204 with server implemented-method Allow        | Finalize then commit; G                                         |
+| L15 | Explicit HEAD after resource policy                                                    | Frozen                                      | Invoke HEAD then R                       | 1                  | R                                    | Responder result; no content                    | Finalize then commit; G                                         |
+| L16 | HEAD falls back to GET after resource policy                                           | Frozen                                      | Invoke GET once, retaining original HEAD | 1                  | R                                    | GET result; no content                          | Finalize then commit; G                                         |
+| L17 | HEAD completes or fails before routing/dispatch                                        | No or frozen according to stopping phase    | None                                     | 0                  | R                                    | Completed draft or selected failure; no content | Finalize then commit; G                                         |
+| L18 | Body byte cap exceeded before dispatch                                                 | No in request hook; frozen in resource hook | None                                     | 0                  | R                                    | 413                                             | Finalize then commit; G; consumption failed                     |
+| L19 | Body byte cap exceeded inside responder                                                | Frozen                                      | None                                     | 1                  | R                                    | 413                                             | Finalize then commit; G; consumption failed                     |
+| L20 | Unsupported media before dispatch                                                      | No in request hook; frozen in resource hook | None                                     | 0                  | R                                    | 415                                             | Finalize then commit; G                                         |
+| L21 | Unsupported media inside responder                                                     | Frozen                                      | None                                     | 1                  | R                                    | 415                                             | Finalize then commit; G                                         |
+| L22 | Malformed JSON before dispatch                                                         | No in request hook; frozen in resource hook | None                                     | 0                  | R                                    | 400                                             | Finalize then commit; G                                         |
+| L23 | Malformed JSON inside responder                                                        | Frozen                                      | None                                     | 1                  | R                                    | 400                                             | Finalize then commit; G                                         |
+| L24 | Buffered read deadline before dispatch                                                 | No in request hook; frozen in resource hook | None                                     | 0                  | R                                    | 408                                             | Finalize then commit; G; consumption failed                     |
+| L25 | Buffered read deadline inside responder                                                | Frozen                                      | None                                     | 1                  | R                                    | 408                                             | Finalize then commit; G; consumption failed                     |
+| L26 | Recoverable request-body transport error before dispatch                               | No in request hook; frozen in resource hook | None                                     | 0                  | R                                    | 400                                             | Finalize then commit; G; failed consumption                     |
+| L27 | Recoverable request-body transport error inside responder                              | Frozen                                      | None                                     | 1                  | R                                    | 400                                             | Finalize then commit; G; failed consumption                     |
+| L28 | Invalid/repeated ownership transfer before dispatch                                    | No or frozen according to phase             | None                                     | 0                  | R                                    | 500 semantic body-state failure                 | Finalize then commit; G                                         |
+| L29 | Invalid/repeated ownership transfer inside responder                                   | Frozen                                      | None                                     | 1                  | R                                    | 500 semantic body-state failure                 | Finalize then commit; G                                         |
+| L30 | Request stream idle expiry before dispatch                                             | No or frozen according to phase             | None                                     | 0                  | R                                    | 408                                             | Finalize then commit; G; failed stream                          |
+| L31 | Request stream idle expiry inside responder before commitment                          | Frozen                                      | None                                     | 1                  | R                                    | 408                                             | Finalize then commit; G; failed stream                          |
+| L32 | Request stream total-byte exhaustion before dispatch                                   | No or frozen according to phase             | None                                     | 0                  | R                                    | 413                                             | Finalize then commit; G; failed stream                          |
+| L33 | Request stream total-byte exhaustion inside responder before commitment                | Frozen                                      | None                                     | 1                  | R                                    | 413                                             | Finalize then commit; G; failed stream                          |
+| L34 | First or later reverse response hook fails                                             | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | Continue remaining R, without replay | First such failure selects sanitized 500        | Finalize then commit; G; later failures invalidate presentation |
+| L35 | Renderer fails or encoded output exceeds cap, after R                                  | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | R already finished; no replay        | Static sanitized 500                            | Finalize then commit; G; no custom renderer retry               |
+| L36 | Informational 1xx or invalid-range status reaches final validation                     | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | R already finished; no replay        | Sanitized 500                                   | Finalize then commit; G; arbitrary 101 cannot upgrade           |
+| L37 | Rejection leaves unread body and framing permits response                              | No or frozen according to rejection phase   | None                                     | Prior D, unchanged | R                                    | Selected rejection                              | Send safe response then close; never unbounded drain; G         |
+| L38 | Framing/transport prevents a safe rejection response                                   | No or frozen according to failure phase     | None                                     | Prior D, unchanged | Only already completed hooks         | No response promised                            | Close immediately; interruption rules in §6.2; G                |
+
+_Table 4a: Exhaustive ordinary-exit families; phase-dependent variants state
+the resource and dispatch distinctions explicitly._
+
+Each ordinary row is crossed with §5.1's final content rules, including HEAD
+and 204/205/304. A transport/parser rejection before context creation is not an
+ordinary engine exit and cannot promise R. Body frames received by a response
+stream after commitment use C09–C11 rather than L30–L33.
+
+### 6.2. Interruption and transfer contract
+
+An interruption is not a returned `Result`. The completed trace prefix can be
+relied upon; hook-start and interruption events may also have been recorded. A
+currently awaited hook is not treated as completed. Drop releases owned
+resources synchronously. A separate tracked supervisor can observe a
+cancellation category but cannot reconstruct unexecuted hooks or prove that an
+application effect did not occur. The count below is the count at interruption,
+not permission to dispatch later. No row adds an asynchronous cleanup phase.
+
+| ID  | Boundary                                                                               | Resource                   | Forward work and responder count       | Response hooks                | HTTP outcome and commitment                         | Diagnostic/cleanup guarantee                                                                      |
+| --- | -------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------- | ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| C01 | Future drop during initialization                                                      | No                         | Stop; D=0                              | None promised                 | Uncommitted; no response promised                   | Completed facts only; synchronous owned release                                                   |
+| C02 | Drop at any awaited request hook                                                       | No                         | Stop; D=0                              | None promised                 | Uncommitted; no response promised                   | Completed hook prefix only; G                                                                     |
+| C03 | Drop at any awaited resource hook                                                      | Frozen                     | Stop; D=0                              | None promised                 | Uncommitted; no response promised                   | Completed forward prefix only; G                                                                  |
+| C04 | Drop at awaited responder                                                              | Frozen                     | Stop; D=1                              | None promised                 | Uncommitted; no response promised                   | Effect outcome may be unknown; G                                                                  |
+| C05 | Drop at any awaited response hook                                                      | No or frozen               | Stop; prior D unchanged                | Completed reverse prefix only | Uncommitted; no response promised                   | No later hooks promised; G                                                                        |
+| C06 | Drop immediately before finalization/commitment                                        | No or frozen               | Stop; prior D unchanged                | Already completed hooks only  | No commitment; no response promised                 | Completed trace only; G                                                                           |
+| C07 | Supervised execution deadline before commitment                                        | No or frozen               | Cancel inner future; prior D unchanged | No additional hooks promised  | Independent static 504, HEAD-aware, if peer usable  | Supervisor timeout event; G; no rollback                                                          |
+| C08 | Disconnect, panic, runtime shutdown, or drain expiry before commitment                 | No or frozen               | Cancel/stop; prior D unchanged         | No additional hooks promised  | No response promised                                | Supervisor records reason when it can run; abort/termination may prevent even that                |
+| C09 | Response stream fails, drops, or exceeds idle deadline after commitment                | Frozen if routing occurred | Forward finished; prior D unchanged    | Never run again               | Terminate transfer; never replace sent status       | Body owner records transfer failure/drop; releases transfer and connection accounting             |
+| C10 | Response stream owns request ingestion; request idle expiry after commitment           | Frozen                     | Forward finished; D=1                  | Never run again               | Terminate input/output transfer; no replacement 408 | Body owner records input timeout separately; G                                                    |
+| C11 | Response stream owns request ingestion; request total-byte exhaustion after commitment | Frozen                     | Forward finished; D=1                  | Never run again               | Terminate input/output transfer; no replacement 413 | Body owner records byte-cap breach separately; G                                                  |
+| C12 | Disconnect, panic, shutdown or graceful-drain expiry during body transfer              | Frozen if routing occurred | Forward finished; prior D unchanged    | Never run again               | Stop transfer; already committed status immutable   | Tracked body/connection tasks release owned accounting; application work has separate supervision |
+
+_Table 4b: Cancellation at every await family, pre-finalization, and committed
+transfer; G has the same limits as in §6.1._
+
+C06 applies at an actual suspension before finalization/handoff. It does not
+claim pre-emption inside a synchronous renderer or finalizer. The later
+representation relationship must identify actual suspension points and mark
+abstract interruption boundaries that an uninterrupted synchronous segment
+elides; do not invent a reachable cancellation witness there.
+
+For an ordinary A/B/C trace, a resource-policy rejection after B.resource gives
+`A.request, B.request, C.request, A.resource, B.resource, C.response,
+B.response, A.response`,
+with D=0. A responder error followed by failures in C.response and A.response
+still visits C, B, A once, retains the responder's private cause, and selects
+500. Cancellation during B.response instead records only C.response as complete
+and does not promise A.response. These are review oracles, not runtime-test
+results. V1–V8 in the ExecPlan assign their later property, finite, socket,
+snapshot, and proof evidence; zero-hook traces contain no hook events and
+retain these dispatch/finalization rules.
 
 ## 7. Errors and response commitment
 
@@ -575,6 +703,85 @@ hooks cannot sign or compress final error bytes before serialization; a
 post-render body adapter would require a separate design and is not part of
 this initial contract.
 
+### 7.2. Failure selection and bounded presentation
+
+Selection retains the first private cause separately from the public failure.
+The first response-hook failure overrides the public status; it does not
+replace an earlier private forward cause. Failure invalidates presentation and
+clears partial-success body, Content-Type, Content-Length, Content-Encoding,
+Cache-Control, ETag, and Last-Modified. The renderer is called only after the
+reverse hooks, with the final public failure and bounded safe details.
+
+| ID  | Event                                                                         | Private cause                                           | Public selection        | Presentation and required headers                                                    |
+| --- | ----------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| E01 | First forward failure                                                         | Retain as primary                                       | Its typed status/reason | Discard success body; derive required headers from this failure                      |
+| E02 | A forward hook sets completion then returns a failure                         | Returned failure becomes primary                        | Its typed status/reason | Returned failure wins over completion; clear presentation                            |
+| E03 | First reverse-hook failure after forward failure                              | Keep forward primary; bounded secondary hook cause      | Sanitized 500           | Clear prior override and 401 challenge/405 Allow; neither belongs to replacement 500 |
+| E04 | First reverse-hook failure with no earlier cause, including a completed draft | Hook cause becomes primary                              | Sanitized 500           | Continue remaining hooks; clear completion/success/presentation                      |
+| E05 | Subsequent reverse-hook failure                                               | Keep primary; retain secondary within cap               | Remains sanitized 500   | Invalidate any intervening presentation override; continue unwind                    |
+| E06 | Renderer error or output-cap breach                                           | Keep primary if present; bounded rendering diagnostic   | Static sanitized 500    | No serializer/custom-code retry; safe finalizer only                                 |
+| E07 | Execution deadline wins before commitment                                     | Preserve available primary diagnostic facts             | Static 504              | Cancel inner future; do not invoke hooks/custom renderer                             |
+| E08 | Body/connection failure after commitment                                      | Existing causes unchanged; separate transfer diagnostic | Sent status unchanged   | Terminate transfer; no replacement response                                          |
+
+_Table 5a: Failure precedence independent of diagnostic storage capacity._
+
+Error headers are rebuilt from a finite allowlist: engine correlation when echo
+is enabled, transport Date/Connection framing, explicitly configured
+`Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials`,
+`Access-Control-Expose-Headers`, `Vary`, and configured security headers
+`Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, and
+`Strict-Transport-Security`. Values must pass header validation; cross-origin
+values come from trusted configuration and validated origin policy, not a raw
+reflection. An invalid renderer media type or invalid required header value is
+a rendering/ finalization failure and selects the static safe 500, not
+unchecked wire data. Required `Allow`, `WWW-Authenticate`, and `Retry-After`
+arise only from the selected typed failure. Custom hooks cannot smuggle other
+headers into error finalization. No cookies, stale caching, encoding, entity
+tags, or application-provided content length survive failure replacement. The
+selected renderer supplies the error Content-Type; the finalizer applies
+H01–H06.
+
+The serializer-free 500 body is exactly
+`{"code":"internal_error","message":"Internal server error"}`. The static 504
+body is exactly
+`{"code":"gateway_timeout","message":"Request deadline exceeded"}`. Both use
+`application/json`, fit the minimum 128-octet output cap, omit details and body
+correlation, and use validated correlation in the header only if already
+available and echo is enabled. Their GET representation lengths are 59 and 64
+octets respectively; HEAD may retain these verified lengths without polling a
+stream. The admission 503 in §9.2 has a verified 69-octet length. Generator
+failure selects 503 without a fabricated ID; custom rendering can produce its
+safe 503 envelope, or E06's static 500 if rendering itself fails. Echo off
+controls the header; a successfully generated ID can still be included in a
+non-fallback error body.
+
+The monotonic execution clock starts immediately after a request execution
+permit is granted, before context/correlation initialization, and stops at the
+single logical response handoff. There is no engine request queue: saturated
+admission rejects without a context. Socket/header wait belongs to adapter
+limits. Immediately before commitment, sample the injected clock. Deadline
+expiry wins a same-poll completion tie (`now >= deadline`), including when a
+completion future is also ready. Once the response has been handed off, only
+transfer limits apply; no late execution timeout replaces it. The in-process
+caller receives the same finalized response handoff as the transport adapter.
+
+Secondary diagnostics retain at most CFG22 entries and CFG23 encoded octets.
+Each entry is clipped before retention without malformed UTF-8/JSON; an entry
+whose valid encoding cannot fit is omitted. Overflow increments one saturating
+dropped count and produces at most one aggregate diagnostic event per request.
+A full buffer never alters failure selection or truncates response hooks. This
+bounds framework-retained encoded diagnostics, not arbitrary private error
+payloads, log-recorder queues, or primary cause allocations.
+
+Renderers, generators, and hooks are trusted application code. A bounded output
+writer checks before append; compatibility renderers returning allocated bytes
+are checked before acceptance, which cannot bound their prior allocations.
+Neither mechanism pre-empts synchronous work. The timeout path never invokes
+that custom code; it still depends on a scheduler able to poll the supervisor.
+A blocking renderer on runtime threads can therefore defeat timely observation.
+The later implementation must exercise these boundaries, not claim hard
+real-time cancellation or application-secret-free logging.
+
 ## 8. Body consumption and streaming
 
 Request bodies have explicit states: available stream, buffered bytes, taken
@@ -640,11 +847,12 @@ trait; see case study E4 and ADR 004.
 
 Require explicit validated limits for accepted connections, concurrent request
 execution, header parsing, buffered and streamed body sizes, request execution
-time, stream idle time, and shutdown drain time. Concrete defaults and units
-must be agreed in roadmap task 1.1.2 before an API is published. There is no
-implicit unlimited setting; a deliberate streaming opt-out must be named and
-documented. Header enforcement belongs to the Hyper adapter, before context
-creation where applicable.
+time, stream idle time, and shutdown drain time. The complete proposed defaults
+and units are in §9.2; owner acceptance of that table is required before
+roadmap task 1.1.2 completes or an API is published. There is no implicit
+unlimited setting; a deliberate streaming opt-out must be named and documented.
+Header enforcement belongs to the Hyper adapter, before context creation where
+applicable.
 
 A connection permit is acquired before accepting more sockets; the operating
 system backlog absorbs or rejects excess connections. A separate request permit
@@ -712,12 +920,156 @@ and exposes unambiguous schema, direction, and policy mappings. Compatibility
 must be established against both Pachinko codecs and its observed hook-layer
 rules, which differ from Peregrine's independent HTTP response hooks.
 
+### 9.2. Proving-ground configuration inventory
+
+The following are concrete **proposed operator defaults**, pending owner
+acceptance of M2. They are finite review inputs, not implemented settings or
+measured release budgets. Bytes mean octets; KiB means 1,024 octets. Numeric
+ranges below are inclusive. `Count` and `Octets` are positive integers bounded
+by 4,294,967,295 unless a narrower range is shown. `Milliseconds` is an integer
+in 1..86,400,000. Startup rejects zero, absent required values, overflow in
+integer/duration conversions, deadline arithmetic, and configured capacity
+products before serving or in-process execution. An opt-out is a named variant,
+never zero or a missing value. Rust type/API names remain for the spike.
+
+`Engine` means both in-process and serving execution; `Adapter` means socket
+serving only; `Owner` means the transferred body retains its policy in either
+mode. Correlation trust and forwarding trust are independent explicit peer
+sets, even if an operator configures the same ingress addresses. In-process
+callers supply a validated source category rather than inventing a socket peer.
+
+| ID / name                               | Typed unit                | Default                                                         | Allowed range                                                  | Cross-field validation                                                     | Scope                    | Enforcement point                                                                                  | Exceedance/outcome                                                                                                             | Explicit opt-out                       |
+| --------------------------------------- | ------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| CFG01 accepted connections              | Count                     | 256                                                             | 1..65,535                                                      | Checked accounting capacity                                                | Adapter                  | Acquire permit before accept; hold through connection close                                        | OS backlog waits/rejects; no context or correlation promised                                                                   | None                                   |
+| CFG02 request executions                | Count                     | 128                                                             | 1..65,535                                                      | CFG03 >= CFG02                                                             | Engine                   | Non-waiting permit before initialization                                                           | Static 503 admission rejection; no engine hooks/context                                                                        | None                                   |
+| CFG03 active streamed body transfers    | Count                     | 256                                                             | 1..65,535                                                      | >= CFG02                                                                   | Owner                    | Reserve before handing off a nonempty owned stream; hold to end/drop                               | Pre-commit 503 if capacity unavailable; never detach uncounted stream                                                          | None                                   |
+| CFG04 header count                      | Count                     | 64                                                              | 1..1,024                                                       | Explicitly set Hyper max_headers                                           | Adapter                  | Parser before context                                                                              | 431 when response can be sent; close if peer/framing prevents it; no engine hooks/ID                                           | None                                   |
+| CFG05 header aggregate bytes            | Octets                    | 16,384                                                          | 1..1,048,576                                                   | CFG06 >= CFG05; includes request start line and trailers                   | Adapter                  | Hyper max_header_size before context                                                               | Initial headers: 431 and close before context; trailer breach: body failure before commit or transfer termination after commit | None                                   |
+| CFG06 connection parser buffer          | Octets                    | 32,768                                                          | 8,192..1,048,576                                               | >= CFG05; validate backend minimum before builder call                     | Adapter                  | Hyper max_buf_size                                                                                 | Parser/connection error; no engine response guarantee                                                                          | None                                   |
+| CFG07 header read deadline              | Milliseconds              | 5,000                                                           | 1..86,400,000                                                  | Timer required; no backend None                                            | Adapter                  | Hyper header_read_timeout plus injected timer                                                      | Close connection, not an engine 408                                                                                            | None                                   |
+| CFG08 buffered body cap                 | Octets                    | 524,288                                                         | 1..4,294,967,295                                               | <= finite CFG10                                                            | Engine                   | Check Content-Length early and each frame before append                                            | 413; terminal failed consumption                                                                                               | None                                   |
+| CFG09 buffered read deadline            | Milliseconds              | 10,000                                                          | 1..86,400,000                                                  | <= CFG13                                                                   | Engine                   | From first collection read to completed cache; never resets                                        | Ordinary 408 while execution remains active                                                                                    | None                                   |
+| CFG10 request stream total cap          | Octets or Unlimited       | 1,048,576                                                       | Positive Octets or named Unlimited                             | Finite cap >= CFG08; opt-out retains CFG11/CFG01–CFG03/CFG14               | Owner                    | Count actual data frames before delivery to consumer                                               | Before commit 413; after commit terminate transfer                                                                             | Unlimited, explicitly configured       |
+| CFG11 request stream idle deadline      | Milliseconds              | 10,000                                                          | 1..86,400,000                                                  | Independent of total-byte opt-out                                          | Owner                    | While request stream remains open; resets only on nonempty input progress                          | Before commit ordinary 408; after commit close transfer                                                                        | None                                   |
+| CFG12 response stream idle deadline     | Milliseconds              | 30,000                                                          | 1..86,400,000                                                  | No total-response-time cap                                                 | Owner                    | Elapsed idle during active transfer; nonempty output progress resets clock                         | Terminate committed transfer; no replacement status                                                                            | None                                   |
+| CFG13 request execution deadline        | Milliseconds              | 30,000                                                          | 1..86,400,000                                                  | >= CFG09; Mornington poll 25,000 leaves 5,000 margin                       | Engine                   | Admission-to-handoff clock and pre-commit check in §7.2                                            | Cancel inner future; independent static 504 if sendable                                                                        | None                                   |
+| CFG14 graceful shutdown drain           | Milliseconds              | 30,000                                                          | 1..86,400,000                                                  | Includes execution and live transfer tasks                                 | Adapter/Owner            | Stop accepts; track all permits to release/transfer completion                                     | Cancel remainder; report incomplete drain                                                                                      | None                                   |
+| CFG15 transient accept retries          | Count                     | 3                                                               | 1..100                                                         | CFG16 <= CFG17; reset after successful accept                              | Adapter                  | Consecutive transient errors only; no retry of terminal listener failures                          | Typed terminal server error after exhausted retries                                                                            | None                                   |
+| CFG16 accept backoff minimum            | Milliseconds              | 100                                                             | 1..86,400,000                                                  | <= CFG17; cap before doubling to avoid intermediate overflow               | Adapter                  | Before retry number n, min(CFG17, CFG16 * 2^(n-1))                                                 | Bounded wait; shutdown interrupts wait                                                                                         | None                                   |
+| CFG17 accept backoff maximum            | Milliseconds              | 1,000                                                           | 1..86,400,000                                                  | >= CFG16                                                                   | Adapter                  | Cap CFG16 schedule through bounded recurrence; no jitter in initial contract                       | Same as CFG16                                                                                                                  | None                                   |
+| CFG18 safe detail item count            | Count                     | 8                                                               | 1..128                                                         | Encoded item and total caps CFG19/CFG20 apply independently                | Engine                   | Before admitting each safe detail                                                                  | Omit whole over-budget items; never submit raw values                                                                          | DisabledDetails, explicitly configured |
+| CFG19 encoded detail item bytes         | Octets                    | 256                                                             | 1..65,536                                                      | <= CFG20                                                                   | Engine                   | Encoded item length including its structure, before retention                                      | Omit oversize item; do not cut encoded UTF-8/JSON                                                                              | DisabledDetails with CFG18             |
+| CFG20 total encoded detail bytes        | Octets                    | 2,048                                                           | 1..1,048,576                                                   | <= CFG21; checked sum                                                      | Engine                   | Before each retained encoded item                                                                  | Omit remaining items; selected status/reason unchanged                                                                         | DisabledDetails with CFG18             |
+| CFG21 accepted error representation     | Octets                    | 4,096                                                           | 128..1,048,576                                                 | >= CFG20; both static fallbacks fit 128                                    | Engine                   | Bounded writer before append or returned-byte acceptance                                           | E06 static 500; previous allocation is outside cap                                                                             | None                                   |
+| CFG22 secondary diagnostic entries      | Count                     | 8                                                               | 1..128                                                         | CFG23 applies independently; primary not counted                           | Engine                   | Before retaining secondary entry                                                                   | Aggregate dropped count, one bounded overflow event                                                                            | DisabledSecondaryDetails               |
+| CFG23 retained encoded secondary bytes  | Octets                    | 4,096                                                           | 1..1,048,576                                                   | Checked sum; each entry clipped to remaining bytes                         | Engine                   | Before diagnostic retention; bounded sink                                                          | Omit excess bytes/entries; selection/unwind unchanged                                                                          | DisabledSecondaryDetails               |
+| CFG24 correlation header name           | HeaderName                | x-request-id                                                    | Valid non-framing single header name                           | Cannot alias auth, cookie, Host, Connection, framing or forwarding headers | Engine                   | Validate at startup; engine alone selects final echo                                               | Semantic configuration error                                                                                                   | None                                   |
+| CFG25 correlation ID bytes              | Octets                    | 128                                                             | 32..1,024                                                      | Generator output must fit; CFG26 grammar always enforced                   | Engine                   | Before ID enters immutable request facts or headers                                                | Trusted input 400; generated invalid ID 503                                                                                    | None                                   |
+| CFG26 correlation validation profile    | Named profile             | StrictHeaderSafe                                                | StrictHeaderSafe or separately specified FalconCompatible      | Always bounded/header-safe; profile choice never weakens CFG25             | Engine                   | Strict profile accepts 1..CFG25 ASCII letters/digits/dot/underscore/hyphen; no whitespace trimming | Trusted malformed or duplicate fields 400; untrusted fields ignored                                                            | None                                   |
+| CFG27 correlation trusted peers         | Peer/network set          | Empty                                                           | Explicit finite configured set                                 | In-process trusted source must be explicitly configured                    | Engine/Adapter           | Before accepting client ID; not an identity check                                                  | Untrusted supplied ID ignored; generate fresh ID                                                                               | None; empty means trust nobody         |
+| CFG28 correlation generator             | Injected generator policy | UUIDv7 lowercase hexadecimal (32 octets)                        | Fallible generator with validated output                       | Validates CFG25/CFG26; no runtime or ambient global context                | Engine                   | Initialize facts before hooks; one attempt                                                         | Generator error/invalid output 503 and absent ID; no invented correlation                                                      | None                                   |
+| CFG29 correlation header echo           | Boolean                   | Enabled                                                         | Enabled or Disabled                                            | Selected engine ID only; body presentation independent                     | Engine                   | Finalizer, including ordinary errors and static 504                                                | Disable omits header; generated ID may still occur in error body                                                               | Disabled                               |
+| CFG30 trusted forwarding peers          | Peer/network set          | Empty                                                           | Explicit finite configured ingress set                         | Peer validation before interpreting forwarding metadata                    | Adapter                  | Request-fact construction after parser, before policy                                              | Ignore untrusted forwarding; malformed trusted metadata selects initialization 400; never establishes identity                 | None; empty means trust nobody         |
+| CFG31 registered route/operation labels | Count                     | 256 each                                                        | 1..65,535 each                                                 | Registry must fit both frozen label vocabularies                           | Engine                   | Registration, before execution                                                                     | Semantic build error; no dynamic raw-path labels                                                                               | None                                   |
+| CFG32 method metric vocabulary          | Finite method classes     | GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, disabled, unknown | Fixed core enumeration                                         | TRACE/CONNECT use disabled; extensions use unknown                         | Engine                   | Observation after request/failure selection                                                        | No raw extension method label                                                                                                  | None                                   |
+| CFG33 outcome metric vocabularies       | Finite categories         | Request, transfer, application separated                        | Fixed core categories; custom codes map to application_failure | No ID/path/secret/error-string labels; no raw custom reason code           | Engine/Owner/Application | Respective outcome boundaries, never speculative hook status                                       | Reject invalid registration; trusted application instrumentation has its own limits                                            | None                                   |
+
+_Table 6a: Complete proposed configuration defaults, ranges, validation,
+application boundary, and exceedance behaviour._
+
+Mornington's 100 active clients and 128 long-poll waiter ceiling motivate 128
+execution permits and 256 connections/transfers, not a capacity guarantee. The
+30-second execution deadline accommodates a 25-second poll; body limits allow
+64 KiB Markdown plus 4 KiB metadata, including worst-case sixfold JSON escaping
+of these text inputs, within a 512 KiB review envelope. Applications still
+enforce field limits and encoded response/page limits; the framework body cap
+is not validation of Mornington business data. Header caps and shorter body
+reads constrain slow input independently of polling. Error and diagnostic
+budgets keep framework-retained output small. Performance thresholds and corpus
+sizes remain Q4; the defaults require operator review, not fabricated
+measurement.
+
+The adapter-only admission rejection uses the serializer-free 503 envelope
+`{"code":"service_unavailable","message":"Request capacity exhausted"}`, with
+JSON media type and the H01–H06 final content rules. It has no request ID
+because context initialization has not run. A failed accept releases its
+reserved connection permit; permits are never transferred to detached work.
+
+The pilot requires Traefik to remove or replace client-supplied forwarding
+fields before forwarding requests. Trust the immediate transport peer, never a
+forwarded address as evidence that the peer itself is trusted. Accept only
+configured forwarding metadata from that ingress and reject malformed trusted
+metadata at initialization; no arbitrary untrusted hop-chain interpretation
+provides authenticated identity.
+
+Core reason labels are the fixed categories `malformed_input`, `unauthorized`,
+`forbidden`, `not_found`, `method_not_allowed`, `unsupported_method`,
+`conflict`, `payload_too_large`, `unsupported_media`, `body_timeout`,
+`execution_timeout`, `internal_error`, `service_unavailable`, and
+`application_failure`. Custom public machine codes remain application response
+contracts and map to `application_failure` for core metrics. Status labels are
+finite HTTP status values; route/operation vocabularies obey CFG31.
+
+No unbounded request waiting queue is introduced. A long poll occupies its
+execution permit until its buffered JSON response is handed off. An owned
+stream releases the execution permit at handoff, but retains a distinct
+transfer permit until completion/drop; the socket retains its connection permit
+until close. Request ingestion transferred to a response stream keeps
+CFG10/CFG11 checks and shares that tracked transfer lifetime. In-process
+transfers have no connection permit but retain CFG03 accounting. A returned
+body abandoned by an in-process caller releases its permit through ownership
+rather than pretending the transfer succeeded.
+
+For accept retry n, the mathematical delay is
+`min(maximum, minimum * 2^(n-1))`. Compute it through a capped recurrence so a
+high retry count does not require constructing an overflowing intermediate
+power.
+
+A terminal listener error or exhausted accept retries stops admission and uses
+the same CFG14 drain for already tracked work before returning the typed server
+error. Keep that original failure and report any incomplete drain separately;
+never detach the remaining connection/body tasks to make serving appear done.
+
+The serving supervisor observes transfer idle expiry even under socket
+backpressure. In-process callers must drive the body or an explicitly supplied
+transfer supervisor; an unpolled future has no timely execution guarantee.
+Expiry invalidates further transfer, while permits remain held until owned
+resources are actually dropped or terminated. Empty frames and timer polls are
+not progress. A request stream used by a response retains its input policy even
+after response commitment.
+
+### 9.3. Versioned adapter enforcement and residual gaps
+
+Hyper **1.12.0** was inspected on 2026-10-13. This is an enforcement reference,
+not a dependency pin or a compiled integration claim. Its
+[max_headers](https://docs.rs/hyper/1.12.0/hyper/server/conn/http1/struct.Builder.html#method.max_headers)
+controls count;
+[max_header_size](https://docs.rs/hyper/1.12.0/hyper/server/conn/http1/struct.Builder.html#method.max_header_size)
+controls aggregate header octets including start line and also chunk trailers;
+[max_buf_size](https://docs.rs/hyper/1.12.0/hyper/server/conn/http1/struct.Builder.html#method.max_buf_size)
+controls the connection buffer and requires at least 8,192. These are distinct
+controls and all must be explicitly assigned. The parser buffer is not a bound
+on application or upstream frame allocation. The
+[header_read_timeout](https://docs.rs/hyper/1.12.0/hyper/server/conn/http1/struct.Builder.html#method.header_read_timeout)
+requires a configured
+[timer](https://docs.rs/hyper/1.12.0/hyper/server/conn/http1/struct.Builder.html#method.timer);
+configuration validation must prevent its missing-timer panic rather than
+waiting for it at serving time. Header timeout closes the connection without
+engine hooks or correlation, unlike an ordinary buffered-read 408.
+
+Later adapter tests must verify count/octet/trailer limits, buffer minimum,
+slow headers, split frames, and parser rejection before context. They must
+observe peak framework accumulator length as well as returned failures. Recheck
+these methods against the actual selected caret requirement; reject an
+unsupported enforcement boundary instead of silently equating parser buffer and
+aggregate header limits. No upstream default establishes a Peregrine budget.
+
 ## 10. Trust boundaries and observability
 
 Untrusted clients control URI, headers, method, and body. Application resources
 and middleware are trusted Rust code with access to the context; the framework
 is not a sandbox. Trusted ingress is configured explicitly before forwarding
-headers can influence client identity or scheme. Authorization uses
+headers can influence client-address metadata or scheme. Authorization uses
 authenticated identity, not raw forwarding or caller-supplied scope headers.
 
 A pre-routing cache or early completion can bypass resource authorization.
@@ -772,7 +1124,7 @@ backpressure, and cancellation behaviour that in-process tests cannot prove.
 | I2: Every response hook runs once in reverse order on ordinary completion.               | `proptest` generates stack lengths, short-circuit indices, and failure phases; shrink to the smallest offending trace.                         | Cancellation and panics are explicitly excluded.                                        |
 | I3: Denied resource policy never reaches a responder.                                    | Exhaustive policy/identity/method cases in the protected-resource slice, with responder invocation counts and behavioural scenarios.           | Application-specific policy correctness remains the application's responsibility.       |
 | I4: Body collection never appends beyond its limit or succeeds after failed consumption. | Properties over frame partitions, limit boundaries, and body-state transitions.                                                                | Upstream frame allocation and application buffering are measured separately.            |
-| I5: Finalized HTTP responses obey method and status constraints.                         | Protocol table cases and socket-level HEAD, 204, 304, 405, and unknown-method tests.                                                           | This is a defined subset, not a claim of complete HTTP conformance.                     |
+| I5: Finalized HTTP responses obey method and status constraints.                         | Protocol table cases and socket-level HEAD, 204, 205, 304, 405, and unknown-method tests.                                                      | This is a defined subset, not a claim of complete HTTP conformance.                     |
 | I6: Public async objects and futures meet their ownership bounds.                        | `trybuild` compile-pass/fail cases for heterogeneous resources, `Send` futures, borrowed context, and rejected non-thread-safe resource state. | Compiler guarantees do not prove application-level policy or progress.                  |
 
 _Table 4: Named invariants, verification methods, and their boundaries._
@@ -799,10 +1151,11 @@ accept both HTTP and non-HTTP callers with the same tenant and mutation
 semantics, and permit concrete or erased service storage. Negative dependency
 fixtures reject forbidden adapter imports and allow composition roots.
 Structural checks do not establish behavioural port conformance: compare a fake
-and a real outbound adapter before pilot acceptance. Record limitations of any
-import checker. Route-renaming and shutdown-failure experiments test operation
-metadata and lifecycle ownership. Axioms A1–A4 are chosen boundaries;
-assumptions S1–S4 and hypotheses H1–H5 require evidence, not assertion.
+and a real outbound adapter before runtime integration acceptance. Record
+limitations of any import checker. Route-renaming and shutdown-failure
+experiments test operation metadata and lifecycle ownership. Axioms A1–A4 are
+chosen boundaries; assumptions S1–S4 and hypotheses H1–H5 require evidence, not
+assertion.
 
 Use `rstest` and `rstest-bdd` within delivery tasks to express representative
 outcomes. Focus `insta` snapshots on stable error envelopes and lifecycle
@@ -825,6 +1178,58 @@ middleware depths, slow consumers, and simulated dependency latency. Compare
 against a direct Hyper baseline under the same settings; add an application
 comparison only with equivalent work. Do not optimize dispatch before the
 measurements identify it as material. Performance budgets remain Q4.
+
+### 11.1. Contract review and later verification
+
+The tables specify reviewable obligations rather than verified runtime
+behaviour. Their witnesses include zero hooks, A/B/C hooks, every stopping
+position, every reverse-hook failure position, and all H01–H06 crossings. For
+every L row, substitute its stopping phase into the phase trace and append R
+once; for every C row, retain only completed prefix events. The no-hook witness
+succeeds with one dispatch, or stops with zero dispatches, without inventing a
+hook. Error combinations apply E01–E08 in event order; full secondary storage
+never changes the chosen outcome.
+
+The candidate pure-kernel argument for I1 is induction on permitted
+transitions. Initially dispatch count is zero and forward state is active. A
+dispatch transition requires active state and count zero, sets count one before
+invoking the responder, and consumes dispatch eligibility. Completion/failure
+makes the stop reason permanent. Response/finalization transitions cannot
+re-enable forward work; interruption is terminal. Thus a permitted transition
+preserves count at most one. For reverse hooks, a cursor starts at middleware
+length and decreases by one after each completed response action; ordinary
+completion reaches zero even when an action returns an error. A cancellation
+does not justify assuming that zero is reached. The runtime must refine these
+phase, stop, identity, dispatch, and cursor transitions; proving this model
+alone would not establish that connection.
+
+For collection, a frame is admitted only if its size is no greater than the
+remaining cap, using checked arithmetic before append. Failed consumption is
+terminal and ownership transfer cannot create buffered success. This bounds the
+framework accumulator, not the upstream allocation. Frozen resource identity
+links policy to the sole eligible dispatch. Error rendering and HTTP
+finalization use a separate public selection, preserve private first cause, and
+cannot change a committed status or a durable application outcome.
+
+| Obligation | Contract rows and witnesses                                              | Owning future evidence                                                                          |
+| ---------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| V1 / I1    | L03–L17, L34–L36, C01–C12; stop/dispatch induction and zero-hook witness | Roadmap 1.2.2 pure-kernel Verus proof, generated async trace refinement in 2.1.3                |
+| V2 / I2    | Every L ordinary row, C05 interruption counterexample; A/B/C and empty R | 1.2.2 and 3.1.3 finite/property trace tests                                                     |
+| V3 / I3    | L07/L08/L10–L16; denied actor never dispatches, identity remains frozen  | 1.1.3, 4.1.1–4.1.3 and 4.2.1 policy examples and behavioural tests                              |
+| V4 / I4    | L18/L19/L24–L33, C10/C11, CFG08–CFG11 configuration                      | 5.1.1 and 5.2.1–5.2.3 frame-partition properties, transient-accumulator observation and sockets |
+| V5 / I5    | E01–E08 crossed with H01–H06, C07/C09–C12                                | 3.1.3–3.1.4, 3.2.2 and 5.2.2 finite/snapshot/socket cases                                       |
+| V6 / I6    | Stream ownership in C09–C12; no HTTP borrow escapes handoff              | 1.1.3 and phase 2 paired compile-pass/compile-fail evidence                                     |
+| V7         | L01/L02, E03–E07, CFG24–CFG30; duplicate/untrusted/generator/echo cases  | 1.4.1, 3.1.3, 6.1.1, 7.4.1 profile and secret-sentinel tests                                    |
+| V8         | CFG01–CFG33, transfer/admission/drain boundaries                         | 3.2.1, 5.1.1, 5.2.1–5.2.3 and 6.1.1–6.1.4 numeric properties, fake clocks and real transport    |
+
+_Table 8a: Specification-to-test/proof handoff; the ExecPlan contains the named
+negative controls, premises, and exact later proof command._
+
+The later suites must reject dispatch twice, clearing stop, skipped/duplicate
+reverse hooks, resource substitution, append-before-check, stale failure
+headers, post-commit status replacement, unbounded labels, and premature permit
+release. A green documentation gate cannot discharge these obligations. No
+Verus source, admitted proof, or passing framework test is introduced here.
 
 ## 12. Dependencies, evolution, and remaining decisions
 
