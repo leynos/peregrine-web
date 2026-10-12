@@ -1,0 +1,10 @@
+[package]
+name = "peregrine-private-docs-lint-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lints.clippy]
+missing_docs_in_private_items = "deny"
