@@ -31,6 +31,18 @@ Every interface below is a proposed contract. The compiler experiment records
 measured acceptance of isolated examples; no framework benchmark, deployment
 compatibility claim, or runnable framework example is implied.
 
+The project owner selected a Peregrine reimplementation of Mornington as the
+pilot.
+[ToR §9.1](terms-of-reference.md#91-mornington-pilot-and-comparative-review)
+records the pinned Actix-based design comparator, protected thread/reply
+operations, and bounded JSON long polling. Mornington has no implemented forum
+to migrate yet; its proposed workload does not establish Peregrine performance.
+Its application services retain authentication, delegated authorization, and
+durable effects. The owner holds the authority, reviewer, and operator roles;
+protocol-scope acceptance remains Q2. No SSE or WebSocket upgrade is required
+by this pilot, and it does not replace ADR 006's independent extension
+consumers.
+
 The initial delivery target is a single `peregrine-web` library, in-process
 request execution, and an HTTP/1.1 serving adapter. Buffered convenience and
 streaming belong in the core release. Pachislot is now a named WebSocket
