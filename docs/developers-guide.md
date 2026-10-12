@@ -314,11 +314,16 @@ runtime path.
 ## Workflow pins and Dependabot
 
 Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
-calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
-commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
-the test fails until a human edits the pinned constant to match. That defeats
-the purpose of automated dependency updates and turns a routine bump into a
-manual chore.
+calls into `leynos/shared-actions`. The hosted action contract deliberately
+records exact revisions, names, ordering, and required inputs. A revision bump
+must update the workflow and its reviewed contract together; the failing test
+keeps that change visible for review rather than accepting a pin change alone.
+
+Reusable-workflow caller tests enforce a different boundary: they check the
+referenced workflow path, that its ref is a full commit SHA, and the caller's
+triggers, permissions, and required inputs. They do not bind the caller to one
+specific reusable-workflow SHA, so routine Dependabot bumps do not require a
+test constant to change.
 
 The narrow `RUSTFLAGS_PASSTHROUGH_REVISION` exception applies only while no
 independent capability probe can establish that the shared `setup-rust` action
@@ -327,8 +332,8 @@ that provides the capability and document this boundary beside the test. Remove
 the literal revision assertion once an independent capability probe is
 available.
 
-Contract tests may still verify the *shape* of a reusable-workflow caller. They
-must not verify the specific SHA value.
+Reusable-workflow caller contract tests verify the *shape* of the caller. They
+must not verify its specific SHA value.
 
 - Do assert the workflow references the correct reusable workflow path.
 - Do assert the ref is pinned to a full 40-character commit SHA, not a
@@ -349,12 +354,13 @@ def test_uses_pinned_full_sha(caller_step):
     assert SHA_RE.match(ref), f"expected a 40-hex commit SHA, got {ref!r}"
 ```
 
-If a workflow's behaviour genuinely depends on a feature only present from a
-particular commit onwards, express that as a comment or a changelog note, not
-as a test assertion on the SHA string. The sole exception is the
-`RUSTFLAGS_PASSTHROUGH_REVISION` boundary above: until an independent probe can
-confirm that `setup-rust` supports `rustflags`, document and assert the first
-capable revision. Remove that literal revision assertion once the probe exists.
+For reusable-workflow callers, if behaviour genuinely depends on a feature only
+present from a particular commit onwards, express that as a comment or a
+changelog note, not as a test assertion on the caller's SHA string. The sole
+exception is the `RUSTFLAGS_PASSTHROUGH_REVISION` boundary above: until an
+independent probe can confirm that `setup-rust` supports `rustflags`, document
+and assert the first capable revision. Remove that literal revision assertion
+once the probe exists.
 
 ## Markdown formatting
 
