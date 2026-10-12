@@ -14,7 +14,6 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_VERSION: '0.2.6'
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -22,19 +21,23 @@ jobs:
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
         with:
-          rustflags: -D warnings
+          # An empty input leaves Cargo's configured development flags active.
+          # Make gates still assign their own warning and build-standard flags.
+          rustflags: ''
       - name: Log Rust compiler configuration
         run: |-
           rustc --version
           printf 'Base RUSTFLAGS: %s\n' "$RUSTFLAGS"
-      - name: Install mold linker
+      - name: Install linker prerequisites
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          # mold accelerates dev builds; coverage uses lld for llvm-tools compatibility.
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the build standard
+        # The pinned toolchain and mold must precede every local suite route.
+        run: make install-build-tools
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
@@ -70,35 +73,21 @@ jobs:
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.x'
-      - name: Cache Whitaker installation
-        id: cache-whitaker
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
-        with:
-          path: |
-            ~/.cargo/bin/whitaker-installer
-            ~/.local/bin/whitaker
-            ~/.dylint_drivers
-            ~/.local/share/whitaker
-          key: whitaker-v3-${{ runner.os }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install Whitaker
-        env:
-          RUSTFLAGS: ""
-          WHITAKER_CACHE_HIT: ${{ steps.cache-whitaker.outputs.cache-hit }}
-        run: |
-          set -euo pipefail
-          echo "Whitaker cache hit: ${WHITAKER_CACHE_HIT}"
-          if [ "${WHITAKER_CACHE_HIT}" != "true" ]; then
-            echo "Installing whitaker-installer ${WHITAKER_INSTALLER_VERSION}"
-            cargo binstall --no-confirm --locked \
-              whitaker-installer@"${WHITAKER_INSTALLER_VERSION}"
-          fi
-          whitaker-installer --cranelift
-          echo "Whitaker binary: $(command -v whitaker || true)"
+        uses: leynos/shared-actions/.github/actions/install-whitaker@6dea5677a84fec60ca51b07202570e3af12ffdb4
+        with:
+          cranelift: 'true'
       - name: Audit dependencies
         if: github.actor != 'dependabot[bot]'
         run: make audit
       - name: Lint
-        run: make lint
+        # A private path exercises Dylint's cold driver construction on each
+        # hosted run before the repository lint check.
+        env:
+          DYLINT_DRIVER_PATH: ${{ runner.temp }}/peregrine-whitaker-driver
+        run: |
+          mkdir -p "$DYLINT_DRIVER_PATH"
+          make lint
       - name: Log coverage linker configuration
         run: |
           echo "Coverage linker: clang"
@@ -109,6 +98,7 @@ jobs:
         if: env.ACT != 'true'
         uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
         env:
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
           RUSTFLAGS: -D warnings -C link-arg=-fuse-ld=lld
           CFLAGS: -fuse-ld=lld
@@ -120,3 +110,9 @@ jobs:
           # The publisher in coverage-main.yml owns the coverage artefact and
           # the ratchet baseline; this lane only compares against it.
           publish-artefact: 'false'
+      - name: Test under Act
+        # Hosted coverage is skipped under Act, so execute the ordinary suite.
+        if: env.ACT == 'true'
+        env:
+          WITH_ACT: '0'
+        run: make test

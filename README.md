@@ -41,20 +41,30 @@ ______________________________________________________________________
 
 ### Get the scaffold
 
-Install Git and a rustup-managed Rust toolchain. The checkout selects its
-pinned nightly and components automatically. On x86-64 Linux, its build
-configuration also requires `clang` and `mold`. See the
-[users' guide](docs/users-guide.md) for build-tool details.
+Install Git, GNU Make, Bash, and rustup. On native x86-64 GNU Linux, install
+Clang as well. Then install and check the pinned build tools before running the
+repository tests. The users' guide lists the additional installer tools needed
+on that host:
 
 ```bash
 git clone https://github.com/leynos/peregrine-web.git
 cd peregrine-web
-cargo test
+make install-build-tools
+make check-build-tools
+make test
 ```
 
-A successful run currently passes the scaffold placeholder plus the workflow
-and Makefile contract tests that guard the generated tooling. These check the
-scaffold, not the proposed HTTP contracts.
+The installer verifies the pinned `mold` archive before installing it on native
+x86-64 GNU Linux, then installs the nightly toolchain and its pinned
+components. Other hosts use their platform linker. Coverage also requires Clang
+and `ld.lld`. The [users' guide](docs/users-guide.md) lists the supported Make
+commands, prerequisites, and host limits; the
+[developers' guide](docs/developers-guide.md) explains their compiler and
+linker routes in detail.
+
+The test run currently covers the scaffold placeholder and the workflow and
+Makefile contracts that guard the generated tooling. It does not test the
+proposed HTTP contracts.
 
 ### Explore the current library
 
@@ -124,7 +134,8 @@ ______________________________________________________________________
   — lessons from Corbusier, Wildside, and Episodic.
 - [Pachislot extension design](docs/pachislot-extension-design.md) — correlation
   propagation and a proposed WebSocket companion hosted inside Peregrine.
-- [Users' guide](docs/users-guide.md) — current scaffold and build commands.
+- [Users' guide](docs/users-guide.md) — repository build quick start and
+  generated-project structure.
 - [Developers' guide](docs/developers-guide.md) — contributor workflow and
   proposed integration boundaries.
 - [Documentation contents](docs/contents.md) — the complete documentation map.

@@ -1,9 +1,26 @@
+# Repository-wide Cargo defaults for the development build standard.
+#
+# The parallel `rustc` frontend is the default for every build, and the mold
+# linker is the default for x86_64 GNU Linux. Cargo auto-discovers this file, so a bare
+# `cargo build` gets both. Coverage and release builds assign `RUSTFLAGS`,
+# which displaces every `rustflags` source below, so neither takes them.
+#
+# Cargo selects a single `rustflags` source rather than merging them: a
+# matching `[target.*]` table replaces `[build] rustflags` outright. Every flag
+# is therefore repeated in each source, and the Makefile restates them where it
+# assigns `RUSTFLAGS` for the gate targets.
+
 [unstable]
 codegen-backend = true
 
 [profile.dev]
 codegen-backend = "cranelift"
 
+[build]
+rustflags = ["-Zthreads=8"]
+
+# mold ships for Linux only; this repository configures its x86_64 GNU target.
+# Other platforms fall through to `[build] rustflags` and their default linker.
 [target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+linker = "scripts/native-clang-linker.sh"
+rustflags = ["-Zthreads=8", "-C", "link-arg=-fuse-ld=mold"]

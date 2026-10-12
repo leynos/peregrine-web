@@ -709,8 +709,8 @@ integrating with common async runtimes and offering syntactic sugar for
 managing futures.
 
 The examples below use `async-std` for `async_std::task::sleep` and the
-`#[async_std::test]` attribute macro. Add it under `[dev-dependencies]` with
-the `attributes` feature enabled:
+`#[async_std::test]` attribute macro. Add it under `[dev-dependencies]` with the
+`attributes` feature enabled:
 
 ```toml
 [dev-dependencies]

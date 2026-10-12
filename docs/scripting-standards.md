@@ -40,10 +40,10 @@ as a default.
   [`cuprum`](https://github.com/leynos/cuprum/) to provide typed,
   allowlist-based command execution rather than ad‑hoc shell strings. Cuprum's
   catalogue system reduces accidental invocation of unregistered executables,
-  but registering an interpreter such as `sh`, `bash` or `python` still
-  permits arbitrary code execution through caller-supplied arguments. An
-  explicit executable policy plus separate validation of caller-supplied
-  arguments remain required.
+  but registering an interpreter such as `sh`, `bash` or `python` still permits
+  arbitrary code execution through caller-supplied arguments. An explicit
+  executable policy plus separate validation of caller-supplied arguments
+  remain required.
 - File‑system interactions use `pathlib.Path`. Higher‑level operations (for
   example, copying or removing trees) go through the `shutil` standard library
   module.
