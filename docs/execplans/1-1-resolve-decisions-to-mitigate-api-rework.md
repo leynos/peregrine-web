@@ -120,6 +120,13 @@ blockers with evidence rather than lowering acceptance criteria.
 
 ## Surprises & discoveries
 
+The M1 CLI review dated its observations in UTC and called the local 2026-10-13
+approval premature. The session uses Europe/Berlin: its 2026-10-12 22:50 UTC
+review start was 2026-10-13 00:50 locally. The owner had already explicitly
+accepted the boundary. ToR now states the date convention; no accepted decision
+is reopened on that incorrect premise. The valid index wrapping finding is
+fixed with a shorter inline link label.
+
 The owner confirmed that this is a one-person operation and selected a
 Peregrine reimplementation of Mornington as the pilot. This resolves the
 previously missing human roles and workload without requiring an external
@@ -159,6 +166,12 @@ recommendation; the later spike must use the Rust Router canary through Cargo,
 preserving wrapper admission, before attributing acceptance to Polonius.
 
 ## Decision log
+
+- (2026-10-13, M1 CLI review) CodeRabbit 0.9.0 reviewed committed `3cc17d9`
+  against `de6b900`, with complete coverage and two minor findings. Fix the
+  93-column index link. Reject the future-date premise using the supplied
+  Europe/Berlin session date and the recorded UTC/local review timestamps; make
+  the ToR date convention explicit. Renew gates and repair review.
 
 - (2026-10-13, owner acceptance) Close the pilot Q1/Q2/Q6 decision slice
   using the owner's explicit acceptance in the linked implementation session.
@@ -764,3 +777,8 @@ outstanding for M1; workload figures are not measured release budgets.
 Revision note (2026-10-13): record explicit owner acceptance of the Mornington
 protocol and deployment boundary. M1 is accepted; M2 can specify lifecycle,
 failure selection, and pilot configuration without the former Q2 blocker.
+
+Revision note (2026-10-13, M1 review): shorten the index link and make the
+local decision-date convention explicit. Preserve actual owner acceptance; the
+UTC date finding does not revoke it. M2 drafts remain outside the checkout
+while the repaired milestone is validated and assessed.

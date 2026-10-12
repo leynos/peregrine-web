@@ -55,7 +55,7 @@ documentation set.
   requires independent consumers and complete generality evidence before
   experimental interfaces stabilize.
 
-- [Execution plan for roadmap 1.1](execplans/1-1-resolve-decisions-to-mitigate-api-rework.md)
+- [Roadmap 1.1 plan](execplans/1-1-resolve-decisions-to-mitigate-api-rework.md)
   defines the approval-gated work to resolve the pilot, lifecycle, and
   configuration decisions in tasks 1.1.1 and 1.1.2.
 
