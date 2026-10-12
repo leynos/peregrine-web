@@ -118,12 +118,16 @@ blockers with evidence rather than lowering acceptance criteria.
 - [x] (2026-10-13) M1 acceptance and all required gates passed; CodeRabbit
   0.9.0 completed full coverage and two repair deltas. The final delta at
   `30d288d` reported zero findings. Original logs and dispositions are retained.
-- [x] (2026-10-13) Prepared L01–L38 ordinary-exit, C01–C12 interruption,
-  E01–E08 precedence, H01–H06 content/framing, and CFG01–CFG33 configuration
+- [x] (2026-10-13) Prepared L01–L38 ordinary-exit, C01–C13 interruption,
+  E01–E09 precedence, H01–H06 content/framing, and CFG01–CFG33 configuration
   tables in the design. Linked ADR ownership and V1–V8 future evidence.
 - [x] (2026-10-13) Applied all six expert perspectives and obtained an
   independent table reading. Four concrete outcomes were derivable; clarified
   header-count rejection, real suspension points, and encoded diagnostic bounds.
+- [x] (2026-10-13) Initial M2 tables/guides passed all required gates
+  (295 tests passed, one suite-defined skip). The committed seven-file CLI
+  review completed; its two valid findings are repaired: CFG03 exhaustion now
+  has L38/E09 and framing interruption has C13. Repair gates/review follow.
 - [ ] M2: accept the complete proving-ground configuration defaults, then
   finish contract validation and CLI review. Owner approval was requested for
   the concrete table; CFG08 was corrected from 256 to 512 KiB and disclosed.
@@ -838,3 +842,8 @@ precedence, configuration and HTTP tables; refine existing ownership ADRs and
 link guides and V1–V8 evidence owners. M1 is locally validated/reviewed. Keep
 A5 acceptance and final milestone gates/review pending; no roadmap item or
 runtime/proof deliverable is marked complete.
+
+Revision note (2026-10-13, M2 review repair): add transfer-capacity rejection
+after completed reverse hooks, drop its unhanded body, and move unsafe
+rejection transport failure to C13. Clarify full-trace hook accounting for rows
+entered after R; preserve ordinary unwind and interruption guarantees.
