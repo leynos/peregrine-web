@@ -217,10 +217,10 @@ constitute separate customer, sponsor, or operator sign-off. The owner selected
 a Peregrine reimplementation of `leynos/mornington` for validation on
 2026-10-12 in the
 [implementation session](https://lody.ai/leynos/sessions/724e71be-1ca2-49c9-a6c9-3aff69b0aeac).
-Decision dates use the owner's Europe/Berlin timezone, which can be one
-calendar day ahead of UTC. That statement assigns the roles and pilot; it does
-not assert a deployed service, measured capacity, or acceptance of every
-proposed contract.
+Decision dates use the owner's local calendar date in Europe/Berlin. That
+local calendar date can be one day ahead of the UTC calendar date. That
+statement assigns the roles and pilot; it does not assert a deployed service,
+measured capacity, or acceptance of every proposed contract.
 
 | ID  | Question and consequence                                                                             | Closure evidence                                                                                             | Decision owner and status                                  |
 | --- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
