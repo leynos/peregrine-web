@@ -560,7 +560,7 @@ original method remains available for HEAD suppression.
 | L35 | Renderer fails or encoded output exceeds cap, after R                                  | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | R already finished; no replay        | Static sanitized 500                            | Finalize then commit; G; no custom renderer retry               |
 | L36 | Informational 1xx or invalid-range status reaches final validation                     | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | R already finished; no replay        | Sanitized 500                                   | Finalize then commit; G; arbitrary 101 cannot upgrade           |
 | L37 | Rejection leaves unread body and framing permits response                              | No or frozen according to rejection phase   | None                                     | Prior D, unchanged | R                                    | Selected rejection                              | Send safe response then close; never unbounded drain; G         |
-| L38 | Owned response stream lacks CFG03 capacity after R, before finalization                | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | R already finished; no replay        | Static 503 capacity rejection                   | Drop unhanded stream; finalize then commit; G                   |
+| L38 | Nonempty owned response stream lacks CFG03 capacity after R, before finalization       | Frozen if routing occurred; otherwise no    | None                                     | Prior D, unchanged | R already finished; no replay        | Static 503 capacity rejection                   | Drop unhanded stream; finalize then commit; G                   |
 
 _Table 4a: Exhaustive ordinary-exit families; phase-dependent variants state
 the resource and dispatch distinctions explicitly._
@@ -610,7 +610,8 @@ For an ordinary A/B/C trace, a resource-policy rejection after B.resource gives
 B.response, A.response`,
 with D=0. A responder error followed by failures in C.response and A.response
 still visits C, B, A once, retains the responder's private cause, and selects
-500. Cancellation during B.response instead records only C.response as complete
+
+1. Cancellation during B.response instead records only C.response as complete
 and does not promise A.response. These are review oracles, not runtime-test
 results. V1–V8 in the ExecPlan assign their later property, finite, socket,
 snapshot, and proof evidence; zero-hook traces contain no hook events and
