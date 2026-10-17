@@ -1,7 +1,7 @@
 # Resolve decisions to mitigate API rework (1.1)
 
-Status: IN PROGRESS — proving-ground defaults accepted; final gates/review
-pending.
+Status: COMPLETE — documentation implementation; PR delivery recorded
+separately.
 
 This ExecPlan is a living document. Keep Constraints, Tolerances, Risks,
 Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
@@ -136,11 +136,19 @@ blockers with evidence rather than lowering acceptance criteria.
 - [x] (2026-10-17) Recorded Mornington's explicit hexagonal architecture and
   validation through existing application ports, with fixed domain/driven-port
   fixtures, direct-domain oracles, and separate HTTP/transfer assertions.
-- [ ] M2: finish final contract validation and committed CLI review.
+- [x] (2026-10-17) M2: all required sequential gates passed for the accepted
+  configuration/stream-admission candidate; committed CLI review of `c062536`
+  covered the six changed documents with no unresolved valid concern. Exact
+  candidate identities, commands, exits, and logs are retained in the delivery
+  ledger; hosted assessment remains a separate PR-delivery gate.
 - [x] (2026-10-13) M3 guide updates are drafted with proposed-contract and
   runtime/proof limitations explicit. Final conformance and roadmap completion
   remain dependent on accepted M2 defaults and validation.
-- [ ] M3: reconcile documentation, acceptance evidence, and roadmap completion.
+- [x] (2026-10-17) M3: reconciled A1–A7 below, guides, and downstream evidence
+  ownership. Marked only roadmap 1.1.1/1.1.2 done. Added the proving-ground
+  review obligation to 6.2.2 and Mornington port validation to 1.3.2, retaining
+  those tasks and all runtime/proof work as unfinished. The final documentation
+  candidate must pass every gate before this completion record is committed.
 
 ## Surprises & discoveries
 
@@ -214,8 +222,8 @@ preserving wrapper admission, before attributing acceptance to Polonius.
   lifecycle and first-cause/public-failure distinction. Use 30,000 ms execution
   for the pilot's 25,000 ms polls, finite independent admission/body/drain
   caps, explicit StrictHeaderSafe correlation, and finite core metric
-  vocabularies. CFG01–CFG33 are proposed operator defaults until explicitly
-  accepted.
+  vocabularies. At that date CFG01–CFG33 remained proposed operator defaults;
+  the 2026-10-17 entry above records their later proving-ground-only approval.
 - (2026-10-13, review) Apply architecture, alternatives, performance,
   contracts, reliability, and maintainability lenses. Retain existing owners
   over a new scheduler; correct JSON buffering and header rejection; separate
@@ -271,24 +279,27 @@ preserving wrapper admission, before attributing acceptance to Polonius.
 
 ## Outcomes & retrospective
 
-M1 is complete: A1/A2 have explicit owner evidence, the gates passed, and
-current repairs have complete local CLI coverage with no unresolved valid
-findings. M2 now has concrete A3/A4 tables, proving-ground-only A5 acceptance
-on 2026-10-17, and A6 proof sketch/traceability. Guides explain these as future
-contracts. Final M2 validation/review and A7 remain pending; roadmap 1.1.1 and
-1.1.2 stay unchecked until M1–M3 meet the plan's completion condition. No
-runtime behaviour, executable proof, benchmark, or released API is claimed.
+M1–M3 documentation implementation is complete. A1/A2 have explicit owner
+evidence; M2 has A3/A4 tables, proving-ground-only A5 approval on 2026-10-17,
+A6 proof sketch/traceability, and completed local gate/review coverage. M3
+reconciles the guides and acceptance mapping. Only roadmap 1.1.1 and 1.1.2 are
+complete; 1.1.3, runtime work, executable proofs, and benchmarks remain
+unfinished. The final documentation candidate is committed only after all
+required gates pass. Hosted checks, completeness/correctness assessment,
+readiness, formal review, and merge are tracked separately in the delivery
+ledger, not inferred from this implementation status.
 
-Execution intake verified PR #26 against local head `6414fda` and base
-`de6b900`. Only the execution record has changed; A1–A7 remain incomplete. No
-upstream requirement, runtime interface, dependency, or trust boundary has
-changed. The owner has since supplied the Mornington pilot and human roles. M1
-was accepted on 2026-10-13; M2 can proceed after milestone validation/review.
-Execution-intake formatting, Markdown and spelling, Mermaid, lint, and test
-gates passed sequentially with exit code zero. Tests reported 295 passed and 1
-skipped; doctests had no cases. Logs are under `/tmp/` with the worktree UUID
-and branch in their names and the suffix `-execution-intake.out`. The planning
-results below remain historical evidence for their original candidate.
+Historical execution intake verified PR #26 against local head `6414fda` and
+base `de6b900`. At that snapshot only the execution record had changed; A1–A7
+remained incomplete. No upstream requirement, runtime interface, dependency, or
+trust boundary has changed. The owner has since supplied the Mornington pilot
+and human roles. M1 was accepted on 2026-10-13; M2 can proceed after milestone
+validation/review. Execution-intake formatting, Markdown and spelling, Mermaid,
+lint, and test gates passed sequentially with exit code zero. Tests reported
+295 passed and 1 skipped; doctests had no cases. Logs are under `/tmp/` with
+the worktree UUID and branch in their names and the suffix
+`-execution-intake.out`. The planning results below remain historical evidence
+for their original candidate.
 
 The six-perspective review found no blocking design flaw. Its concerns led to
 exact downstream task assignments, body-owner transfer accounting, explicit
@@ -368,6 +379,34 @@ locked or compatibility-tested dependency set.
 | User/developer documentation; requested completion discipline | M3        | A7: reconciled sources, green gates, accepted task completion         |
 
 _Table 1: Selective traceability from requirements to evidence._
+
+The completed documentation acceptance maps as follows:
+
+- A1/A2: ToR §9.1 names Mornington, the sole owner and review/operator roles,
+  the pinned Actix-design comparator, workload, proxy policy, and accepted
+  HTTP/1.1/Traefik scope. ToR §9.2 records the later limited parameter approval
+  and hexagonal validation seam; Q3–Q5 and release readiness remain open.
+- A3: design §§6.1–6.2 define L01–L38 ordinary exits and C01–C13 interruption
+  boundaries, including zero hooks, partial reverse prefixes, and body handoff.
+  The independent reader derived forward 403, hook-failure 500 after responder
+  409, HEAD 504, and committed-transfer termination from the tables.
+- A4: design §§5.1/7.2 define H01–H06 content rules and E01–E09 failure
+  selection, bounded presentation, pre-commit fallbacks, and immutable sent
+  status. ADR 003 assigns engine, application, transport, and body ownership.
+- A5: design §9.2 fills every CFG01–CFG33 unit, default, range, validation,
+  scope, enforcement, outcome, and opt-out cell. Its owner approval is solely
+  for the proving ground; per-row evidence and retain/revise decisions after
+  the exercise gate 1.0 parameter acceptance. Hyper 1.12.0 links identify the
+  researched enforcement surface, not an installed or tested dependency.
+- A6: design §§11/11.1 and this plan's V1–V8 assignments connect each invariant
+  to future proof/test tasks, premises, witnesses, and negative controls. These
+  are prose sketches; no executable proof or production refinement is claimed.
+- A7: the user/developer guides agree with the canonical design and ADRs; the
+  contents/layout index the plan; roadmap 1.1.1/1.1.2 retain their acceptance
+  text and are marked done. Required final gates are enforced before commit.
+  Review covered architecture, alternatives, performance/observability,
+  contracts, reliability, and maintainability; no unresolved semantic
+  counterexample or unapproved scope deviation remains.
 
 Change a traced decision only after checking its upstream assumptions and later
 consumers. In particular, transport changes affect Q2, ADRs 003/005/006, and
@@ -687,10 +726,11 @@ reasons. Do not substitute expert review for pilot-owner acceptance.
 guides agree with the design, and every downstream obligation has an owner
 task. Run all gates. Only after implementation of M1–M3 is complete, mark
 roadmap **1.1.1 and 1.1.2** checked and explicitly `done`, retaining their
-acceptance text. Do not mark all of 1.1 done: 1.1.3 remains outstanding. Leave
-every roadmap item unchecked in this planning PR. Use the `mapsplice` skill
-when making that later structural roadmap edit. Record approval and evidence,
-mark the executed plan COMPLETE, and commit the final coherent documentation.
+acceptance text. Do not mark all of 1.1 done: 1.1.3 remains outstanding. The
+original planning-only PR kept every roadmap item unchecked until execution.
+Use the `mapsplice` skill when making that later structural roadmap edit.
+Record approval and evidence, mark the executed plan COMPLETE, and commit the
+final coherent documentation.
 
 At each milestone record whether assigned requirements are satisfied, the
 approved design is followed, assumptions still hold, there is no unapproved
@@ -738,12 +778,15 @@ For this plan's delivery, use the standard GitHub client authenticated as
 `leynos`, a clean command environment as specified in `AGENTS.md`, and verified
 SSH identity. Push to the requested branch, fetch its explicit tracking ref,
 set upstream to `origin/1-1-resolve-decisions-to-mitigate-api-rework`, and
-compare local/remote SHAs. Create a **draft** PR titled
+compare local/remote SHAs. The original planning-phase instructions were to
+create a **draft** PR titled
 `Plan: Resolve decisions to mitigate API rework (1.1)` with a branch-wise plan
 link and a terminal References section containing this Lody session:
 <https://lody.ai/leynos/sessions/a4599fc6-f75b-46a1-9fdc-3116d6c5774c>. Read
-back title, body, draft state, and branch head. Publication is authorized;
-implementation waits for explicit user approval.
+back title, body, draft state, and branch head. Those planning-phase approval
+conditions were later satisfied by the explicit implementation request and
+owner decisions recorded above; the 2026-10-17 request authorizes equilibrium
+and merge through pr-babysitting after its candidate-bound delivery gates.
 
 ## Validation and acceptance
 
@@ -773,7 +816,8 @@ changes within scope, never discarding someone else's work.
 
 A partial push or PR failure does not require rewriting commits: inspect the
 remote head and existing PR before retrying. Refresh the remote-tracking ref
-after explicit-URL pushes. Approval remains pending regardless of publication.
+after explicit-URL pushes. Publication alone does not establish approval; use
+the explicit owner decisions and candidate-bound review evidence above.
 
 ## Interfaces and dependencies
 
@@ -882,3 +926,11 @@ then freeze the updated candidate for fresh sequential gates. Retain the
 stream-admission repair and all previous review evidence. The owner now
 explicitly authorizes equilibrium and merge through pr-babysitting, using the
 allocated comment-token pool. No daemon or host-limit change is authorized.
+
+Revision note (2026-10-17, M3): reconcile accepted requirements and completed
+specification activity without claiming runtime or release readiness. Keep
+proposed ADRs and downstream tasks separate. The installed mapsplice 0.1.0
+preview of replacing 1.1.1 failed with `dangling_dependency`: dependency anchor
+`1.1.1` was not found. It made no tracked edit. Apply only the exact existing
+checkbox/status changes and additive acceptance prose; preserve all numbering,
+dependencies, and unrelated tasks. No structural renumbering is required.
