@@ -3,9 +3,10 @@
 This proposed roadmap turns the [terms of reference](terms-of-reference.md) and
 [technical design](peregrine-design.md)
 into a candidate delivery sequence. It is not a release commitment and promises
-no dates. Tasks remain unchecked because compiler probes are evidence for the
-proposal, not completion of the planned framework prototypes.
-[ADR 001](adr-001-resource-aware-lifecycle.md) and
+no dates. Only decision/specification tasks 1.1.1 and 1.1.2 are done. Compiler
+probes remain evidence for the proposal, not completion of the planned
+framework prototypes; implementation and proving-ground validation remain
+unfinished. [ADR 001](adr-001-resource-aware-lifecycle.md) and
 [ADR 002](adr-002-compiler-ownership-experiment.md) remain proposed. The key
 compiler experiment in phase 2 gates the implementation direction. The
 [actix-v2a case study](actix-v2a-middleware-case-study.md) and proposed
@@ -55,12 +56,13 @@ contract? The answers determine which later slices are relevant. See
 [terms of reference §9](terms-of-reference.md#9-open-questions-and-decision-authority)
 and technical design §§1, 4, 9, and 12.
 
-- [ ] 1.1.1. Record the pilot use case, decision owner, and initial protocol
-      scope.
+- [x] 1.1.1. Record the pilot use case, decision owner, and initial protocol
+      scope — done.
   - See terms-of-reference.md Q1, Q2, and Q6; peregrine-design.md §§1 and 12.
   - Success: a named review scenario and owner confirm or revise HTTP/1.1,
     external secure ingress, and the proposed release boundary.
-- [ ] 1.1.2. Specify lifecycle, error precedence, and operational configuration.
+- [x] 1.1.2. Specify lifecycle, error precedence, and operational configuration
+      — done.
   - Requires 1.1.1.
   - See peregrine-design.md §§3 and 5–9; adr-001-resource-aware-lifecycle.md.
   - Success: contract tables cover every ordinary exit and cancellation
@@ -118,7 +120,9 @@ hexagonal-application-case-study.md §6 and ADR 004.
     without Peregrine/HTTP dependencies. E5 rejects forbidden dependency/import
     fixtures and permits a composition root; fake-port tests cover behaviours,
     not only method presence. Record gaps requiring a real outbound adapter
-    before pilot acceptance. No consumer migration is implied.
+    before pilot acceptance. No consumer migration is implied. Use Mornington's
+    hexagonal application ports for direct-domain oracles and controlled
+    driving-adapter comparisons as specified in terms-of-reference.md §9.2.
 
 ### 1.4. Define extension ownership before stabilizing the core
 
@@ -435,6 +439,9 @@ See terms of reference §§7–9 and technical design §§11–12.
     Record E1–E5 outcomes, validate or revise S1–S4, and compare the specimen's
     fake and real outbound adapter behaviours before accepting its boundary
     claims. Reject proposed conveniences that add wiring without measured value.
+    After the Mornington proving ground, revisit every CFG01–CFG33 value with
+    reproducible evidence and an owner retain/revise decision before accepting
+    1.0 parameters; see peregrine-design.md §9.2 and terms-of-reference.md §9.2.
 - [ ] 6.2.3. Prepare the pilot release documentation and package evidence.
   - Requires 6.2.2.
   - See peregrine-design.md §§1–13; users-guide.md and developers-guide.md.

@@ -55,6 +55,11 @@ documentation set.
   requires independent consumers and complete generality evidence before
   experimental interfaces stabilize.
 
+- [Roadmap 1.1 plan](execplans/1-1-resolve-decisions-to-mitigate-api-rework.md)
+  records the Mornington proving ground, explicit pilot-owner acceptance
+  separately from plan approval, and the lifecycle/configuration specification
+  and acceptance evidence for tasks 1.1.1 and 1.1.2.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)

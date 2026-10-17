@@ -1,0 +1,949 @@
+# Resolve decisions to mitigate API rework (1.1)
+
+Status: COMPLETE — documentation implementation; PR delivery recorded
+separately.
+
+This ExecPlan is a living document. Keep Constraints, Tolerances, Risks,
+Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
+Conformance basis, and Verification plan current at every milestone boundary.
+
+## Purpose / big picture
+
+Resolve roadmap tasks **1.1.1 and 1.1.2** so the next ownership spike has an
+agreed deployment scenario and testable contracts. A reviewer should be able to
+name the decision authority, explain which hooks run for any documented exit,
+choose the winning failure, and determine exactly which configured bound
+applies. Those answers reduce public API rework before a framework exists.
+
+The deliverable after approval is a consistent decision and specification set,
+not a running HTTP framework. This plan records proof obligations and future
+test oracles before implementation structure is selected. Task 1.1.3's compiled
+spike, task 1.2.2's executable lifecycle model and Verus proof, and subsequent
+runtime, transport, and extension delivery remain separate roadmap work.
+
+Approval of this plan authorizes its documentation milestones. It does not
+supply the missing pilot-owner acceptance, accept every proposed ADR, commit to
+a release, or authorize the downstream runtime work described for handoff.
+
+## Constraints
+
+- Preserve resource identity as the source of endpoint behaviour and policy;
+  no duplicate route-policy registry, hidden service container, or extraction
+  scheduler.
+- This slice edits documentation only. Do not change `src/`, `tests/`, Cargo
+  manifests, toolchain, Makefile, or workflows to make a proposed contract look
+  implemented. Do not add speculative proof source or passing proof stubs.
+- Preserve ordinary-result versus cancellation/panic distinctions. Response
+  hooks do not guarantee cleanup, audit delivery, rollback, or durable commit.
+- Keep proposed and accepted decisions visibly distinct. Only a named human
+  authority can close Q1, Q2, and Q6. Do not infer that authority from a GitHub
+  login, this planning request, or a case-study author's name.
+- Preserve ADR 006's separate-consumer and independent-generality conditions.
+  Earlier HTTP delivery must leave extension interfaces experimental or absent.
+- Preserve the compiler experiment in ADR 002. No compiler adoption or API
+  compatibility layer follows from this documentation work.
+- Run the required gates sequentially, log exit codes, and commit only green
+  milestones. Do not bypass shared compiler admission or use `/tmp` for builds.
+- No `assume`, `admit`, external/trusted proof bodies, or equivalent shortcuts
+  may be introduced to make a speculative theorem compile.
+
+## Tolerances (exception triggers)
+
+Stop the affected milestone and record a proposed deviation if it needs runtime
+code, a new dependency, a compiler change, an additional protocol, native TLS,
+a new trust boundary, or changed lifecycle guarantees. Set status to BLOCKED
+until the user accepts the deviation. Also stop if a required authority cannot
+be identified, a normative table retains contradictory rows, or a limit cannot
+be enforced at its stated boundary using the selected upstream interface.
+
+The expected edit set is this plan, `docs/terms-of-reference.md`,
+`docs/peregrine-design.md`, ADRs 001 and 003, `docs/users-guide.md`,
+`docs/developers-guide.md`, `docs/contents.md`, `docs/repository-layout.md`, and
+`docs/roadmap.md`. Targeted cross-reference corrections to ADRs 004–006 or the
+case studies are allowed when they preserve existing scope. Substantive changes
+to those decisions require review before proceeding. Do not rewrite completed
+historical ExecPlans. No elapsed-time limit applies; report dependency or gate
+blockers with evidence rather than lowering acceptance criteria.
+
+## Risks
+
+- **Unmeasured pilot (high impact, medium likelihood):** the sole owner has
+  selected Mornington, whose forum remains at design stage. Compare against the
+  pinned Actix-based design; do not claim a deployed comparator or measured
+  capacity. Q2 acceptance is recorded; Q4 measurements remain separate evidence.
+- **Arbitrary defaults (high impact, medium likelihood):** defaults can imply
+  deployment guarantees. Record their workload rationale, enforcement point,
+  and owner acceptance; keep performance targets under Q4 separately open.
+- **False cleanup guarantees (high impact, medium likelihood):** an unwind
+  table can hide future cancellation. Give every await boundary a separate
+  cancellation row and define what the supervisor can still observe.
+- **Specification drift (high impact, medium likelihood):** proving a model
+  alone cannot establish async behaviour. Require a representation relationship
+  and generated runtime trace comparisons in the later implementation slice.
+- **Unbounded custom code (high impact, medium likelihood):** checking renderer
+  output after allocation does not bound its allocations or execution time.
+  Document trusted application code and use an independent static timeout path.
+- **Baseline tooling failure (medium impact, medium likelihood):** document
+  the failing gate and log; repair only within authorized scope. A failed or
+  missing check must not be reported as passed.
+
+## Progress
+
+- [x] (2026-10-12) Inspected branch ownership, repository guidance, roadmap,
+  design, ADRs, and testing references; renamed the local branch as requested.
+- [x] (2026-10-12) Two Wyvern agents gathered pilot and contract evidence;
+  CodeGraph confirmed the library remains a stub.
+- [x] (2026-10-12) Researched protocol and tooling boundaries with Firecrawl.
+- [x] (2026-10-12) Completed six-perspective expert review and incorporated
+  its ownership, streaming, verification, and evidence corrections.
+- [x] (2026-10-12) Passed formatting, Markdown/spelling, Mermaid, lint, and
+  test gates sequentially; checked every local document reference.
+- [x] (2026-10-12) Published planning commit `6414fda` as draft
+  [PR #26](https://github.com/leynos/peregrine-web/pull/26).
+- [x] (2026-10-12) The requesting user explicitly approved execution by
+  invoking `/sdlc-implementation` with this plan slug in
+  [the implementation session](https://lody.ai/leynos/sessions/724e71be-1ca2-49c9-a6c9-3aff69b0aeac).
+  This approves execution only; no individual pilot authority is inferred.
+- [x] (2026-10-12) Inspected the clean checkout, matching PR head/base,
+  ToR §9, and PR comments/reviews. No Q1/Q2/Q6 acceptance evidence was found.
+  Requested the named authority, reviewer/operator, workload/comparator,
+  protocol scope, proxy policy, and upgrade requirements from the user.
+- [x] (2026-10-12) The owner confirmed a one-person operation and selected
+  a Peregrine reimplementation of `leynos/mornington` as the pilot. Recorded
+  the authority/reviewer/operator roles and pinned Actix-design comparator in
+  ToR §9.1; no separate external customer acceptance is required.
+- [x] (2026-10-13) M1: the owner explicitly accepted HTTP/1.1 behind
+  Traefik, configured trusted proxy peers, JSON long polling, no upgrades, and
+  deferred HTTP/2/native TLS as a solid proving ground. A1/A2 are recorded in
+  ToR §9.1; buffered/streaming core and separate Pachislot scope are retained.
+- [x] (2026-10-13) M1 acceptance and all required gates passed; CodeRabbit
+  0.9.0 completed full coverage and two repair deltas. The final delta at
+  `30d288d` reported zero findings. Original logs and dispositions are retained.
+- [x] (2026-10-13) Prepared L01–L38 ordinary-exit, C01–C13 interruption,
+  E01–E09 precedence, H01–H06 content/framing, and CFG01–CFG33 configuration
+  tables in the design. Linked ADR ownership and V1–V8 future evidence.
+- [x] (2026-10-13) Applied all six expert perspectives and obtained an
+  independent table reading. Four concrete outcomes were derivable; clarified
+  header-count rejection, real suspension points, and encoded diagnostic bounds.
+- [x] (2026-10-13) Initial M2 tables/guides passed all required gates
+  (295 tests passed, one suite-defined skip). The committed seven-file CLI
+  review completed; its two valid findings are repaired: CFG03 exhaustion now
+  has L38/E09 and framing interruption has C13. Repair gates/review follow.
+- [x] (2026-10-17) The owner approved CFG01–CFG33 for the proving ground
+  only, requiring every parameter to be revisited with evidence afterwards
+  before 1.0 acceptance. Recorded that release gate in design §9.2, ToR §9.2,
+  ADR 003, and guides. CFG08 remains 512 KiB.
+- [x] (2026-10-17) Recorded Mornington's explicit hexagonal architecture and
+  validation through existing application ports, with fixed domain/driven-port
+  fixtures, direct-domain oracles, and separate HTTP/transfer assertions.
+- [x] (2026-10-17) M2: all required sequential gates passed for the accepted
+  configuration/stream-admission candidate; committed CLI review of `c062536`
+  covered the six changed documents with no unresolved valid concern. Exact
+  candidate identities, commands, exits, and logs are retained in the delivery
+  ledger; hosted assessment remains a separate PR-delivery gate.
+- [x] (2026-10-13) M3 guide updates are drafted with proposed-contract and
+  runtime/proof limitations explicit. Final conformance and roadmap completion
+  remain dependent on accepted M2 defaults and validation.
+- [x] (2026-10-17) M3: reconciled A1–A7 below, guides, and downstream evidence
+  ownership. Marked only roadmap 1.1.1/1.1.2 done. Added the proving-ground
+  review obligation to 6.2.2 and Mornington port validation to 1.3.2, retaining
+  those tasks and all runtime/proof work as unfinished. The final documentation
+  candidate must pass every gate before this completion record is committed.
+
+## Surprises & discoveries
+
+Worst-case JSON escaping of the pilot's 64 KiB Markdown plus 4 KiB metadata
+requires 417,792 octets before other envelope fields. The proposed buffered cap
+is therefore 512 KiB, rather than the initially suggested 256 KiB. This is a
+workload rationale, not a capacity measurement. Static 500/504/admission-503
+bodies contain 59/64/69 octets and fit the minimum 128-octet renderer cap.
+
+Hyper 1.12.0 exposes separate count, aggregate-header/start-line/trailer, and
+parser-buffer controls; its header timer is required, and its buffer minimum is
+8,192. Targeted RFC prose corrected structured extraction of 205 semantics: 205
+must have no content, while zero Content-Length remains allowed. No new
+dependency is installed or pinned by this evidence.
+
+The M1 CLI review dated its observations in UTC and called the local 2026-10-13
+approval premature. The session uses Europe/Berlin: its 2026-10-12 22:50 UTC
+review start was 2026-10-13 00:50 locally. The owner had already explicitly
+accepted the boundary. ToR now states the date convention; no accepted decision
+is reopened on that incorrect premise. The valid index wrapping finding is
+fixed with a shorter inline link label.
+
+The owner confirmed that this is a one-person operation and selected a
+Peregrine reimplementation of Mornington as the pilot. This resolves the
+previously missing human roles and workload without requiring an external
+customer. Mornington revision `43a0046efdf06faaefb7bcc2d37877f059825b88`
+contains scaffolding and an Actix-based design, not an implemented forum. Its
+observation contract uses bounded JSON long polling and explicitly excludes
+SSE/WebSockets. The owner accepted the HTTP/1.1/secure-ingress boundary and
+explicit trusted-proxy policy on 2026-10-13. No human-role or protocol blocker
+remains.
+
+A repeated execution-intake test gate blocked in an inherited Lody Git shim
+inside a build-contract fixture. The gate owner verified and terminated only
+that validation run's process chain; the gate exited 143 and is not a pass.
+Final validation uses the clean Git environment required by the supplied agent
+instructions, preserving compiler admission and shared caches. No daemon or
+unrelated process was signalled. The subsequent clean-environment test run
+failed with a child-process spawn error (`Resource temporarily unavailable`)
+and two build-contract assertions. Preserve that failed log separately; use
+`NEXTEST_TEST_THREADS=2` for the next complete gate run to reduce process
+demand without excluding tests or changing their expectations.
+
+The source design already specifies independent reverse response hooks and
+error precedence, but deliberately leaves all operational defaults to 1.1.2.
+The work is to close decisions and make a complete, auditable contract; it is
+not permission to invent an alternative lifecycle.
+
+`src/lib.rs` only exports `greet()`. `Cargo.toml` has no runtime dependencies;
+its test dependencies include `rstest` and `proptest`. There is no Verus target
+in `Makefile`. Existing green tests establish repository tooling health, not
+framework conformance.
+
+The toolchain is `nightly-2026-08-27`. `.cargo/config.toml` uses Cranelift and
+parallel frontend flags; `Makefile` leaves `POLONIUS_FLAGS` empty by default.
+The ambient borrow-checker posture is **unknown** until a selected-compiler
+canary establishes it. This plan makes no borrow-sensitive implementation
+recommendation; the later spike must use the Rust Router canary through Cargo,
+preserving wrapper admission, before attributing acceptance to Polonius.
+
+## Decision log
+
+- (2026-10-17, owner acceptance) Accept CFG01–CFG33 solely for the Mornington
+  proving ground. Revisit every value after the exercise with reproducible
+  evidence and explicit retain/revise decisions before 1.0 parameter
+  acceptance; Q4 remains open. Use Mornington's existing hexagonal application
+  ports for independent domain oracles and paired driving-adapter validation.
+  No runtime code, new port, or deployed Actix comparator is introduced here.
+
+- (2026-10-13, M2 specification) Preserve the agreed independent reverse
+  lifecycle and first-cause/public-failure distinction. Use 30,000 ms execution
+  for the pilot's 25,000 ms polls, finite independent admission/body/drain
+  caps, explicit StrictHeaderSafe correlation, and finite core metric
+  vocabularies. At that date CFG01–CFG33 remained proposed operator defaults;
+  the 2026-10-17 entry above records their later proving-ground-only approval.
+- (2026-10-13, review) Apply architecture, alternatives, performance,
+  contracts, reliability, and maintainability lenses. Retain existing owners
+  over a new scheduler; correct JSON buffering and header rejection; separate
+  synchronous non-pre-emption from actual cancellation points. The independent
+  reader derived forward 403, responder 409 then hook-failure 500, HEAD 504,
+  and committed body-cap termination. These are specification oracles, not
+  tests.
+
+- (2026-10-13, M1 CLI review) CodeRabbit 0.9.0 reviewed committed `3cc17d9`
+  against `de6b900`, with complete coverage and two minor findings. Fix the
+  93-column index link. Reject the future-date premise using the supplied
+  Europe/Berlin session date and the recorded UTC/local review timestamps; make
+  the ToR date convention explicit. Renew gates and repair review.
+
+- (2026-10-13, owner acceptance) Close the pilot Q1/Q2/Q6 decision slice
+  using the owner's explicit acceptance in the linked implementation session.
+  Proceed to M2 without inventing a customer, accepting the proposed lifecycle
+  ADR, or claiming measured release readiness.
+
+- (2026-10-12, owner clarification) Select the Mornington reimplementation
+  instead of the synthetic task/annotation specimen. The sole project owner
+  holds authority, reviewer, and operator roles. Pin the existing Actix-based
+  design as comparator and keep the application's delegated-grant and durable
+  storage responsibilities out of middleware. Protocol acceptance is requested
+  separately under Q2; no deployed-service or capacity claim is made.
+
+- (2026-10-12, execution) Record the user's explicit implementation request
+  as plan approval. Stop at M1 because A1/A2 lack named authority and explicit
+  pilot/deployment acceptance. The user can accept the proposed synthetic
+  scenario with named roles and scope, or supply a real workload and
+  comparator. A synthetic review cannot establish deployment demand. No
+  contract default, ADR acceptance, or roadmap completion follows from
+  execution approval.
+
+- (2026-10-12, execution) Remove inherited Lody Git routing from the
+  final gate environment after observing a blocked Git-backed fixture. Retain
+  the interrupted gate log and validate the final candidate again; do not
+  change product contracts or count the interrupted run as successful.
+- (2026-10-12, planning) Limit this plan to 1.1.1 and 1.1.2. The roadmap assigns
+  compilation to 1.1.3 and exhaustive transition proof to 1.2.2. Advancing
+  those here would bypass their dependencies and the requested approval gate.
+- (2026-10-12, planning) Propose a protected task/annotation service as the
+  review specimen because the hexagonal case study already motivates it. The
+  pilot deployment, reviewer, operator, and decision authority remain
+  unconfirmed; M1 must obtain evidence rather than claim acceptance.
+- (2026-10-12, planning) Specify the abstract lifecycle and candidate lemmas
+  before API signatures. Retain proof sketches in prose until the pure kernel
+  exists; defer solver triggers and auxiliary algebra to the proof milestone.
+- (2026-10-12, planning) Use conventional review for this documentation slice.
+  Assign executable tests and Verus obligations to their owning roadmap tasks
+  explicitly; adding tests that merely search prose would not validate
+  semantics.
+
+## Outcomes & retrospective
+
+M1–M3 documentation implementation is complete. A1/A2 have explicit owner
+evidence; M2 has A3/A4 tables, proving-ground-only A5 approval on 2026-10-17,
+A6 proof sketch/traceability, and completed local gate/review coverage. M3
+reconciles the guides and acceptance mapping. Only roadmap 1.1.1 and 1.1.2 are
+complete; 1.1.3, runtime work, executable proofs, and benchmarks remain
+unfinished. The final documentation candidate is committed only after all
+required gates pass. Hosted checks, completeness/correctness assessment,
+readiness, formal review, and merge are tracked separately in the delivery
+ledger, not inferred from this implementation status.
+
+Historical execution intake verified PR #26 against local head `6414fda` and
+base `de6b900`. At that snapshot only the execution record had changed; A1–A7
+remained incomplete. No upstream requirement, runtime interface, dependency, or
+trust boundary has changed. The owner has since supplied the Mornington pilot
+and human roles. M1 was accepted on 2026-10-13; M2 can proceed after milestone
+validation/review. Execution-intake formatting, Markdown and spelling, Mermaid,
+lint, and test gates passed sequentially with exit code zero. Tests reported
+295 passed and 1 skipped; doctests had no cases. Logs are under `/tmp/` with
+the worktree UUID and branch in their names and the suffix
+`-execution-intake.out`. The planning results below remain historical evidence
+for their original candidate.
+
+The six-perspective review found no blocking design flaw. Its concerns led to
+exact downstream task assignments, body-owner transfer accounting, explicit
+streaming-limit exits, observable transient buffer bounds, versioned upstream
+evidence, and explicit formatter restaging. The scope remains decision closure
+with later proof delivery. The pilot boundary is now accepted; no runtime
+feature, formal proof, or roadmap completion is claimed. Record review changes,
+measured gate results, and the draft PR here before handoff. At implementation
+completion, compare M1–M3 evidence to the purpose above and reconcile every
+affected upstream assumption before changing status to COMPLETE.
+
+## Context and orientation
+
+Start with [documentation contents](../contents.md) and
+[repository layout](../repository-layout.md). The terms of reference explain
+why the project exists; the technical design proposes its contracts. A resource
+is the shared application object containing operations, dependencies, and
+policy. A responder is its HTTP-method operation. A response draft can still
+change; commitment is the final response handoff to Hyper. An ordinary exit
+means the future is driven to completion through success or a returned error,
+excluding cancellation and panic.
+
+Read these sources before M1 and revisit their affected sections after M2:
+
+- [Terms of reference](../terms-of-reference.md), especially goals G1/G2/G4,
+  success criteria, and Q1/Q2/Q6 in §9.
+- [Technical design](../peregrine-design.md), §§1, 3–9, 11, and 12.
+- [Hexagonal application case study](../hexagonal-application-case-study.md),
+  especially E1/E2 and the small consumer specimen in §6.
+- [Pachislot extension design](../pachislot-extension-design.md), including
+  correlation, HTTP/session ownership, and compatibility experiments X1–X5.
+- [Compiler experiment](../polonius-ownership-experiment.md) and
+  [ADR 002](../adr-002-compiler-ownership-experiment.md): experimental compiler
+  benefits remain a separate decision.
+- [ADR 001](../adr-001-resource-aware-lifecycle.md): lifecycle ownership.
+- [ADR 003](../adr-003-http-integration-boundaries.md): HTTP integration.
+- [ADR 004](../adr-004-application-port-boundaries.md): application ports.
+- [ADR 005](../adr-005-extension-and-upgrade-boundaries.md): session ownership.
+- [ADR 006](../adr-006-extension-interface-stabilization.md): stabilization
+  gates.
+- [Developer guide](../developers-guide.md) and
+  [documentation style guide](../documentation-style-guide.md).
+- [Dependency-injection testing guide](../reliable-testing-in-rust-via-dependency-injection.md):
+  inject environment, clock, randomness, and outbound dependencies.
+- [Fixture guide](../rust-testing-with-rstest-fixtures.md) and
+  [BDD guide](../rstest-bdd-users-guide.md): finite cases and reusable fixtures.
+- [Doctest guide](../rust-doctest-dry-guide.md): executable public examples,
+  with private edge cases in ordinary tests.
+- [Complexity and refactoring guide](../complexity-antipatterns-and-refactoring-strategies.md):
+  coherent functions, command/query separation, and existing-helper discovery.
+
+Use the `execplans`, `codegraph-mcp`, `rust-router`, and `firecrawl-mcp`
+skills. For verification selection, consult `rust-verification`, then `verus`
+when implementing the proof. Use `logisphere-experts` for design review and
+`pr-creation` and `commit-message` for delivery. Skills are procedural aids;
+this plan contains the contract and must remain usable without agent memory.
+
+## Conformance basis
+
+The baseline is commit `de6b900d08b2a7ffc798dca47e40ea997dcbc267`: terms of
+reference draft v0.3 and technical design proposed v0.5, both dated 2026-09-21,
+plus ADRs 001–006 at that commit. These ADRs remain proposed. Normative HTTP
+semantics come from RFC 9110; the design deliberately defines only a subset.
+The current target is ToR v0.4 with accepted Mornington scope and design v0.6
+with the contract tables; ADR 001/003 status remains proposed. Retrieved
+tooling documentation, including Hyper 1.12.0, is research evidence, not a
+locked or compatibility-tested dependency set.
+
+| Source requirement or gap                                     | Milestone | Acceptance evidence                                                   |
+| ------------------------------------------------------------- | --------- | --------------------------------------------------------------------- |
+| G1/G4; Q1; 1.1.1                                              | M1        | A1: named pilot and comparative review scenario                       |
+| Q2/Q6; design §§1/12; ADR 006                                 | M1        | A2: named authority, operator requirements, explicit scope acceptance |
+| G2; design §§3/5–8; ADR 001; 1.1.2                            | M2        | A3: exhaustive ordinary-exit and cancellation tables                  |
+| Design §7; ADR 003                                            | M2        | A4: error precedence, safe presentation, and commitment matrix        |
+| Design §9; ADRs 003–005                                       | M2        | A5: complete validated configuration and ownership tables             |
+| Design §11 I1–I6; G4                                          | M2/M3     | A6: proof sketch and downstream verification assignments              |
+| User/developer documentation; requested completion discipline | M3        | A7: reconciled sources, green gates, accepted task completion         |
+
+_Table 1: Selective traceability from requirements to evidence._
+
+The completed documentation acceptance maps as follows:
+
+- A1/A2: ToR §9.1 names Mornington, the sole owner and review/operator roles,
+  the pinned Actix-design comparator, workload, proxy policy, and accepted
+  HTTP/1.1/Traefik scope. ToR §9.2 records the later limited parameter approval
+  and hexagonal validation seam; Q3–Q5 and release readiness remain open.
+- A3: design §§6.1–6.2 define L01–L38 ordinary exits and C01–C13 interruption
+  boundaries, including zero hooks, partial reverse prefixes, and body handoff.
+  The independent reader derived forward 403, hook-failure 500 after responder
+  409, HEAD 504, and committed-transfer termination from the tables.
+- A4: design §§5.1/7.2 define H01–H06 content rules and E01–E09 failure
+  selection, bounded presentation, pre-commit fallbacks, and immutable sent
+  status. ADR 003 assigns engine, application, transport, and body ownership.
+- A5: design §9.2 fills every CFG01–CFG33 unit, default, range, validation,
+  scope, enforcement, outcome, and opt-out cell. Its owner approval is solely
+  for the proving ground; per-row evidence and retain/revise decisions after
+  the exercise gate 1.0 parameter acceptance. Hyper 1.12.0 links identify the
+  researched enforcement surface, not an installed or tested dependency.
+- A6: design §§11/11.1 and this plan's V1–V8 assignments connect each invariant
+  to future proof/test tasks, premises, witnesses, and negative controls. These
+  are prose sketches; no executable proof or production refinement is claimed.
+- A7: the user/developer guides agree with the canonical design and ADRs; the
+  contents/layout index the plan; roadmap 1.1.1/1.1.2 retain their acceptance
+  text and are marked done. Required final gates are enforced before commit.
+  Review covered architecture, alternatives, performance/observability,
+  contracts, reliability, and maintainability; no unresolved semantic
+  counterexample or unapproved scope deviation remains.
+
+Change a traced decision only after checking its upstream assumptions and later
+consumers. In particular, transport changes affect Q2, ADRs 003/005/006, and
+roadmap 1.4/7.3; lifecycle changes affect I1/I2 and roadmap 1.2.2/2.1.3.
+
+## Verification plan
+
+### Abstract model before implementation
+
+Specify a request independently of Rust storage as a phase, a fixed ordered
+middleware sequence, an optional frozen resource identity and effective method,
+a monotonic forward-stop reason, a dispatch count, a response-hook cursor,
+private primary failure, selected public failure, and a commitment flag. Keep
+ordinary execution and external cancellation as distinct transitions.
+
+Initially, dispatch count is zero, no response hooks have run, commitment is
+false, and routing is unset. Initialization can establish a pending failure.
+Request hooks may change the effective URI until routing freezes the target.
+Only a successfully matched, authorized, active request can dispatch. Record
+dispatch before invoking the responder so a responder failure cannot re-enter
+it. Completion and failure disable every remaining forward action. Every
+ordinary path enters reverse response processing, then selects/render errors
+and finalizes once. Cancellation enters an interrupted terminal state and does
+not synthesize response-hook completion. A supervisor may separately construct
+a pre-commit timeout response.
+
+The representation relationship for later code must map its phase and private
+state to this model, its hook indices to positions in the fixed sequence, and
+its trace events to model transitions. The same resource identity must appear
+at policy and dispatch. Each awaited hook may produce an ordinary successor or
+an interruption; it must never grant access to reset the stop state. A proof of
+the abstract model alone does not establish that this relationship holds.
+
+### Obligations, methods, and witnesses
+
+| ID      | Contract and proposed semantic lemma                                                                                                                                                                                                                  | Method and artefact owner                                                                                                                                                             | Non-vacuity and discharge                                                                                                                                                                 |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1 / I1 | From a valid initial state, every permitted transition preserves dispatch count at most one; after stop, no later transition dispatches. Candidate lemmas: stop is preserved, dispatch requires active state, and dispatch consumes that eligibility. | Unbounded Verus proof of the later pure transition kernel, roadmap 1.2.2; generated runtime traces in 2.1.3 and lifecycle implementation.                                             | Witness zero hooks with one successful dispatch and a stopped request with zero dispatches. Deliberately permit a second dispatch or clear stop: verification must fail.                  |
+| V2 / I2 | Ordinary completion visits exactly the reverse middleware sequence once, including hooks without forward setup; hook failure does not truncate it.                                                                                                    | `proptest` over lengths and stop/failure positions, plus finite `rstest` examples; roadmap 1.2.2 and 3.1.3.                                                                           | Include zero/one/three hooks, every failure phase, and failure in first/last reverse hook. A skip or duplicate mutation must fail. Cancellation is excluded explicitly.                   |
+| V3 / I3 | Denied policy never invokes the responder, and policy and dispatch use the same frozen resource.                                                                                                                                                      | Finite policy/identity/method `rstest` cases and `rstest-bdd`; roadmap 1.1.3, 4.1.1–4.1.3, and 4.2.1.                                                                                 | Accepted identity reaches responder once; missing/wrong-tenant identity reaches it zero times. Swapping the resource or bypassing denial must fail.                                       |
+| V4 / I4 | Checked collection cannot exceed its byte cap; failed or transferred consumption cannot become cached success.                                                                                                                                        | Frame-partition and state-sequence `proptest`; roadmap 5.1.1 and 5.2.1–5.2.3.                                                                                                         | Empty frame, exact cap, cap plus one, lying length, partial failure, repeated read. Check before append; a post-append check mutation must fail.                                          |
+| V5 / I5 | Finalization applies the selected failure and mandatory HTTP constraints once, without changing application effects or a committed status.                                                                                                            | Finite protocol/error tables, `insta` presentation snapshots, and socket tests; roadmap 3.1.3–3.1.4, 3.2.2, and 5.2.2.                                                                | 409 then hook failure yields sanitized 500; HEAD errors have no content; post-commit body failure cannot emit another response. Status restoration and stale framing mutations must fail. |
+| V6 / I6 | Public async values meet the selected `Send` and ownership bounds; request borrows cannot escape into streams or detached tasks.                                                                                                                      | `trybuild` pass/fail pairs in 1.1.3 and phase 2.                                                                                                                                      | Positive owned escape and negative borrowed escape; record compiler diagnostics and reject unrelated compile failures.                                                                    |
+| V7      | Correlation is engine-owned and consistent across configured echo/presentation; private causes never enter safe details.                                                                                                                              | Finite correlation/profile cases, byte-boundary properties, redaction sentinels, and normalized snapshots; roadmap 1.4.1, 3.1.3, 6.1.1, and 7.4.1.                                    | Exercise duplicates, invalid bytes, untrusted input, generator failure, echo off, fallback, and later hook failure. Inject a secret sentinel and reject its appearance.                   |
+| V8      | Validated limits are finite unless a named opt-out permits otherwise; permits remain accounted for until their documented release boundary.                                                                                                           | `rstest` invalid/boundary configuration cases, generated numeric boundaries, deterministic cancellation and real transport tests; roadmap 3.2.1, 5.1.1, 5.2.1–5.2.3, and 6.1.1–6.1.4. | Minimum/maximum, zero, overflow, stalled peer, dropped stream, and shutdown expiry. Premature permit release must be observable.                                                          |
+
+_Table 2: Verification obligations and their later executable evidence._
+
+For V4, inspect the bound after every collection transition and observe peak
+retained buffer length or use an injected bounded sink. A test observing only
+the returned error cannot detect append-then-discard. The measured quantity is
+the accumulator, excluding upstream frame allocation.
+
+The lemma statements are hypotheses about a useful proof structure, not fixed
+proof decomposition. M2 must pressure-test them against every contract row and
+record counterexamples before selecting public API shapes. V1 warrants Verus
+because it claims safety for every finite execution length. Do not formalize
+JSON formatting, ordinary adapter wiring, or documentation synchronization.
+Kani is not additionally required: bounded exploration would not replace V1's
+unbounded guarantee; cheap properties and explicit protocol cases suit the
+other obligations. Reassess if implementation exposes a different invariant.
+
+For this slice, A3–A6 are review evidence: tables, reachable trace examples,
+preconditions, and proposed lemmas. They do **not** discharge V1–V8 for a
+runtime. M3 must leave that distinction explicit in the design.
+
+### External premises and residual gaps
+
+Assume ordinary futures are polled to completion and their hooks terminate;
+reverse-hook completion is conditional on that premise. Dropping futures and
+runtime termination can prevent progress. A deadline is a cooperative runtime
+boundary, not pre-emption of synchronous application code. Assume upstream body
+frames and HTTP parsing follow the chosen version's documented interface; frame
+allocation before framework receipt is outside its collection bound. Assume
+Rust's ownership checker and the Verus verifier/compiler toolchain are sound
+within their documented trusted bases. Do not attempt to prove Tokio, Hyper,
+serializers, or application authorization internals.
+
+External ingress authentication and application-owned effects require their own
+operational evidence. A safe public error does not prove private logging is
+secret-free. A fixed renderer-output cap bounds accepted encoded bytes, not
+arbitrary renderer allocation or running time. Enforce framework-owned budget
+logic against actual adapters when they exist, retaining these residual gaps.
+
+### Downstream test and proof handoff
+
+When each later implementation is approved, first add the smallest failing
+unit/behavioural case, record the expected red failure, implement the minimum
+change, then refactor and run the full gates. Use `rstest` fixtures and case
+tables, `googletest` matchers for semantic assertions, and `pretty_assertions`
+for structured trace diffs, with custom diagnostic messages. Both assertion
+libraries are authorized dependencies; introduce compatible caret versions in
+the owning implementation, not in this documentation slice. Upstream documents
+`rstest` integration; if using non-fatal assertions, place `#[gtest]` before
+`#[rstest]` and verify each generated case runs once.[^googletest]
+
+Proposed future paths are `tests/lifecycle_contract.rs`,
+`tests/features/lifecycle_contract.feature`, `tests/http_finalization.rs`,
+`tests/configuration_contract.rs`, and `verus/lifecycle.rs`. They do not exist
+as a consequence of this plan. Keep BDD bindings in ordinary Rust integration
+tests so `make test` executes them. The following feature specifies
+representative oracles; expand it from A3/A4 when implementing the lifecycle.
+
+```gherkin
+Feature: Resource-aware lifecycle outcomes
+  Scenario: Completion before routing
+    Given middleware A, B, and C in registration order
+    When B completes the request before routing
+    Then the trace is A.request, B.request, C.response, B.response, A.response
+    And no responder is invoked
+
+  Scenario: Response failure overrides a domain conflict
+    Given a responder returns a private domain conflict mapped to 409
+    When C's response hook fails and B's response hook also fails
+    Then all response hooks run once in reverse order
+    And the selected public failure is a sanitized 500
+    And private diagnostic causes do not appear in the response
+
+  Scenario: Supervised timeout before commitment
+    Given a HEAD request is suspended in a responder
+    When the request execution deadline expires before commitment
+    Then the supervisor produces a minimal 504 with no response content
+    And no remaining response hooks are promised
+
+  Scenario: Failure after commitment
+    Given response headers have been handed to the transport
+    When the response body fails
+    Then the transfer terminates without a replacement status
+    And the transfer failure is recorded separately from application effects
+```
+
+Use `insta` for default/custom/fallback error representations and stable
+traces, normalizing clocks and generated IDs while also asserting semantic
+status, header, and secrecy rules. Use end-to-end socket tests for parser
+rejection, HEAD/framing, streaming, timeouts, disconnect, and shutdown.
+In-process traces alone cannot establish wire behaviour. Inject clocks,
+environment, identity, generators, and application ports; only child processes
+may receive mutated environments. Keep public doctests executable once the API
+exists.
+
+Roadmap 1.2.2 must add the proof entrypoint and pinned tool metadata, then run
+`prover-tools verus run --proof-file verus/lifecycle.rs` through a proposed
+`make verus` target. That command is a future acceptance requirement, not an
+existing gate. Record verifier version, solver/toolchain identity, successful
+verification with zero errors and no admitted obligations, and the negative
+control failure. Also run `make check-fmt`, `make lint`, and `make test` at
+that proof milestone. A skipped proof cannot satisfy it. Generated trace tests
+must continue to connect the pure kernel to async execution; the proof cannot
+replace integration tests. Defer auxiliary induction lemmas and solver tuning
+until the actual verification conditions exist.[^verus]
+
+## Plan of work
+
+### M1 — Confirm the deployment and decision authority
+
+Use the owner-selected **Mornington forum reimplementation** recorded in ToR
+§9.1. The sole project owner is the authority, pilot reviewer, and operator.
+Compare protected thread/topology reads, reply creation, and bounded JSON long
+polling against Mornington's pinned Actix-based design. Application services
+own delegated authorization, idempotency, and durable storage. No existing
+forum implementation or deployment is claimed. Do not implement Mornington or
+change its repository in this documentation slice.
+
+In `docs/terms-of-reference.md` §9 record the actual named service/workload,
+individual decision authority, pilot reviewer and operator (one person may hold
+multiple roles), date, and durable approval evidence. Record its current
+framework/comparator and how reviewers will compare locating policy, adding an
+operation, and explaining rejection without duplicating policy registration. A
+synthetic fixture is acceptable for architecture review only if the owner
+explicitly accepts that limitation; it is not evidence of deployment demand.
+
+Confirm or revise: one `peregrine-web` library, in-process execution and
+HTTP/1.1 serving, external secure ingress, buffered and streaming core, with
+HTTP/2/native TLS deferred and Pachislot delivery separate. Specify trusted
+proxy configuration and whether the pilot needs upgrades now or later. Reconcile
+`docs/peregrine-design.md` §§1/12 with the accepted boundary and ADR
+006. If this changes scope materially, record the deviation and seek approval.
+Keep Q3/Q4/Q5 open for their actual API, measurement, and compiler evidence.
+
+**Acceptance A1/A2:** a named reviewer can describe the use case and
+comparison; a named authority explicitly accepts the deployment and maintenance
+scope. No placeholder owners or inferred sign-off remain. Run the sequential
+gates, record conformance and evidence, then commit the coherent decision set.
+If acceptance is unavailable, remain at M1; M2 cannot complete against an
+invented pilot. Recovery is to revise the proposed decision without claiming
+closure.
+
+### M2 — Specify lifecycle, errors, and operational configuration
+
+After M1, edit `docs/peregrine-design.md` §§3 and 5–9 with stable contract-row
+identifiers. Link the lifecycle table from ADR 001 and put ownership and budget
+decisions in ADR 003. Keep a single normative definition per contract, using
+cross-references elsewhere. Record alternatives and rationale for substantive
+changes. Do not promote ADR 001 to Accepted before its separate spike and trace
+prerequisites are satisfied.
+
+For A3, each row must identify entry phase, route/resource availability,
+remaining forward work, responder count, response-hook sequence, selected
+outcome, commitment state, and cleanup/diagnostic guarantees. Cover all of:
+
+- Initialization/correlation rejection; request completion or failure; success;
+  route miss; resource completion or policy failure; responder failure.
+- Recognized unsupported methods (405 and `Allow`), unknown methods (501),
+  automatic and explicit OPTIONS, `OPTIONS *`, explicit HEAD and GET fallback,
+  HEAD short circuits/errors, and forbidden informational final responses.
+- Body limit (413), unsupported media (415), malformed JSON (400), body-read
+  deadline (408), body transport errors, and invalid/repeated consumption.
+- Request-stream idle expiry and total-byte exhaustion before and after
+  response commitment; response-stream idle expiry after commitment.
+  Distinguish ordinary error unwinding, execution cancellation, and transfer
+  termination without status replacement, including request ingestion owned by
+  a response stream.
+- Rejection with an unread request body: close after a safe response, or close
+  immediately if framing prevents it; do not drain unbounded input.
+- Response-hook failures at every reverse position, multiple failures, error
+  presentation invalidation, renderer error, and output-budget failure.
+- Future drop at initialization, every awaited forward/response hook and
+  responder, pre-finalization, and response-body transfer; supervised execution
+  expiry (504 before commitment), disconnect, panic, runtime shutdown, and
+  graceful-drain expiry. State which boundaries cannot produce an HTTP response.
+
+Cross the ordinary response cases with HEAD/204/304 constraints. Check 205's
+no-content requirement against RFC 9110 as a targeted design gap; record its
+resolution rather than copying the existing subset blindly.[^http] Do not
+promise arbitrary 1xx outcomes or upgrade semantics in the ordinary finalizer.
+
+For A4, separately tabulate first forward failure, completion followed by
+failure, first response-hook failure, subsequent hook failures, renderer
+failure, timeout, and committed body failure. Preserve private first cause; the
+first response-hook failure selects sanitized 500, later failures do not stop
+unwind, and subsequent failures invalidate presentation overrides. Clear
+partial-success bodies and stale representation headers. Derive required
+headers from the selected typed failure, document the safe-header allowlist,
+and retain correlation according to configured echo policy. An original 401's
+challenge or 405's `Allow` must not leak into a replacement 500 by accident.
+
+Name the deterministic tie rule for simultaneous timeout/completion readiness,
+the timeout clock's start and end, and the commitment check. Specify bounded
+secondary-error recording when capacity is exhausted. Define a
+generator-failure outcome without claiming a correlation guarantee that cannot
+be met. Choose the static fallback's exact safe envelope and how it fits the
+minimum output cap. These are decisions to close with evidence, not unspecified
+implementation choices. A synchronous renderer cannot be interrupted
+cooperatively; state its trusted-code contract and keep it off the supervisor's
+timeout response path.
+
+For A5, build a configuration table with these mandatory columns: name, typed
+unit, default, allowed range, cross-field validation, scope, enforcement point,
+exceedance outcome, and explicit opt-out. Every row must have a concrete agreed
+default before M2 completes. Missing values and zero must never mean unlimited.
+Choose values with the pilot operator and record a workload rationale; do not
+present upstream defaults as measured Peregrine release budgets.
+
+| Required configuration family                         | Required distinctions and review decisions                                                                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accepted connections and concurrent request execution | Positive counts; before-accept admission versus request permit; waiting/backlog policy; permit release versus live transfer accounting                                                |
+| Header parsing                                        | Header count, aggregate bytes including start line, parser buffer bytes, read deadline in milliseconds; adapter-only rejection before context; timer dependency and backend minimum   |
+| Buffered request collection                           | Bytes and total read deadline in milliseconds; known and unknown lengths; validate before append and mark failed consumption                                                          |
+| Streamed request and response bodies                  | Request total bytes versus long-lived response transfer; idle deadline in milliseconds and what resets it; named total-byte opt-out without disabling idle/admission/drain accounting |
+| Whole request execution                               | Milliseconds from the defined admission/initialization boundary to commitment; queued-time treatment; supervised 504 versus ordinary body-read 408                                    |
+| Shutdown and accept retries                           | Drain milliseconds; retry count and minimum/maximum backoff milliseconds; terminal outcome and tracked-task accounting                                                                |
+| Correlation                                           | Header name, accepted syntax, byte limit, duplicate handling, peer trust, generator and failure policy, validation profile, echo default; immutable facts and propagation ownership   |
+| Safe error details                                    | Maximum item count, per-item and total encoded bytes, truncation/omission rules, and exclusion of submitted secrets                                                                   |
+| Error rendering and secondary diagnostics             | Maximum encoded representation bytes, bounded writer/check boundary, static fallback minimum, secondary failure count/bytes, overflow logging policy                                  |
+| Observability                                         | Bounded label vocabulary, unknown-method classification, no raw path/ID/secret labels, and distinct request/transfer/application outcomes                                             |
+
+_Table 3: Configuration inventory that M2 must resolve without placeholders._
+
+Define bytes as octets and document duration conversion/overflow validation.
+Reject invalid configuration before serving or application execution. Express
+opt-outs as named variants in the contract rather than sentinel integers; which
+concrete Rust types represent them belongs to the spike. Document which
+settings are enforced by in-process execution and which require the transport.
+Hyper's header-size limit, connection buffer, and header count are different
+controls; validate their selected-version semantics and timer requirements
+rather than treating one as a substitute for another.[^hyper]
+
+For A5, record the exact upstream version reviewed, version-specific method
+links, supported enforcement boundary, and residual gaps beside the table. The
+`latest` research link is not sufficient implementation evidence.
+
+In ADR 003 record a responsibility table: the engine owns immutable facts,
+phase transitions, failure selection, renderer invocation, required headers,
+and HTTP finalization; the application supplies policy, safe mappings,
+renderer/generator configuration, identity, durable effects, and lifespan
+cleanup; the body owner records transfer outcomes even in process. The
+transport owns parser/connection enforcement and integrates body outcomes into
+connection accounting. Preserve ADR 004's HTTP-independent ports and ADR 005's
+separation of request and session correlation. Document the limits of the
+renderer cap, logging cap, and cancellation guarantees explicitly.
+
+**Acceptance A3–A6:** walk every table row with concrete A/B/C traces and
+zero-hook cases, complete every configuration cell, and reconcile the abstract
+model and V1–V8 assignments. Record unresolved counterexamples as blockers. A
+second reviewer should derive the selected result without consulting author
+intent. Run all gates sequentially and commit. Recovery is a focused document
+revision; never weaken a guarantee solely to remove a review finding.
+
+### M3 — Reconcile guides and deliver the decision set
+
+Update `docs/users-guide.md` with a clearly labelled proposed-contract section
+or link: explain public behaviour, cancellation limitations, and configuration
+scope without advertising unavailable APIs. Put internal engine/application
+interfaces and proof-influenced invariants in `docs/peregrine-design.md` and
+ADR 003. Update `docs/developers-guide.md` with contract-row/test traceability,
+injected dependencies, and the later proof/test relationship. Update
+`docs/contents.md` for new documents and `docs/repository-layout.md` for the
+ExecPlan directory; no separate architecture document is needed because the
+technical design already owns these interfaces.
+
+Review all six expert perspectives: architecture, alternatives, performance and
+observability, contracts, reliability, and maintainability. Reconcile
+conflicting advice against G1/G2/G4 and record accepted/rejected findings with
+reasons. Do not substitute expert review for pilot-owner acceptance.
+
+**Acceptance A7:** verify A1–A6 are present and accepted as required, all
+guides agree with the design, and every downstream obligation has an owner
+task. Run all gates. Only after implementation of M1–M3 is complete, mark
+roadmap **1.1.1 and 1.1.2** checked and explicitly `done`, retaining their
+acceptance text. Do not mark all of 1.1 done: 1.1.3 remains outstanding. The
+original planning-only PR kept every roadmap item unchecked until execution.
+Use the `mapsplice` skill when making that later structural roadmap edit.
+Record approval and evidence, mark the executed plan COMPLETE, and commit the
+final coherent documentation.
+
+At each milestone record whether assigned requirements are satisfied, the
+approved design is followed, assumptions still hold, there is no unapproved
+API/dependency/trust/format change, and trace links remain current. No source
+compatibility machinery is needed: there is no implemented framework API.
+Recovery is to revert the specific milestone commit if necessary, preserving
+later independent work; do not reset a shared branch.
+
+## Concrete steps
+
+Run from the repository root on `1-1-resolve-decisions-to-mitigate-api-rework`.
+Before execution, read this plan, `AGENTS.md`, `git status --short`, and
+`git branch --show-current`; confirm approval evidence and the exact baseline.
+Keep unrelated work intact.
+
+For the plan PR and after every major implementation milestone, stage only
+intended documentation so the spelling gate includes the new files. Delegate
+full gates to the scrutineer agent and run these sequentially with shell
+pipeline failure propagation. Run formatting before checks; inspect its diff.
+
+```bash
+set -o pipefail
+make fmt 2>&1 | tee /tmp/fmt-peregrine-web-1-1.out
+make check-fmt 2>&1 | tee /tmp/check-fmt-peregrine-web-1-1.out
+make markdownlint 2>&1 | tee /tmp/markdownlint-peregrine-web-1-1.out
+make nixie 2>&1 | tee /tmp/nixie-peregrine-web-1-1.out
+make lint 2>&1 | tee /tmp/lint-peregrine-web-1-1.out
+make test 2>&1 | tee /tmp/test-peregrine-web-1-1.out
+```
+
+Run each command separately and stop on failure; do not continue merely because
+`tee` succeeded. Each must exit zero. `make markdownlint` includes spelling;
+`make test` includes doctests. Hosted `build-test` remains the authoritative
+repository gate; local results do not claim hosted success. Capture exact
+counts and logs after execution rather than inventing expected pass counts.
+Read a failing log before changing anything; rerun only after a relevant fix.
+
+For each green atomic milestone, inspect `git diff --check` and the staged
+diff, restage intended formatter changes, and verify staged and working copies
+agree. Then write an imperative commit message to a temporary file, and use
+`git commit -F` with that file. Preserve rollback points. No failed gate may be
+hidden by committing the documentation anyway.
+
+For this plan's delivery, use the standard GitHub client authenticated as
+`leynos`, a clean command environment as specified in `AGENTS.md`, and verified
+SSH identity. Push to the requested branch, fetch its explicit tracking ref,
+set upstream to `origin/1-1-resolve-decisions-to-mitigate-api-rework`, and
+compare local/remote SHAs. The original planning-phase instructions were to
+create a **draft** PR titled
+`Plan: Resolve decisions to mitigate API rework (1.1)` with a branch-wise plan
+link and a terminal References section containing this Lody session:
+<https://lody.ai/leynos/sessions/a4599fc6-f75b-46a1-9fdc-3116d6c5774c>. Read
+back title, body, draft state, and branch head. Those planning-phase approval
+conditions were later satisfied by the explicit implementation request and
+owner decisions recorded above; the 2026-10-17 request authorizes equilibrium
+and merge through pr-babysitting after its candidate-bound delivery gates.
+
+## Validation and acceptance
+
+This slice has no executable feature to drive Red-Green-Refactor. The nearest
+honest red evidence is the baseline's unassigned Q1/Q2/Q6 owners and incomplete
+contract/configuration tables. Green means A1–A7 are complete with explicit
+acceptance evidence and all repository gates passing. Review must reject a
+missing exit row, implicit unlimited setting, unsupported cleanup promise, or
+unassigned authority. That negative check validates the specification process;
+it does not prove the future framework.
+
+Runtime tests use the red/green procedure and BDD oracles above when their
+owning roadmap work starts. Do not create fake framework tests to make the plan
+appear executable. The plan PR is complete when reviewed, validated, committed,
+pushed, and available as a draft for approval. Roadmap task delivery is
+complete only after the approved M1–M3 work meets A1–A7.
+
+## Idempotence and recovery
+
+Documentation edits and gates can be repeated. Retain stable row identifiers
+when refining text and record superseded choices rather than silently losing
+acceptance history. Use one gate process at a time; wait for compile admission
+instead of launching a competing build. If disk capacity is exhausted, stop and
+report it. Do not kill unrelated processes, change the Lody daemon, or create
+isolated Cargo caches. Inspect broad formatter output and retain only necessary
+changes within scope, never discarding someone else's work.
+
+A partial push or PR failure does not require rewriting commits: inspect the
+remote head and existing PR before retrying. Refresh the remote-tracking ref
+after explicit-URL pushes. Publication alone does not establish approval; use
+the explicit owner decisions and candidate-bound review evidence above.
+
+## Interfaces and dependencies
+
+The documentation interface consists of the decision record in ToR §9,
+canonical contract/configuration tables in the design, and the responsibility
+and budget decisions in ADR 003. Their consumers are the ownership spike,
+lifecycle model, body/finalization implementation, transport adapter, and
+extension experiments. Every new abstraction later needs an equivalent-helper
+sweep and documented ownership, permitted callers, and composition rules.
+
+Do not freeze Rust signatures before M1/M2 or add runtime/test dependencies
+here. Later tests use the requested `rstest`, `rstest-bdd`, `googletest`,
+`pretty_assertions`, `insta`, and `proptest` where their evidence applies, plus
+`trybuild` for ownership. Verus is a separate verifier, not a Cargo dependency.
+Pin compatible tool versions and record them at the owning implementation
+milestone; the present research does not establish a tested dependency set.
+
+## Artefacts and notes
+
+Planning validation on 2026-10-12 passed `make fmt`, `make check-fmt`,
+`make markdownlint` (including spelling), `make nixie`, `make lint`, and
+`make test`, each with exit code zero. The scrutineer ran checks sequentially.
+Logs use `/tmp/<gate>-a4599fc6-f75b-46a1-9fdc-3116d6c5774c-` followed by
+`1-1-resolve-decisions-to-mitigate-api-rework.out`; the formatter log is
+`/tmp/fmt-peregrine-web-1-1.out`. Initial process-slot exhaustion delayed
+execution; no shared process or admission control was changed. Rust builds
+reported the managed cache unavailable and succeeded uncached. Hosted checks
+are separate evidence and are not claimed here.
+
+M3 validation on 2026-10-17 passed `make fmt`, `make check-fmt`,
+`make markdownlint` (including spelling), `make nixie`, `make lint`, and
+`make test`, each with exit code zero, sequentially on tree
+`d3b2a2ffba9d09b8adb12221c45927af7c45fd8e` (committed as `1a66d79`). Nextest
+passed 295 tests with one suite-defined skip; the doctest phase succeeded with
+zero cases. In particular, the final `make markdownlint` returned zero. Gate
+logs use `/tmp/<gate>-a4599fc6-f75b-46a1-9fdc-3116d6c5774c-` followed by
+`1-1-resolve-decisions-to-mitigate-api-rework-pr26-m3-final.out`, with
+`markdownlint` as the Markdown gate name. The formatter log is
+`/tmp/fmt-peregrine-web-pr26-m3-final.out`. These results support the M3
+completion record; validation of later evidence-record amendments and hosted
+checks is recorded separately in the delivery ledger.
+
+Planning evidence was gathered through CodeGraph and two Wyvern agents using
+context packs `pk_poizqppi` and `pk_e7ma7ccy`. The repository paths and
+contracts above are the durable evidence; executing this plan does not require
+those packs to remain available. External references were checked with
+Firecrawl on 2026-10-12; structured extraction was cross-checked against source
+prose where it omitted distinctions or produced suspect section references.
+
+[^http]: [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html), especially
+    §§8.6, 9.1, 9.3.2, 15.3.5–15.3.6, 15.4.5, and 15.5.6. HEAD and the
+    specified no-content statuses require explicit finalization rules.
+
+[^hyper]: [Hyper HTTP/1 builder](https://docs.rs/hyper/latest/hyper/server/conn/http1/struct.Builder.html),
+    methods `max_headers`, `max_header_size`, `max_buf_size`,
+    `header_read_timeout`, and `timer`. Recheck against the selected version;
+    do not confuse an upstream connection buffer bound with a header contract.
+
+[^googletest]: [GoogleTest Rust integration guidance](https://github.com/google/googletest-rust)
+    and [assertion documentation](https://docs.rs/googletest/latest/googletest/).
+
+[^verus]: [Verus guide](https://verus-lang.github.io/verus/guide/) describes
+    static functional verification and its limits. The `verus` skill provides
+    the repository integration pattern using `prover-tools`.
+
+Revision note (2026-10-12): expert review clarified downstream ownership,
+streaming exits, transfer accounting, non-vacuity checks, and versioned limit
+evidence. These refinements preserve the decision-only scope and approval gate.
+
+Revision note (2026-10-12, execution intake): record explicit execution
+approval and the missing M1 acceptance evidence. Preserve all contract and
+verification requirements; M2/M3 remain dependent on accepted A1/A2. Record the
+interrupted Git-backed gate separately and use the prescribed clean Git
+environment for final validation.
+
+Revision note (2026-10-12, owner clarification): replace the synthetic specimen
+with the owner-selected Mornington pilot, record the shared human roles, and
+pin the design-stage Actix comparator. Only protocol acceptance remains
+outstanding for M1; workload figures are not measured release budgets.
+
+Revision note (2026-10-13): record explicit owner acceptance of the Mornington
+protocol and deployment boundary. M1 is accepted; M2 can specify lifecycle,
+failure selection, and pilot configuration without the former Q2 blocker.
+
+Revision note (2026-10-13, M1 review): shorten the index link and make the
+local decision-date convention explicit. Preserve actual owner acceptance; the
+UTC date finding does not revoke it. M2 drafts remain outside the checkout
+while the repaired milestone is validated and assessed.
+
+Revision note (2026-10-13, M2 draft): integrate the complete lifecycle,
+precedence, configuration and HTTP tables; refine existing ownership ADRs and
+link guides and V1–V8 evidence owners. M1 is locally validated/reviewed. Keep
+A5 acceptance and final milestone gates/review pending; no roadmap item or
+runtime/proof deliverable is marked complete.
+
+Revision note (2026-10-13, M2 review repair): add transfer-capacity rejection
+after completed reverse hooks, drop its unhanded body, and move unsafe
+rejection transport failure to C13. Clarify full-trace hook accounting for rows
+entered after R; preserve ordinary unwind and interruption guarantees.
+
+Revision note (2026-10-13, stream admission): the follow-up CLI identified that
+observing a first frame cannot define pre-handoff admission for lazy streams.
+CFG03 now reserves every content-permitted owned response stream, including
+unpolled or zero-yielding streams; explicit empty and buffered forms require no
+transfer permit. No stream polling decides admission. Keep numeric defaults
+proposed and final M2/M3 acceptance pending.
+
+The bounded reread also exposed needless overload rejection of streams that
+HEAD or no-content rules would discard. HTTP content eligibility now precedes
+transfer admission: HEAD, 204/205/304, and invalid final statuses skip CFG03;
+the single finalizer drops those streams without polling. A full transfer pool
+cannot change their selected outcome to 503. This preserves the one-finalizer
+and no-hook-replay boundaries.
+
+Revision note (2026-10-17, resumed delivery): the prior body-form lint and test
+logs reached successful terminal summaries; their owned processes are absent.
+Record the new limited parameter approval and hexagonal validation boundary,
+then freeze the updated candidate for fresh sequential gates. Retain the
+stream-admission repair and all previous review evidence. The owner now
+explicitly authorizes equilibrium and merge through pr-babysitting, using the
+allocated comment-token pool. No daemon or host-limit change is authorized.
+
+Revision note (2026-10-17, M3): reconcile accepted requirements and completed
+specification activity without claiming runtime or release readiness. Keep
+proposed ADRs and downstream tasks separate. The installed mapsplice 0.1.0
+preview of replacing 1.1.1 failed with `dangling_dependency`: dependency anchor
+`1.1.1` was not found. It made no tracked edit. Apply only the exact existing
+checkbox/status changes and additive acceptance prose; preserve all numbering,
+dependencies, and unrelated tasks. No structural renumbering is required.

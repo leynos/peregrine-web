@@ -118,3 +118,55 @@ policy/replay separation, task 5.2.3 tests representation replacement, and task
 correlation syntax/length, error-detail count/bytes, and rendering output size.
 SSE convenience packaging and reuse of actix-v2a remain optional until a pilot
 requires them. No runtime performance or compiler-specific benefit is inferred.
+
+## Pilot responsibility and budget decisions
+
+The owner accepted Mornington as the proving ground and the HTTP/1.1/Traefik
+boundary on 2026-10-13;
+[ToR §9.1](terms-of-reference.md#91-mornington-pilot-and-comparative-review)
+records that evidence. This acceptance does not promote this whole ADR or the
+uncompiled ownership API to Accepted. ADR 001 still requires its spike/traces;
+ADR 006 still requires separate consumers and independent extension evidence.
+
+| Responsibility                                                 | Owner                                            | Boundary and permitted composition                                                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Immutable request facts and frozen resource identity           | Engine                                           | Initialize once; hooks/renderer/supervisor receive restricted views; no correlation-based authentication             |
+| Forward stop, reverse-hook cursor, failure selection           | Engine                                           | L01–L38/C01–C13 in design §6 and E01–E09 in §7.2 are canonical; no second lifecycle registry                         |
+| Renderer invocation, typed required headers, HTTP finalization | Engine                                           | Application supplies safe mappings/renderer; H01–H06 apply once; custom code does not own final status               |
+| Parser, connection admission, trusted ingress metadata         | Transport adapter                                | Apply CFG01/CFG04–CFG07/CFG30 before the corresponding boundary; parser exits have no context/hook/ID guarantee      |
+| Streaming input/output and transfer accounting                 | Body owner, integrated with transport supervisor | Retain request-input policy after ownership transfer; committed failures terminate transfer and never replace status |
+| Identity, resource policy, domain mappings, durable effects    | Application                                      | Mornington owns grants/revocation/idempotency/storage; HTTP and non-HTTP drivers use the same application ports      |
+| Runtime, generators, clocks, shutdown and application cleanup  | Composition root                                 | Inject dependencies and initialize subscribers once; cleanup and external-task cancellation have their own evidence  |
+
+_Table 3: Responsibility split without a service container or extraction
+scheduler. Canonical contract and configuration values remain in the design._
+
+Design §9.2 contains the proving-ground defaults approved on 2026-10-17 and
+their workload rationale. This accepts CFG01–CFG33 for the exercise only, not
+for 1.0; each row requires evidence-backed review afterwards before 1.0
+parameter acceptance. Mornington's hexagonal ports provide direct-domain and
+paired driving-adapter validation, as recorded in
+[ToR §9.2](terms-of-reference.md#92-proving-ground-approval-and-validation-boundaries).
+Application ports remain HTTP-independent under ADR 004. Choose finite limits
+over implicit unlimited settings, explicit stream opt-out over sentinel zero,
+and static fallback over re-entering custom code during cancellation. Request
+execution releases its permit at handoff; streamed bodies and connections
+retain their distinct accounting until release. This permits long polling
+without pretending that finalized streams disappeared from load.
+
+The renderer cap limits accepted encoded output, and a bounded writer limits
+its own accumulation. It cannot limit arbitrary renderer allocations or
+synchronous running time. Secondary-diagnostic caps limit retained encoded
+details, not primary error payloads or logging-backend queues. Timeouts are
+cooperative; blocking trusted code can prevent their timely observation.
+Response hooks provide neither durable effects nor asynchronous cancellation
+cleanup.
+
+These decisions refine existing owners rather than introducing a new port or
+helper. Reuse follows the table's permitted callers and ADR 004; custom
+protocol sessions continue to use ADR 005's separate ownership.
+StrictHeaderSafe is the pilot's only selectable correlation profile. The
+separate Falcon-compatible profile is deferred until X1 specifies its
+behaviour; the pilot does not silently redefine that profile or claim X1
+compatibility. No upgrade delivery or stabilization follows from Mornington's
+no-upgrades boundary.

@@ -1,8 +1,8 @@
 # Peregrine Web – terms of reference
 
-- Status: draft v0.3, incorporating the supplied papers and extension
-  requirements.
-- Date: 2026-09-21.
+- Status: draft v0.4, incorporating the supplied papers, extension
+  requirements, and the accepted Mornington pilot.
+- Date: 2026-10-13 (Europe/Berlin).
 - Audience: project maintainers, prospective library users, and design
   reviewers.
 - Companions: [technical design](peregrine-design.md),
@@ -211,16 +211,25 @@ committed deliverable is identified in the inputs.
 
 ## 9. Open questions and decision authority
 
-Owners below are proposed roles; no individual has been assigned or consulted.
+The project owner, `leynos`, is the sole human decision authority, pilot
+reviewer, and operator. Agent reviewers support that owner; they do not
+constitute separate customer, sponsor, or operator sign-off. The owner selected
+a Peregrine reimplementation of `leynos/mornington` for validation on
+2026-10-12 in the
+[implementation session](https://lody.ai/leynos/sessions/724e71be-1ca2-49c9-a6c9-3aff69b0aeac).
+Decision dates use the owner's local calendar date in Europe/Berlin. That
+local calendar date can be one day ahead of the UTC calendar date. That
+statement assigns the roles and pilot; it does not assert a deployed service,
+measured capacity, or acceptance of every proposed contract.
 
-| ID  | Question and consequence                                                                             | Closure evidence                                                                            | Proposed owner                       |
-| --- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Q1  | Which service authors and workload should validate the architectural benefit? Gates adoption claims. | A named pilot scenario and comparative review against its current framework.                | Project maintainer with pilot users. |
-| Q2  | Is HTTP/1.1 with external secure ingress an acceptable initial boundary? Gates serving scope.        | Confirmed deployment requirements and an accepted protocol-scope decision.                  | Project maintainer with an operator. |
-| Q3  | Which resource-policy interface and enforcement default should be public? Gates API stability.       | A working public/protected example and review of missing-policy behaviour.                  | API maintainer.                      |
-| Q4  | What latency, allocation, memory, and connection budgets define release readiness?                   | Reproducible measurements and agreed thresholds for the pilot workload.                     | Maintainer with an operator.         |
-| Q5  | What compiler posture, supported platforms, and compatibility policy can be maintained?              | The phase 2 compiler experiment, a downstream build matrix, and a published support policy. | Release maintainer.                  |
-| Q6  | Who can accept the design and allocate ongoing maintenance effort?                                   | Named decision authority and explicit scope acceptance.                                     | Project sponsor or maintainer.       |
+| ID  | Question and consequence                                                                             | Closure evidence                                                                                             | Decision owner and status                                  |
+| --- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| Q1  | Which service authors and workload should validate the architectural benefit? Gates adoption claims. | Mornington reimplementation, compared against its pinned Actix-based design; review scenarios below.         | `leynos`; pilot selected.                                  |
+| Q2  | Is HTTP/1.1 with external secure ingress an acceptable initial boundary? Gates serving scope.        | Confirmed deployment requirements and an accepted protocol-scope decision.                                   | `leynos`; accepted 2026-10-13.                             |
+| Q3  | Which resource-policy interface and enforcement default should be public? Gates API stability.       | A working public/protected example and review of missing-policy behaviour.                                   | `leynos`; open.                                            |
+| Q4  | What latency, allocation, memory, and connection budgets define release readiness?                   | Reproducible measurements and agreed thresholds for the pilot workload.                                      | `leynos`; measurements open.                               |
+| Q5  | What compiler posture, supported platforms, and compatibility policy can be maintained?              | The phase 2 compiler experiment, a downstream build matrix, and a published support policy.                  | `leynos`; open.                                            |
+| Q6  | Who can accept the design and allocate ongoing maintenance effort?                                   | Sole owner directs this decision/specification slice and selects its pilot; no external sponsor is required. | `leynos`; authority assigned, release commitment excluded. |
 
 _Table 4: Open decisions and evidence required to close them._
 
@@ -228,6 +237,77 @@ The evidence is sufficient for a draft design and potential roadmap. API
 stabilization depends on Q3 and Q5; release commitments depend on Q1, Q2, Q4,
 and Q6. The [proposed ADR](adr-001-resource-aware-lifecycle.md) records the
 principal architectural choice for review, without implying acceptance.
+
+### 9.1. Mornington pilot and comparative review
+
+The accepted pilot is a Peregrine-based implementation of the Mornington forum
+for agent swarms and their human owner. Its current
+[README](https://github.com/leynos/mornington/blob/43a0046efdf06faaefb7bcc2d37877f059825b88/README.md)
+reports design-stage Rust scaffolding; no forum or hosting stack is
+implemented. The comparator is therefore Mornington's
+[Actix-based technical design](https://github.com/leynos/mornington/blob/43a0046efdf06faaefb7bcc2d37877f059825b88/docs/mornington-design.md),
+not a measured migration from a working Actix service. These sources were
+inspected at revision `43a0046efdf06faaefb7bcc2d37877f059825b88` on 2026-10-12.
+
+Compare locating policy, adding an operation, and explaining rejection for
+three concrete cases: read a protected thread and its topology; create a reply
+with application-owned idempotency and durable storage; and observe authorized
+changes through bounded JSON long polling. Trace a denied actor to zero
+responder calls and require a renewed authority check before a long-poll
+response. The domain and application services retain delegated grants,
+revocation, storage, and durable-effect recovery; response hooks do not commit
+or roll back those effects. The pilot is not multi-tenant: Mornington's scope
+explicitly excludes multi-tenancy.
+
+Mornington's proposed envelope is one serving process, 100 active clients, 64
+KiB Markdown plus 4 KiB metadata per post, and at most 128 concurrent long
+polls of at most 25 seconds. These are workload inputs for configuration
+review, not measured Peregrine limits. Whole-request execution must accommodate
+the 25-second poll and subsequent authorization/finalization work. Latency,
+corpus, memory, and connection thresholds remain Q4 measurement decisions.
+
+The source design uses Traefik ingress and explicitly selects JSON long polling
+rather than SSE or WebSocket protocols. Its identity flows are OIDC for humans
+and OAuth for agents, followed by application grant checks; reverse-proxy
+headers are not identity evidence. The proposed Peregrine pilot boundary is
+HTTP/1.1 behind secure ingress, explicit trusted ingress peers for forwarding
+metadata, and no upgrades. The owner explicitly accepted this proving-ground
+boundary on 2026-10-13 in the linked implementation session. HTTP/2 and native
+Transport Layer Security (TLS) are deferred. Traefik may terminate secure
+external connections; Peregrine trusts forwarding metadata only from configured
+ingress peers. Forwarding headers never establish identity. Buffered and
+streaming core bodies remain in scope; Pachislot remains separate. This closes
+Q1/Q2/Q6 for the pilot decision slice, without accepting all ADRs or committing
+to measured release readiness. The later implementation and any edits to
+Mornington belong to separate work; this slice records the pilot and the
+contracts that it will exercise.
+
+### 9.2. Proving-ground approval and validation boundaries
+
+On 2026-10-17 the sole owner approved design §9.2's CFG01–CFG33 as parameters
+for the proving ground only. This approval does not select 1.0 defaults. Every
+parameter must be revisited after the exercise with reproducible evidence and
+an explicit retain/revise decision; design §9.2 records the evidence contract.
+Q4 and release-readiness decisions remain open until that review is accepted.
+
+Mornington explicitly uses ports/adapters hexagonal architecture. Exploit its
+application-owned driving ports to validate Peregrine: exercise the same use
+cases directly, through in-process Peregrine execution, and through HTTP/1.1.
+Keep domain logic and driven-port fixtures constant while varying the driving
+adapter. Compare authorization decisions, domain results, and durable effects;
+check HTTP status, framing, correlation, cancellation, and transfer outcomes
+against Peregrine's separate contract rows. Protocol failure must not imply
+application rollback. Inject clocks, identity, and persistence through existing
+ports; domain tests must not require Peregrine, Hyper, or socket infrastructure.
+
+The pinned Actix design is a design comparator; no runnable Actix baseline is
+claimed. Paired adapter comparisons become executable only when both relevant
+adapters exist. Direct-port witnesses still provide an independent domain
+oracle. Roadmap 1.3.1–1.3.2 owns the port-boundary specimen; 3.1.1–3.1.4,
+3.2.1–3.2.2, and 5.2.1–5.2.3 own the later resource/engine/transport
+validation, with measurement and pilot review under 6.2.1–6.2.2. ADR 004
+retains port ownership; this decision adds no framework dependency or new port
+to Mornington in this documentation slice.
 
 ## 10. Source register
 

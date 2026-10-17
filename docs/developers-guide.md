@@ -392,3 +392,55 @@ Install mdtablefix 0.6.0 or later locally with
 `cargo install --locked mdtablefix@0.6.0`. Install markdownlint-cli2 with
 `bun add --global markdownlint-cli2` or
 `npm install --global markdownlint-cli2`.
+
+## Implement against the recorded contracts
+
+The
+[roadmap 1.1 ExecPlan](execplans/1-1-resolve-decisions-to-mitigate-api-rework.md)
+records the accepted Mornington pilot and the specification-to-runtime
+handoff. The framework is unimplemented. Contract identifiers in the
+[technical design](peregrine-design.md) are stable trace anchors: L rows cover
+ordinary exits, C rows cover interruption/transfer, E rows select failures, H
+rows constrain content/framing, and CFG01–CFG33 in §9.2 name configuration
+rows. Cite a row alongside its section and V/I verification obligation.
+
+CFG01–CFG33 are approved for the proving ground only. Capture configuration and
+workload revisions with measurements and per-row retain/revise decisions after
+the exercise, before accepting 1.0 values; see design §9.2 and ToR Q4.
+Mornington's hexagonal architecture enables a controlled comparison through its
+existing driving ports: keep domain logic and driven-port fixtures fixed,
+compare direct calls with in-process Peregrine and socket execution, and assert
+domain/effect outcomes separately from HTTP and transfer outcomes. Retain
+framework-free domain tests as an independent oracle. The pinned Actix design
+is not an executable baseline; only compare implementations once available. ToR
+§9.2 assigns the downstream validation tasks; this slice adds no adapter.
+
+Each later regression/behavioural test should name its contract row and V/I
+obligation. Use finite cases for protocol partitions, properties for stop/order
+and byte-budget invariants, snapshots for stable public representations, paired
+compile-pass/fail cases for ownership, and native-socket checks for parser and
+transfer boundaries. Observe peak accumulator size before append; an error-only
+assertion cannot detect append-then-discard. Include zero-hook witnesses and
+negative controls that violate dispatch-once, stop, unwind, secrecy, or permit
+release expectations. Do not replace semantic tests with searches for prose.
+
+The pure-kernel Verus proof belongs to roadmap 1.2.2. Its production refinement
+and generated async traces remain necessary; no documentation gate proves the
+future engine. Keep compiler/tool identities, actual proof commands, premises,
+bounds, and deliberately failing mutations with the evidence. V1–V8 and their
+owning tasks are recorded in design §11.1 and the ExecPlan.
+
+Inject environment, clock, shutdown signals, identity, generators, and
+application ports. Source values at the composition root; do not mutate process
+environment in test fixtures. The application creates the runtime, subscriber,
+recorder, and outbound adapters. Transport/body supervisors retain tracked
+permits; in-process callers must drive their owned bodies or explicitly
+supplied supervision. An unpolled future cannot promise timely timeout
+observation.
+
+For Git-backed gates in Lody, use the clean command environment required by the
+supplied agent instructions. The validated pilot gates used
+`NEXTEST_TEST_THREADS=2` to reduce process pressure without skipping tests.
+Keep formatting, lint, and tests sequential; do not bypass shared compiler
+admission or remove inherited compiler wrappers. Distinguish local green gates,
+CLI review, hosted assessment, and runtime conformance evidence.
