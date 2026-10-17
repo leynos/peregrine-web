@@ -165,7 +165,8 @@ cleanup.
 These decisions refine existing owners rather than introducing a new port or
 helper. Reuse follows the table's permitted callers and ADR 004; custom
 protocol sessions continue to use ADR 005's separate ownership.
-StrictHeaderSafe is the pilot's explicit correlation profile; it does not
-silently redefine the separate Falcon-compatible profile or claim X1
+StrictHeaderSafe is the pilot's only selectable correlation profile. The
+separate Falcon-compatible profile is deferred until X1 specifies its
+behaviour; the pilot does not silently redefine that profile or claim X1
 compatibility. No upgrade delivery or stabilization follows from Mornington's
 no-upgrades boundary.

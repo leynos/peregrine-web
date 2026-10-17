@@ -82,11 +82,13 @@ application owns authorization, durable storage, and effect recovery.
 The approved proving-ground 30-second deadline allows the pilot's 25-second
 long poll. Byte, idle, connection, transfer, and drain limits have separate
 scopes. Socket/parser limits do not apply to in-process execution;
-engine/body-owner limits do. Only the named request-stream total-byte opt-out
-permits unlimited bytes; idle and admission accounting remain finite.
-CFG01–CFG33 were approved on 2026-10-17 for the proving ground only. They must
-all be revisited after the exercise using reproducible evidence before 1.0
-parameter acceptance; their approval establishes no measured release-capacity
-guarantee. See
+engine/body-owner limits do. Request-body ingestion has a total-byte cap unless
+the named request-stream opt-out is selected. Response streams have no
+cumulative byte cap. Both retain finite idle deadlines and admission
+accounting; transferring request ingestion into a response does not remove its
+input policy. CFG01–CFG33 were approved on 2026-10-17 for the proving ground
+only. They must all be revisited after the exercise using reproducible evidence
+before 1.0 parameter acceptance; their approval establishes no measured
+release-capacity guarantee. See
 [ToR §9.1](terms-of-reference.md#91-mornington-pilot-and-comparative-review)
 for the pinned Actix-design comparator and acceptance scope.
