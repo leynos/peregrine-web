@@ -1,6 +1,7 @@
 # Resolve decisions to mitigate API rework (1.1)
 
-Status: IN PROGRESS — M1 complete; M2 defaults await operator acceptance.
+Status: IN PROGRESS — proving-ground defaults accepted; final gates/review
+pending.
 
 This ExecPlan is a living document. Keep Constraints, Tolerances, Risks,
 Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
@@ -128,9 +129,14 @@ blockers with evidence rather than lowering acceptance criteria.
   (295 tests passed, one suite-defined skip). The committed seven-file CLI
   review completed; its two valid findings are repaired: CFG03 exhaustion now
   has L38/E09 and framing interruption has C13. Repair gates/review follow.
-- [ ] M2: accept the complete proving-ground configuration defaults, then
-  finish contract validation and CLI review. Owner approval was requested for
-  the concrete table; CFG08 was corrected from 256 to 512 KiB and disclosed.
+- [x] (2026-10-17) The owner approved CFG01–CFG33 for the proving ground
+  only, requiring every parameter to be revisited with evidence afterwards
+  before 1.0 acceptance. Recorded that release gate in design §9.2, ToR §9.2,
+  ADR 003, and guides. CFG08 remains 512 KiB.
+- [x] (2026-10-17) Recorded Mornington's explicit hexagonal architecture and
+  validation through existing application ports, with fixed domain/driven-port
+  fixtures, direct-domain oracles, and separate HTTP/transfer assertions.
+- [ ] M2: finish final contract validation and committed CLI review.
 - [x] (2026-10-13) M3 guide updates are drafted with proposed-contract and
   runtime/proof limitations explicit. Final conformance and roadmap completion
   remain dependent on accepted M2 defaults and validation.
@@ -197,6 +203,13 @@ preserving wrapper admission, before attributing acceptance to Polonius.
 
 ## Decision log
 
+- (2026-10-17, owner acceptance) Accept CFG01–CFG33 solely for the Mornington
+  proving ground. Revisit every value after the exercise with reproducible
+  evidence and explicit retain/revise decisions before 1.0 parameter
+  acceptance; Q4 remains open. Use Mornington's existing hexagonal application
+  ports for independent domain oracles and paired driving-adapter validation.
+  No runtime code, new port, or deployed Actix comparator is introduced here.
+
 - (2026-10-13, M2 specification) Preserve the agreed independent reverse
   lifecycle and first-cause/public-failure distinction. Use 30,000 ms execution
   for the pilot's 25,000 ms polls, finite independent admission/body/drain
@@ -260,10 +273,10 @@ preserving wrapper admission, before attributing acceptance to Polonius.
 
 M1 is complete: A1/A2 have explicit owner evidence, the gates passed, and
 current repairs have complete local CLI coverage with no unresolved valid
-findings. M2 now has concrete A3/A4 tables, proposed A5 defaults, and A6 proof
-sketch/traceability. Guides explain these as future contracts. A5 operator
-acceptance, final M2 validation/review, and A7 remain pending; roadmap 1.1.1
-and 1.1.2 stay unchecked until M1–M3 meet the plan's completion condition. No
+findings. M2 now has concrete A3/A4 tables, proving-ground-only A5 acceptance
+on 2026-10-17, and A6 proof sketch/traceability. Guides explain these as future
+contracts. Final M2 validation/review and A7 remain pending; roadmap 1.1.1 and
+1.1.2 stay unchecked until M1–M3 meet the plan's completion condition. No
 runtime behaviour, executable proof, benchmark, or released API is claimed.
 
 Execution intake verified PR #26 against local head `6414fda` and base
@@ -847,3 +860,25 @@ Revision note (2026-10-13, M2 review repair): add transfer-capacity rejection
 after completed reverse hooks, drop its unhanded body, and move unsafe
 rejection transport failure to C13. Clarify full-trace hook accounting for rows
 entered after R; preserve ordinary unwind and interruption guarantees.
+
+Revision note (2026-10-13, stream admission): the follow-up CLI identified that
+observing a first frame cannot define pre-handoff admission for lazy streams.
+CFG03 now reserves every content-permitted owned response stream, including
+unpolled or zero-yielding streams; explicit empty and buffered forms require no
+transfer permit. No stream polling decides admission. Keep numeric defaults
+proposed and final M2/M3 acceptance pending.
+
+The bounded reread also exposed needless overload rejection of streams that
+HEAD or no-content rules would discard. HTTP content eligibility now precedes
+transfer admission: HEAD, 204/205/304, and invalid final statuses skip CFG03;
+the single finalizer drops those streams without polling. A full transfer pool
+cannot change their selected outcome to 503. This preserves the one-finalizer
+and no-hook-replay boundaries.
+
+Revision note (2026-10-17, resumed delivery): the prior body-form lint and test
+logs reached successful terminal summaries; their owned processes are absent.
+Record the new limited parameter approval and hexagonal validation boundary,
+then freeze the updated candidate for fresh sequential gates. Retain the
+stream-admission repair and all previous review evidence. The owner now
+explicitly authorizes equilibrium and merge through pr-babysitting, using the
+allocated comment-token pool. No daemon or host-limit change is authorized.

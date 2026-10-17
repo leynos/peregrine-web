@@ -141,13 +141,18 @@ ADR 006 still requires separate consumers and independent extension evidence.
 _Table 3: Responsibility split without a service container or extraction
 scheduler. Canonical contract and configuration values remain in the design._
 
-Design §9.2 contains the proposed proving-ground defaults and workload
-rationale. Choose finite limits over implicit unlimited settings, explicit
-stream opt-out over sentinel zero, and static fallback over re-entering custom
-code during cancellation. Request execution releases its permit at handoff;
-streamed bodies and connections retain their distinct accounting until release.
-This permits long polling without pretending that finalized streams disappeared
-from load.
+Design §9.2 contains the proving-ground defaults approved on 2026-10-17 and
+their workload rationale. This accepts CFG01–CFG33 for the exercise only, not
+for 1.0; each row requires evidence-backed review afterwards before 1.0
+parameter acceptance. Mornington's hexagonal ports provide direct-domain and
+paired driving-adapter validation, as recorded in
+[ToR §9.2](terms-of-reference.md#92-proving-ground-approval-and-validation-boundaries).
+Application ports remain HTTP-independent under ADR 004. Choose finite limits
+over implicit unlimited settings, explicit stream opt-out over sentinel zero,
+and static fallback over re-entering custom code during cancellation. Request
+execution releases its permit at handoff; streamed bodies and connections
+retain their distinct accounting until release. This permits long polling
+without pretending that finalized streams disappeared from load.
 
 The renderer cap limits accepted encoded output, and a bounded writer limits
 its own accumulation. It cannot limit arbitrary renderer allocations or

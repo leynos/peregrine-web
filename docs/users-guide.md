@@ -79,11 +79,14 @@ A successful application mutation can therefore coexist with HTTP/transfer
 failure. Response hooks are not rollback or guaranteed cleanup. Mornington's
 application owns authorization, durable storage, and effect recovery.
 
-The proposed 30-second execution deadline allows the pilot's 25-second long
-poll. Byte, idle, connection, transfer, and drain limits have separate scopes.
-Socket/parser limits do not apply to in-process execution; engine/body-owner
-limits do. Only the named request-stream total-byte opt-out permits unlimited
-bytes; idle and admission accounting remain finite. These are operator-review
-inputs, not measured release-capacity guarantees. See
+The approved proving-ground 30-second deadline allows the pilot's 25-second
+long poll. Byte, idle, connection, transfer, and drain limits have separate
+scopes. Socket/parser limits do not apply to in-process execution;
+engine/body-owner limits do. Only the named request-stream total-byte opt-out
+permits unlimited bytes; idle and admission accounting remain finite.
+CFG01–CFG33 were approved on 2026-10-17 for the proving ground only. They must
+all be revisited after the exercise using reproducible evidence before 1.0
+parameter acceptance; their approval establishes no measured release-capacity
+guarantee. See
 [ToR §9.1](terms-of-reference.md#91-mornington-pilot-and-comparative-review)
 for the pinned Actix-design comparator and acceptance scope.

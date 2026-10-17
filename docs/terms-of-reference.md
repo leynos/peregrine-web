@@ -282,6 +282,33 @@ to measured release readiness. The later implementation and any edits to
 Mornington belong to separate work; this slice records the pilot and the
 contracts that it will exercise.
 
+### 9.2. Proving-ground approval and validation boundaries
+
+On 2026-10-17 the sole owner approved design §9.2's CFG01–CFG33 as parameters
+for the proving ground only. This approval does not select 1.0 defaults. Every
+parameter must be revisited after the exercise with reproducible evidence and
+an explicit retain/revise decision; design §9.2 records the evidence contract.
+Q4 and release-readiness decisions remain open until that review is accepted.
+
+Mornington explicitly uses ports/adapters hexagonal architecture. Exploit its
+application-owned driving ports to validate Peregrine: exercise the same use
+cases directly, through in-process Peregrine execution, and through HTTP/1.1.
+Keep domain logic and driven-port fixtures constant while varying the driving
+adapter. Compare authorization decisions, domain results, and durable effects;
+check HTTP status, framing, correlation, cancellation, and transfer outcomes
+against Peregrine's separate contract rows. Protocol failure must not imply
+application rollback. Inject clocks, identity, and persistence through existing
+ports; domain tests must not require Peregrine, Hyper, or socket infrastructure.
+
+The pinned Actix design is a design comparator; no runnable Actix baseline is
+claimed. Paired adapter comparisons become executable only when both relevant
+adapters exist. Direct-port witnesses still provide an independent domain
+oracle. Roadmap 1.3.1–1.3.2 owns the port-boundary specimen; 3.1.1–3.1.4,
+3.2.1–3.2.2, and 5.2.1–5.2.3 own the later resource/engine/transport
+validation, with measurement and pilot review under 6.2.1–6.2.2. ADR 004
+retains port ownership; this decision adds no framework dependency or new port
+to Mornington in this documentation slice.
+
 ## 10. Source register
 
 The documents are synthesized from the supplied local files, read on

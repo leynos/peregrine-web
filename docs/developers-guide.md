@@ -404,6 +404,17 @@ ordinary exits, C rows cover interruption/transfer, E rows select failures, H
 rows constrain content/framing, and CFG01–CFG33 in §9.2 name configuration
 rows. Cite a row alongside its section and V/I verification obligation.
 
+CFG01–CFG33 are approved for the proving ground only. Capture configuration and
+workload revisions with measurements and per-row retain/revise decisions after
+the exercise, before accepting 1.0 values; see design §9.2 and ToR Q4.
+Mornington's hexagonal architecture enables a controlled comparison through its
+existing driving ports: keep domain logic and driven-port fixtures fixed,
+compare direct calls with in-process Peregrine and socket execution, and assert
+domain/effect outcomes separately from HTTP and transfer outcomes. Retain
+framework-free domain tests as an independent oracle. The pinned Actix design
+is not an executable baseline; only compare implementations once available. ToR
+§9.2 assigns the downstream validation tasks; this slice adds no adapter.
+
 Each later regression/behavioural test should name its contract row and V/I
 obligation. Use finite cases for protocol partitions, properties for stop/order
 and byte-budget invariants, snapshots for stable public representations, paired
