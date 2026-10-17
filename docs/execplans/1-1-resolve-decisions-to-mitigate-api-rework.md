@@ -847,6 +847,19 @@ execution; no shared process or admission control was changed. Rust builds
 reported the managed cache unavailable and succeeded uncached. Hosted checks
 are separate evidence and are not claimed here.
 
+M3 validation on 2026-10-17 passed `make fmt`, `make check-fmt`,
+`make markdownlint` (including spelling), `make nixie`, `make lint`, and
+`make test`, each with exit code zero, sequentially on tree
+`d3b2a2ffba9d09b8adb12221c45927af7c45fd8e` (committed as `1a66d79`). Nextest
+passed 295 tests with one suite-defined skip; the doctest phase succeeded with
+zero cases. In particular, the final `make markdownlint` returned zero. Gate
+logs use `/tmp/<gate>-a4599fc6-f75b-46a1-9fdc-3116d6c5774c-` followed by
+`1-1-resolve-decisions-to-mitigate-api-rework-pr26-m3-final.out`, with
+`markdownlint` as the Markdown gate name. The formatter log is
+`/tmp/fmt-peregrine-web-pr26-m3-final.out`. These results support the M3
+completion record; validation of later evidence-record amendments and hosted
+checks is recorded separately in the delivery ledger.
+
 Planning evidence was gathered through CodeGraph and two Wyvern agents using
 context packs `pk_poizqppi` and `pk_e7ma7ccy`. The repository paths and
 contracts above are the durable evidence; executing this plan does not require
