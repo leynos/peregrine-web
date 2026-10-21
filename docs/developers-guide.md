@@ -121,11 +121,12 @@ GitHub-hosted runners; the hosted `build-test` job remains the repository gate.
 Contributors can also opt into this local integration run with
 `make test WITH_ACT=1`. It first runs the outer Rust tests, then Act runs the
 CI workflow with its ordinary test step and without hosted coverage collection.
-On Linux, the host needs Docker, Act, `clang`, `lld`, `python3`, and
-`cargo-audit`, plus a GitHub token for nested actions. The ordinary PR
-contracts and hosted lint retain the cold Whitaker driver construction and real
-repository check, so the stubbed command contracts do not replace compiler
-integration evidence.
+The Makefile maps `ubuntu-latest` to `catthehacker/ubuntu:act-latest`, so Act
+does not prompt for an image interactively. On Linux, the host needs Docker,
+Act, `clang`, `lld`, `python3`, and `cargo-audit`, plus a GitHub token for
+nested actions. The ordinary PR contracts and hosted lint retain the cold
+Whitaker driver construction and real repository check, so the stubbed command
+contracts do not replace compiler integration evidence.
 
 Use `make act-contract-smoke` for the focused Act compatibility check. It runs
 an ignored Rust test against a derived copy of the CI workflow, with explicit
