@@ -146,6 +146,32 @@ fn preserves_ci_coverage_guard_for_nested_act() {
     );
 }
 
+/// Requires exactly one test path for every value of `env.ACT`.
+///
+/// The coverage guard and the Act fallback are complements. Testing each in
+/// isolation would still pass if both steps ran, or if neither did, so assert
+/// the partition itself: the job cannot finish with linting alone, and it
+/// cannot run the suite twice.
+#[test]
+fn runs_ci_tests_under_act_and_on_the_host() {
+    let workflow = parse_ci_workflow(WorkflowSource(CI_WORKFLOW));
+
+    for act_value in [ActValue::True, ActValue::False, ActValue::Unset] {
+        let executing = [
+            coverage_step_runs(&workflow, act_value),
+            act_test_step_runs(&workflow, act_value),
+        ]
+        .iter()
+        .filter(|outcome| **outcome == Some(true))
+        .count();
+
+        assert_eq!(
+            executing, 1,
+            "build-test must run the suite exactly once when ACT is {act_value:?}"
+        );
+    }
+}
+
 /// Rejects coverage guards missing from the coverage step.
 #[test]
 fn rejects_missing_coverage_guard() {
