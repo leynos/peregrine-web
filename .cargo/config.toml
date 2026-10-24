@@ -11,6 +11,7 @@
 # assigns `RUSTFLAGS` for the gate targets.
 
 [unstable]
+embed-metadata = false
 codegen-backend = true
 
 [profile.dev]
