@@ -60,6 +60,10 @@ documentation set.
   separately from plan approval, and the lifecycle/configuration specification
   and acceptance evidence for tasks 1.1.1 and 1.1.2.
 
+- [Resource-policy and ownership spike plan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)
+  defines the compile, body-adapter, and async ownership evidence for roadmap
+  task 1.1.3, pending implementation approval.
+
 ## Rust reference material
 
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
