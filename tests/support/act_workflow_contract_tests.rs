@@ -67,7 +67,7 @@ fn workflow_mutations_break_the_contract() {
         ),
         (
             "changed Whitaker action",
-            CI_WORKFLOW.replace("6dea5677a84fec60ca51b07202570e3af12ffdb4", "main"),
+            CI_WORKFLOW.replace("5a99aed78ce68dcebd3052b75c31e6f173162b1e", "main"),
         ),
         (
             "changed Whitaker input",
