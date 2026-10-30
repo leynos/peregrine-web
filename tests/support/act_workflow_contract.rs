@@ -56,7 +56,7 @@ pub(super) const ACTIONS: &[ActionContract] = &[
     ),
     (
         "leynos/shared-actions/.github/actions/install-whitaker@\
-         6dea5677a84fec60ca51b07202570e3af12ffdb4",
+         5a99aed78ce68dcebd3052b75c31e6f173162b1e",
         "Install Whitaker",
         &[("cranelift", "true")],
     ),

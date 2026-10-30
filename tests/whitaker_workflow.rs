@@ -7,7 +7,7 @@ const CI: &str = include_str!("../.github/workflows/ci.yml");
 // boundary: earlier revisions can build the rolling suite from source.
 const INSTALL_ACTION: &str = concat!(
     "leynos/shared-actions/.github/actions/install-whitaker@",
-    "6dea5677a84fec60ca51b07202570e3af12ffdb4",
+    "5a99aed78ce68dcebd3052b75c31e6f173162b1e",
 );
 
 fn check_install_step(step: &Value) -> Result<(), String> {
