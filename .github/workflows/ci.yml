@@ -96,7 +96,7 @@ jobs:
           echo "Coverage LDFLAGS: -fuse-ld=lld"
       - name: Test and Measure Coverage
         if: env.ACT != 'true'
-        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        uses: leynos/shared-actions/.github/actions/generate-coverage@872f59f53717b5bebe8e24b2f4a7496b089a939a
         env:
           CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
