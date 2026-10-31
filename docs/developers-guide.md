@@ -445,3 +445,15 @@ supplied agent instructions. The validated pilot gates used
 Keep formatting, lint, and tests sequential; do not bypass shared compiler
 admission or remove inherited compiler wrappers. Distinguish local green gates,
 CLI review, hosted assessment, and runtime conformance evidence.
+
+## Toolchain updates
+
+`rust-toolchain.toml` pins `nightly-2026-08-27`. Dependabot's `rust-toolchain`
+entry in `.github/dependabot.yml` (directory `/`, daily, the `dependencies` and
+`rust-toolchain` labels, one `minor-and-patch` catch-all group) opens a pull
+request when a newer toolchain exists. Review it like any other change: CI
+builds and tests the project on the new toolchain. Dated nightly versions carry
+no SemVer meaning, so whether Dependabot groups a bump or opens it alone
+depends on how it classifies the version; both are normal. The entry sets no
+cooldown: Dependabot's toolchain fetcher publishes no release date, so a
+cooldown would delay nothing.
