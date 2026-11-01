@@ -185,6 +185,18 @@ concurrent request serving. A boxed body implementation meeting those bounds is
 selected and compile-tested in the first spike; the conceptual `BoxBody` in the
 source papers is not a complete type signature.
 
+The first spike tested
+`http_body_util::combinators::UnsyncBoxBody<Bytes, BodyError>` as that erased
+type. It is `Send` but deliberately not `Sync`, matches Hyper's incoming-body
+posture, and still lets one uniform type cross the request boundary. Upstream
+failures are wrapped in a semantic `BodyError` that retains its source. The
+tested adapter preserves frame boundaries, including empty data frames, and
+forwards trailers unchanged. That choice records what compiles and passes the
+body witnesses; it is a provisional candidate, not an accepted public alias.
+See the
+[spike evidence](resource-policy-ownership-spike.md#v-body-adapter-and-network-witnesses)
+and [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md).
+
 Context exposes request metadata for inspection, route parameters for reading,
 mutable response operations, and typed extensions. Framework-owned lifecycle,
 route selection, and error state stay private. `complete()` makes forward
@@ -339,6 +351,23 @@ JSON response. Policy rejection still reaches response hooks.
 The policy vocabulary and enforcement registration API require the Q3 spike
 before acceptance. Rate-limit and audit classifications are extension
 candidates; they do not imply built-in policy engines.
+
+The first spike compiled and exercised a provisional form of that surface. A
+`Send + Sync`, dyn-compatible resource owns a method-independent `Policy` of
+`Public`, `Authenticated`, or a non-empty scope set; an empty set is a typed
+rejection. Registration captures the frozen method and policy and retains the
+resource handle, and it rejects a policy that requires enforcement when the
+runner has no enforcer installed. The enforcer is one erased async trait object
+supplied at the composition root. Admission receives the retained handle, its
+declared observation, the frozen method, the captured policy, the request path,
+and an optional identity; an anonymous protected request is denied before the
+enforcer runs. Witnesses show those values unchanged across a real await, and
+show that a denial reaches neither the responder nor the resource dependency.
+The tested shape, its rejected alternatives, and its limits are recorded in
+[ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) and the
+[evidence ledger](resource-policy-ownership-spike.md#v-identity-identity-and-admission-witnesses).
+Q3 acceptance, tenant or object-level context, revocation, and production
+enforcement remain open.
 
 ### 4.1. Illustration: protected mutation with explicit inputs
 
@@ -1206,6 +1235,17 @@ expectations, and semantic parity checks. Compiler acceptance cannot establish
 authorization correctness, runtime efficiency, or cancellation cleanup. See
 [experimental evidence](polonius-ownership-experiment.md#2-compiler-evidence-and-reproduction).
 
+The completed 1.1.3 spike supplies the first I3 and I6 witnesses. Compile
+fixtures under `tests/ui/ownership/` pass or fail for one named requirement
+each, runtime witnesses show a denial leaving responder and dependency counts
+at zero, and frame witnesses compare partitions rather than concatenated bytes.
+The [evidence ledger](resource-policy-ownership-spike.md) maps every witness to
+its fixture, command, observed result, pinned compiler, and limitation. That
+evidence is bounded: the enforcer is a fixture, the network harness serves one
+connection with Hyper's lower-level API, and cancellation is observed at one
+known suspension point. No Verus source, admitted proof, or production
+authorization path is introduced by the spike.
+
 The case study adds integration invariants: metadata parsing preserves
 duplicate headers and never consumes the body; correlation agrees across
 ordinary exits and supervised 504; rendering sees the last selected failure;
@@ -1319,6 +1359,17 @@ The retrieved documentation identifies `matchit` 0.9.2 and `async-trait`
 Recheck compatibility when implementing. Dependency licences and feature
 defaults must be reviewed then, particularly before choosing a secure transport
 adapter.
+
+The 1.1.3 spike added caret requirements for the subset it exercised:
+`async-trait`, `bytes`, `http`, `http-body`, `http-body-util`, and `thiserror`
+as runtime dependencies, plus test-only `hyper`, `hyper-util`, `tokio`,
+`trybuild`, `googletest`, `pretty_assertions`, `rstest-bdd`, and
+`rstest-bdd-macros`. That set demonstrates mutual compatibility on the pinned
+nightly for the witnesses recorded in the
+[evidence ledger](resource-policy-ownership-spike.md#compiler-and-build-posture).
+It is not a framework dependency decision: routing, serialization,
+instrumentation, and transport dependencies remain unselected, and every
+addition still needs licence and feature review.
 
 The current library has no framework API to migrate. Stabilization requires
 agreement on terms-of-reference Q1–Q6, a compiled public API example, and

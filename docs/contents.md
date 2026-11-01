@@ -62,7 +62,13 @@ documentation set.
 
 - [Resource-policy and ownership spike plan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)
   defines the compile, body-adapter, and async ownership evidence for roadmap
-  task 1.1.3, pending implementation approval.
+  task 1.1.3.
+- [Resource-policy and ownership spike evidence](resource-policy-ownership-spike.md)
+  records the pinned compiler posture, the compile witnesses, and the limits of
+  what the spike establishes.
+- [ADR 007: Resource-policy and body-erasure boundary](adr-007-resource-policy-and-body-erasure-boundary.md)
+  records the tested provisional shapes and their rejected alternatives,
+  without accepting the policy vocabulary or a public API.
 
 ## Rust reference material
 

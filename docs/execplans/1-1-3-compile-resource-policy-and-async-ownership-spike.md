@@ -1,6 +1,7 @@
 # Compile a resource-policy and async ownership spike (1.1.3)
 
-Status: DRAFT — awaiting explicit approval before implementation.
+Status: IMPLEMENTED — local gates green; roadmap 1.1.3 marked done; hosted
+assessment and merge still pending.
 
 This execution plan is a living document. Keep Constraints, Tolerances, Risks,
 Progress, Surprises & discoveries, Decision log, Outcomes & retrospective,
@@ -98,17 +99,98 @@ the required design/ADR change; obtain explicit approval for deviations.
   Nextest reported 295 passed and one existing ignored Act/Docker fixture; the
   doctest stage passed with zero tests. Publication is recorded in PR metadata
   rather than treated as implementation approval.
-- [ ] Obtain explicit approval of this plan.
-- [ ] M1: compile the resource and ownership boundary.
-- [ ] M2: exercise identity, policy admission, and body adapters.
+- [x] (2026-11-01) Obtained explicit approval of this plan and marked it
+  approved for implementation.
+- [x] M1: compile the resource and ownership boundary.
+  - [x] (2026-11-01) Recorded `rustc -Vv`, the Cargo configuration, and the
+    compile-admission wrappers. The borrow-checker canary returned exit 0 on
+    the default and exit 101 with `-Zpolonius=off`, so the posture is
+    `polonius-alpha`. The temporary example was removed.
+  - [x] (2026-11-01) Observed the red state first: with `pub mod spike;` gated
+    out, the ownership contract failed with `E0432: unresolved import
+    peregrine_web::spike`. Log:
+    `/tmp/red-ownership-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
+  - [x] (2026-11-01) Implemented the smallest interfaces under `src/spike/`:
+    owned policy, frozen registration, one conditional invocation, and an
+    erased `Send`-not-`Sync` body.
+  - [x] (2026-11-01) Authored six compile-pass and six compile-fail fixtures
+    under `tests/ui/ownership/`, driven by `tests/ownership_contract.rs`.
+  - [x] (2026-11-01) Wrote `docs/resource-policy-ownership-spike.md` and linked
+    it from `docs/contents.md`.
+  - [x] (2026-11-01) Ran the ownership suite green: six compile-pass and six
+    compile-fail fixtures matched their reviewed baselines. The final baseline,
+    `tests/ui/ownership/fail/spawn_borrows_request.stderr`, records `E0597`.
+    Every fail fixture's primary diagnostic is now tabulated in the evidence
+    document. Log:
+    `/tmp/green3-ownership-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
+- [x] M2: exercise identity, policy admission, and body adapters.
+  - [x] (2026-11-01) Added four integration targets:
+    `tests/resource_policy_spike.rs` (11 cases covering public and protected
+    admission, identity across a real suspension, unselected resources, scope
+    rejection, and cancellation or drop of owned and borrowed arguments),
+    `tests/resource_policy_spike_bdd.rs` (five `rstest-bdd` scenarios from
+    `tests/features/resource_policy_spike.feature`),
+    `tests/body_adapter_spike.rs` (seven cases, including a 64-case generated
+    frame-partition property), and `tests/network_body_spike.rs` (three cases
+    driving a real Hyper `Incoming` body through the same seam). Split the
+    shared fixtures into `tests/support/spike/{frames,components,admission,
+    synthetic}.rs` after the single fixture file exceeded the 400-line limit;
+    each module carries a scoped `#![allow(dead_code)]` because Cargo compiles a
+    separate copy into every binary.
+  - [x] (2026-11-01) Fixed two genuine suite defects found while going green:
+    the `rstest-bdd` rendezvous deadlocked for an anonymous protected request,
+    because admission denies before the hook, so `invoke_selected` now drives
+    the rendezvous only when an identity is present; and
+    `pending_then_ready_is_polled_again` recorded three polls rather than two,
+    because the body is polled for the pending report, the resumed frame, and
+    end of stream.
+  - [x] (2026-11-01) Ran the three required negative controls, then reverted
+    each fault: substituting the observed allocation handle failed
+    `identity_and_policy_survive_the_awaited_hook`; invoking despite
+    `Decision::Deny` failed `missing_identity_is_denied_before_the_hook_runs`
+    and `enforcer_denial_withholds_the_request`; dropping empty data frames in
+    `adapt_body` failed `several_data_frames_preserve_boundaries` and
+    `generated_partitions_are_reproduced_frame_by_frame`. Logs:
+    `/tmp/negctl-b-1-1-3-compile-resource-policy-and-async-ownership-spike.out`
+    and
+    `/tmp/negctl-c-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
+  - [x] (2026-11-01) Ran all four targets green after restoring the correct
+    implementation: 11, 5, 7, and 3 cases passed; `cargo run --example
+    resource_policy_spike` exited 0 with no output. Log:
+    `/tmp/m2-green-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
 - [ ] M3: reconcile evidence and documentation; mark 1.1.3 done.
+  - [x] (2026-11-01) Reconciled the design with the tested shapes: §3 records
+    `UnsyncBoxBody<Bytes, BodyError>`, §4 records the provisional policy and
+    enforcement surface, §11 connects the witnesses to I3 and I6, and §12
+    records the dependency subset the spike added.
+  - [x] (2026-11-01) Wrote
+    `docs/adr-007-resource-policy-and-body-erasure-boundary.md` (Proposed),
+    linked it from the design and `docs/contents.md`, and added the
+    design-traceability table to the evidence ledger.
+  - [x] (2026-11-01) Updated `docs/users-guide.md` with the experimental
+    consumer surface, `docs/developers-guide.md` with fixture maintenance and
+    compiler-evidence rules, and `docs/repository-layout.md` with the new
+    paths.
+  - [x] (2026-11-01) Ran every ordinary gate after the documentation changes,
+    then marked roadmap 1.1.3 checked and explicitly done. `mapsplice` 0.1.0
+    refused the edit with `dangling_dependency` for every possible anchor,
+    because tasks 1.2.1, 1.3 and 4.1 all declare `Requires 1.1.3`; the same
+    tool limitation was already recorded for 1.1.1 in the 1.1 execplan. The
+    exact checkbox and status change was applied as a reviewed manual edit, and
+    the roadmap's opening status paragraph now names the completed spike.
 
 ## Surprises & discoveries
 
-The prerequisite is already satisfied: `docs/roadmap.md` marks 1.1.1 and 1.1.2
-done. The current `src/lib.rs` is a generated greeting stub and `Cargo.toml`
-has no runtime dependencies. The compiler examples in the design are evidence,
-not an existing framework seam to extend.
+- 2026-11-01: `mapsplice` 0.1.0 cannot replace a roadmap task that another
+  task declares as a dependency. Replacing 1.1.3 failed with
+  `dangling_dependency` for both `1.1.3` and `1.1.2` anchors, and a scratch
+  roadmap reproduced it: an item with a dependent cannot be replaced, while a
+  leaf item can. The reviewed manual edit is therefore the fallback, consistent
+  with the 1.1 execplan's record of the same failure for 1.1.1. The
+  prerequisite is already satisfied: `docs/roadmap.md` marks 1.1.1 and 1.1.2
+  done. The current `src/lib.rs` is a generated greeting stub and `Cargo.toml`
+  has no runtime dependencies. The compiler examples in the design are
+  evidence, not an existing framework seam to extend.
 
 CodeGraph MCP tools were unavailable during planning. Known-file inspection and
 scoped file searches supplied the evidence; no semantic index result is
@@ -134,15 +216,42 @@ effective wrapper/configuration posture.
 - 2026-10-20, proposed: use conventional compiler/integration/property tests
   here. Retain the upstream lifecycle proof sketch and its later owner without
   manufacturing speculative Verus code for adapter plumbing.
+- 2026-11-01, accepted: the M2 suites were written against the seam M1 already
+  delivered, so V-IDENTITY, V-BODY, and V-CANCEL did not fail first as planned.
+  Red evidence was obtained instead from three deliberate faults injected after
+  the suites were green, and each fault was reverted before re-running. The
+  handle-substitution fault failed
+  `identity_and_policy_survive_the_awaited_hook` with differing `AllocationId`
+  values; the invocation fault failed both denial tests; the frame-drop fault
+  failed the named boundary test and the generated property.
+- 2026-11-01, accepted: keep the four fixture modules under
+  `tests/support/spike/` rather than one shared file. Cargo compiles a separate
+  copy of every `#[path]` module into each integration binary, so an item used
+  by only one binary is dead code in the others and would fail `-D warnings`;
+  the documented module-scoped `#![allow(dead_code)]` keeps the allowance
+  narrow.
 
 ## Outcomes & retrospective
 
-The plan has completed community review and repository validation. No
-implementation, passing spike, compiler canary, API acceptance, or proof
-completion is claimed. Final implementation evidence must distinguish compiler
-acceptance, executable behaviour, and decisions still reserved for phase 2. A
-negative spike result remains useful evidence but does not satisfy the
-roadmap's success criterion or justify marking it done.
+All three milestones are complete. (2026-11-01) The spike answered its four
+questions affirmatively on the pinned compiler, and the answers are recorded as
+compiler acceptance, executable behaviour, and decisions still reserved for
+phase 2, not as framework acceptance.
+
+- Compiler acceptance: six compile-pass fixtures and six compile-fail fixtures
+  witness `Send` futures, frozen registration, and the ownership errors the
+  design intends to keep out. The negative fixtures assert the compiler's own
+  diagnostics, so they fail if a later change makes the code acceptable.
+- Executable behaviour: the integration, behavioural, generated-frame, and
+  network suites show admission ordering, identity stability across a real
+  suspension, frame and trailer fidelity, drop-once release, and cancellation.
+- Still reserved: the exported policy vocabulary, the public API, and the
+  compiler posture are phase 2 decisions. ADR 007 stays Proposed, and the
+  specimen remains experimental.
+- Gates: `make check-fmt`, `make lint`, `make typecheck`, `make test`,
+  `make markdownlint`, `make spelling`, `make nixie`, and
+  `cargo run --example resource_policy_spike` all pass on the implementation
+  candidate.
 
 ## Context and orientation
 
