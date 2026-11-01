@@ -128,7 +128,7 @@ witness.
 Terms-of-reference Q3 and Q5 must still accept or revise the policy vocabulary
 and enforcement registration surface; this ADR does not accept them by
 recording how they compile. Roadmap task 2.2.3 must select the compiler and
-ownership direction before the invocation boundary stabilises, and
+ownership direction before the invocation boundary stabilizes, and
 [ADR 002](adr-002-compiler-ownership-experiment.md) remains proposed. Open
 questions for acceptance:
 

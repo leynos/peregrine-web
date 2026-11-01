@@ -53,6 +53,7 @@ compact and omits build output such as `target/`.
 │   │   └── spike/
 │   │       ├── admission.rs
 │   │       ├── components.rs
+│   │       ├── fixtures.rs
 │   │       ├── frames.rs
 │   │       └── synthetic.rs
 │   ├── ui/
@@ -60,6 +61,7 @@ compact and omits build output such as `target/`.
 │   ├── body_adapter_spike.rs
 │   ├── network_body_spike.rs
 │   ├── ownership_contract.rs
+│   ├── resource_policy_cancellation.rs
 │   ├── resource_policy_spike.rs
 │   ├── resource_policy_spike_bdd.rs
 │   └── stub.rs
