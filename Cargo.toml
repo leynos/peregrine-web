@@ -11,16 +11,30 @@ keywords = ["web"]
 categories = ["network"]
 
 [dependencies]
+async-trait = "0.1.92"
+bytes = "1.12.1"
+http = "1.5.0"
+http-body = "1.1.0"
+http-body-util = "0.1.5"
+thiserror = "2.0.21"
 
 [dev-dependencies]
 camino = "1.2.0"
 cap-std = { version = "4.0.3", features = ["fs_utf8"] }
+googletest = "0.14.4"
+hyper = { version = "1.12.0", features = ["http1", "server"] }
+hyper-util = { version = "0.1.21", features = ["tokio"] }
 mockable = { version = "3.0.0", default-features = false }
+pretty_assertions = "1.4.1"
 proptest = "1.9.0"
 rstest = { version = "0.27.0", default-features = false }
+rstest-bdd = "0.6.0"
+rstest-bdd-macros = "0.6.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
+tokio = { version = "1.54.1", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 toml = "1.1.3"
+trybuild = "1.0.122"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

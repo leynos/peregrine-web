@@ -1,0 +1,10 @@
+error[E0521]: borrowed data escapes outside of function
+ --> tests/ui/ownership/fail/response_captures_request_borrow.rs:7:47
+  |
+7 | fn body_for(view: RequestView<'_>) -> Bytes { Bytes::from_static(view.path().as_bytes()) }
+  |             ----                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |             |                                 |
+  |             |                                 `view` escapes the function body here
+  |             |                                 argument requires that `'1` must outlive `'static`
+  |             `view` is a reference that is only valid in the function body
+  |             has type `RequestView<'1>`
