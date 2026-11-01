@@ -1,0 +1,9 @@
+error[E0499]: cannot borrow `value` as mutable more than once at a time
+ --> tests/ui/ownership/fail/overlapping_mutable_loans.rs:6:18
+  |
+5 |     let first = &mut value;
+  |                 ---------- first mutable borrow occurs here
+6 |     let second = &mut value;
+  |                  ^^^^^^^^^^ second mutable borrow occurs here
+7 |     first.push('!');
+  |     ----- first borrow later used here

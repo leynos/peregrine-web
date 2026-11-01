@@ -1,0 +1,7 @@
+error[E0046]: not all trait items implemented, missing: `policy`
+  --> tests/ui/ownership/fail/missing_policy.rs:19:1
+   |
+19 | impl Resource for Catalogue {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `policy` in implementation
+   |
+   = help: implement the missing item: `fn policy(&self, _: Method) -> &Policy { todo!() }`

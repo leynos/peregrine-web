@@ -1,0 +1,253 @@
+# Resource-policy and ownership spike evidence
+
+This ledger records what the experimental specimen under `src/spike/` actually
+demonstrated for roadmap task 1.1.3 on the pinned compiler. It maps each
+witness in the
+[spike plan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)
+to its fixture, command, and observed result, and it states what the
+experiment does not establish.
+
+The specimen is exported as `peregrine_web::spike` so compile fixtures exercise
+the real library surface. It is not a framework, router, server, or
+authorization provider, and nothing here promises a stable interface.
+
+## Scope
+
+The specimen answers four bounded questions:
+
+- Can a resource object own its typed policy and its injected dependencies?
+- Can registration freeze the effective method and policy before admission?
+- Can an erased response body stay `Send` but not `Sync` across a real await?
+- Can one conditional invocation be expressed without route-policy tables,
+  service locators, or shared mutable application state?
+
+Runtime identity, body-adapter, and cancellation witnesses are recorded in the
+M2 sections of this ledger. Full HTTP serving, production authorization, and
+lifecycle proofs remain out of scope.
+
+## Design traceability
+
+Each witness group answers a design obligation rather than a free-standing
+experiment. Every result below was observed on the compiler recorded in
+[Compiler and build posture](#compiler-and-build-posture); the reproducing
+commands appear with each group, and the limits follow each table.
+
+Table: Witness groups, their design and ADR anchors, and the obligation each
+group partially discharges
+
+| Group      | Design anchor                                                                                                                                         | ADR anchor                                                      | Obligation                                                                              |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| V-OWN      | [§3.1](peregrine-design.md#31-experimental-compiler-and-ownership-direction), [§11 I6](peregrine-design.md#11-correctness-and-evidence)               | [ADR 002](adr-002-compiler-ownership-experiment.md) (proposed)  | V6: public async objects and futures meet their ownership bounds                        |
+| V-IDENTITY | [§4](peregrine-design.md#4-resources-method-metadata-and-policy), [§11 I3](peregrine-design.md#11-correctness-and-evidence)                           | [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) | V3: denied resource policy never reaches a responder, with identity frozen at admission |
+| V-BODY     | [§3](peregrine-design.md#3-application-and-context-contracts), [§11 I4](peregrine-design.md#11-correctness-and-evidence)                              | [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) | V4/I4 body-adapter subset: frames, trailers, and terminal errors survive erasure        |
+| V-CANCEL   | [§3.1](peregrine-design.md#31-experimental-compiler-and-ownership-direction), [§11.1](peregrine-design.md#111-contract-review-and-later-verification) | [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) | V6 owned-escape counterparts and the cancellation boundary of C09–C12                   |
+
+The V4/I4 mapping is partial on purpose: the spike proves the adapter preserves
+frames and errors, not the collection limit or backpressure behaviour that
+design §11 assigns to later slices.
+
+## Compiler and build posture
+
+Table: Compiler, toolchain, and build configuration observed for this evidence
+
+| Item                  | Observed value                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `rustc -Vv`           | `rustc 1.100.0-nightly (bff8e12ff 2026-08-26)`, LLVM 23.1.0                          |
+| `cargo --version`     | `cargo 1.100.0-nightly (e8cb624d5 2026-08-22)`                                       |
+| `rust-toolchain.toml` | `nightly-2026-08-27`, with Clippy, LLVM tools, Cranelift, rust-analyzer, and rustfmt |
+| Development backend   | `codegen-backend = "cranelift"` in `.cargo/config.toml`                              |
+| Linker                | `scripts/native-clang-linker.sh` with `-C link-arg=-fuse-ld=mold`                    |
+| Rust flags            | `-Zthreads=8` from Cargo configuration; `RUSTFLAGS` unset                            |
+| Compile admission     | `RUSTC_WRAPPER` and `RUSTDOC` point at the host `build-limits` adapters              |
+
+Every command in this ledger was run through Cargo with those wrappers in
+place. No compiler invocation bypassed admission.
+
+Snapshots of the full `rustc -Vv` text and the gate logs are kept on the
+recording host under `/tmp`.
+
+### Borrow-checker posture
+
+The toolchain, Cargo configuration, and Makefile select no `-Zpolonius` value,
+so the compiler's default applies. Current nightlies enable Polonius Alpha by
+default, but the effective posture is recorded from a canary rather than from
+the channel name. The temporary example below returns `b` on one path and `a`
+on another after a shared reborrow:
+
+```rust
+fn reborrow(a: &mut u8) -> &mut u8 {
+    let b = &mut *a;
+    if true { b } else { a }
+}
+```
+
+- `cargo rustc --example polonius_canary` exited 0.
+- `cargo rustc --example polonius_canary -- -Zpolonius=off` exited 101 with
+  `error[E0499]: cannot borrow *a as a mutable more than once at a time`.
+
+Recorded posture: `polonius-alpha`. The example was removed before the M1
+commit; the source above, the two commands, and the recorded exit statuses are
+the retained evidence. Logs are in `/tmp/canary-1-1-3-*.out` on the recording
+host. This experiment makes no compiler commitment, and the default posture
+could change with a future nightly.
+
+## V-OWN: compile witnesses
+
+`tests/ownership_contract.rs` runs `trybuild` over
+`tests/ui/ownership/pass/*.rs` and `tests/ui/ownership/fail/*.rs`. Positive
+fixtures must compile against the exported spike module. Negative fixtures must
+fail for one named ownership, borrow, or trait requirement, and each reviewed
+`.stderr` baseline records the diagnostic the pinned compiler emitted.
+
+Table: V-OWN compile-pass witnesses and what each one establishes
+
+| Witness                             | Fixture                                | Establishes                                                                  |
+| ----------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------- |
+| Heterogeneous collection            | `pass/heterogeneous_collection.rs`     | Two concrete resource types share one erased interface in a collection       |
+| Shared resource state               | `pass/shared_resource_state.rs`        | Two registrations retain the same resource allocation                        |
+| Disjoint field borrows across await | `pass/disjoint_fields_across_await.rs` | A `Send` future borrows disjoint context fields across a suspension          |
+| `Send` but not `Sync` body          | `pass/send_not_sync_body.rs`           | An erased `Cell`-bearing body crosses an await while the future stays `Send` |
+| Owned escape counterparts           | `pass/owned_escapes.rs`                | Every rejected escape has an owned form that compiles                        |
+| `Rc` ends before await              | `pass/rc_scope_ends_before_await.rs`   | A non-`Send` local scoped before the await does not prohibit a `Send` future |
+
+Table: V-OWN compile-fail witnesses, the requirement each one violates, and the
+diagnostic the pinned compiler emitted
+
+| Witness                        | Fixture                                    | Requirement                                         | Observed diagnostic                                           |
+| ------------------------------ | ------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------- |
+| `Rc`-backed resource           | `fail/rc_backed_resource.rs`               | `Resource: Send + Sync`                             | `E0277`: `Rc<String>` cannot be shared between threads safely |
+| Non-`Send` state across await  | `fail/non_send_state_across_await.rs`      | Spawned futures must be `Send`                      | `future cannot be sent between threads safely`                |
+| Overlapping mutable loans      | `fail/overlapping_mutable_loans.rs`        | Rust's exclusive-borrow rule                        | `E0499`: cannot borrow as mutable more than once at a time    |
+| Response body captures request | `fail/response_captures_request_borrow.rs` | Owned bodies cannot retain request-local references | `E0521`: borrowed data escapes outside of function            |
+| Spawned task borrows request   | `fail/spawn_borrows_request.rs`            | Detached tasks require `'static` captures           | `E0597`: `headers` does not live long enough                  |
+| Missing policy                 | `fail/missing_policy.rs`                   | `Resource::policy` is required                      | `E0046`: not all trait items implemented, missing `policy`    |
+
+## Reproducing the compile evidence
+
+```sh
+make test TEST_FLAGS='--test ownership_contract'
+```
+
+The positive fixtures must pass and every negative fixture must match its
+reviewed `.stderr` baseline. `trybuild` normalizes machine-specific paths, so a
+compiler change can alter the baseline even when acceptance is unchanged.
+Compiler changes therefore need a deliberate baseline review, never a blind
+`TRYBUILD=overwrite`.
+
+## What the compile evidence does not establish
+
+- `trybuild` compiles fixtures; it does not exercise runtime scheduling,
+  cancellation, or network I/O. The M2 witnesses cover those.
+- A dishonest resource can return a policy that differs from its behaviour.
+  The specimen records the contract and does not detect that violation.
+- The fixtures record acceptance on one dated nightly. They do not claim a
+  minimum supported Rust version or forward compatibility.
+- The specimen's policy gate demonstrates admission ordering only. It is not
+  tenant or object authorization for an application.
+
+## V-IDENTITY: identity and admission witnesses
+
+`tests/resource_policy_spike.rs` drives the runner directly. The fixture
+enforcer records one observation, suspends on a `tokio::sync::Notify`
+rendezvous, then records a second observation after it resumes, so every
+equality below spans a real await boundary rather than a synchronous stand-in.
+`tests/resource_policy_spike_bdd.rs` repeats the outcomes as `rstest-bdd`
+scenarios bound to `tests/features/resource_policy_spike.feature`.
+
+Table: V-IDENTITY witnesses and the behaviour each one establishes
+
+| Witness                    | Test                                               | Establishes                                                                                                  |
+| -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Identity across suspension | `identity_and_policy_survive_the_awaited_hook`     | Handle, observation, method, policy, path, and principal are identical before and after the enforcer's await |
+| Denial before the hook     | `missing_identity_is_denied_before_the_hook_runs`  | An anonymous protected request is denied with `MissingIdentity` and never reaches the enforcer               |
+| Enforcer denial            | `enforcer_denial_withholds_the_request`            | A `Decision::Deny` reaches neither the responder nor the dependency                                          |
+| Protected registration     | `protected_registration_requires_an_enforcer`      | A protected resource cannot register without an enforcement hook                                             |
+| Public registration        | `public_resource_permits_direct_invocation`        | A public resource registers and responds with no enforcer installed                                          |
+| Unselected resource        | `an_unselected_resource_is_not_invoked`            | Invoking one registration leaves a second registered resource untouched                                      |
+| Scope delegation           | `scoped_policy_delegates_without_computing_scopes` | A scoped policy defers its decision to the enforcer                                                          |
+| Empty scope rejection      | `empty_scope_set_is_rejected`                      | An empty scope set is a typed rejection, not a silent permit                                                 |
+
+The BDD suite covers five of these as scenarios: public direct invocation,
+protected denial before invocation, protected registration without enforcement,
+a present identity permitting a protected invocation, and an absent identity
+being denied before the hook.
+
+## V-BODY: adapter and network witnesses
+
+`tests/body_adapter_spike.rs` compares frames, not concatenated bytes, because
+a byte oracle cannot see a dropped empty frame or a moved boundary.
+`tests/network_body_spike.rs` drives a real Hyper `Incoming` body through the
+same `adapt_body` and `ResourceRunner::invoke` seam on an ephemeral loopback
+port.
+
+Table: V-BODY witnesses and the behaviour each one establishes
+
+| Witness              | Test                                                       | Establishes                                                                       |
+| -------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Empty input          | `empty_input_yields_no_frames`                             | An empty body emits no frames                                                     |
+| Frame boundaries     | `several_data_frames_preserve_boundaries`                  | Three frames, including an empty one, survive unchanged                           |
+| Trailers             | `trailers_are_forwarded_verbatim`                          | Every trailer name and value is forwarded unchanged                               |
+| Pending then ready   | `pending_then_ready_is_polled_again`                       | A pending poll does not lose the next frame; polls cover pending, data, and end   |
+| Terminal error       | `terminal_error_is_reported_once`                          | An upstream error surfaces as `BodyError::Upstream` with its text intact          |
+| Partial consumption  | `dropping_a_partially_consumed_body_releases_it_once`      | A half-read body owns its resources until dropped, then releases them once        |
+| Generated partitions | `generated_partitions_are_reproduced_frame_by_frame`       | Sixty-four generated partitions, with optional trailers, reproduce frame by frame |
+| One invocation path  | `synthetic_and_network_requests_share_one_invocation_path` | A synthetic and a network request reach the same dependency, one call each        |
+| Network trailers     | `chunked_request_trailers_reach_the_resource`              | Chunked trailers arrive at the resource through Hyper                             |
+| Truncated request    | `truncated_content_length_surfaces_the_body_error`         | A short body surfaces the adapter's error, not a silent success                   |
+
+Frame-level tests compile against a `Cell`-bearing synthetic body that is
+`Send` but not `Sync`, so the tests themselves witness the claimed bound.
+
+## V-CANCEL: cancellation and drop witnesses
+
+Table: V-CANCEL witnesses and the behaviour each one establishes
+
+| Witness                    | Test                                                         | Establishes                                                                                        |
+| -------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Owned body, cancelled call | `dropping_a_pending_invocation_releases_the_owned_body_once` | Dropping a pending invocation releases the owned body exactly once and never reaches the responder |
+| Borrowed arguments         | `a_dropped_future_returns_its_borrowed_arguments`            | A cancelled invocation leaves a caller-owned body usable and still owned by the caller             |
+| Spawned invocation         | `a_fully_owned_invocation_can_be_spawned`                    | A fully owned invocation crosses a multi-thread runtime boundary and responds once                 |
+
+## Negative controls
+
+Each control below was injected after the suites were green, observed to fail
+the named tests, and then reverted before the green run recorded above. This
+substitutes for a red-first stage on the runtime witnesses, which M1 had
+already implemented.
+
+Table: Injected faults and the tests that detected each one
+
+| Fault                         | Injected at                                            | Failing tests                                                                                   |
+| ----------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Substituted allocation handle | Fixture observer in `tests/support/spike/admission.rs` | `identity_and_policy_survive_the_awaited_hook`                                                  |
+| Invocation despite denial     | `src/spike/invoke.rs`, `Decision::Deny` arm            | `missing_identity_is_denied_before_the_hook_runs`, `enforcer_denial_withholds_the_request`      |
+| Dropped empty data frames     | `src/spike/body.rs`, `adapt_body`                      | `several_data_frames_preserve_boundaries`, `generated_partitions_are_reproduced_frame_by_frame` |
+
+The handle substitution changed only the fixture's observation, which is the
+point: the equality assertion fails when the observed allocation differs from
+the registration's retained allocation.
+
+## Reproducing the runtime evidence
+
+```sh
+make test TEST_FLAGS='--test resource_policy_spike'
+make test TEST_FLAGS='--test resource_policy_spike_bdd'
+make test TEST_FLAGS='--test body_adapter_spike'
+make test TEST_FLAGS='--test network_body_spike'
+cargo run --example resource_policy_spike
+```
+
+All four targets passed after the faults were reverted, and the example exited
+zero without printing diagnostics. The network cases bind an ephemeral loopback
+port and join their server task rather than sleeping.
+
+## What the runtime evidence does not establish
+
+- The enforcer is a fixture. No authentication, authorization, or session
+  policy is implemented or evaluated.
+- The network harness serves one request with Hyper's lower-level connection
+  API; it does not demonstrate routing, connection reuse, or load behaviour.
+- The cancellation witnesses drop futured invocations at one known suspension
+  point. They do not explore cancellation at every await or under load.
+- Frame-level equality holds for the generated partitions in this suite, not
+  for arbitrary bodies or arbitrary upstream error types.
