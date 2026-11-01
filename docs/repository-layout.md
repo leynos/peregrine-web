@@ -27,8 +27,18 @@ compact and omits build output such as `target/`.
 │   ├── repository-layout.md
 │   ├── users-guide.md
 │   └── ...
+├── examples/
+│   └── resource_policy_spike.rs
 ├── src/
-
+│   ├── spike/
+│   │   ├── body.rs
+│   │   ├── invoke.rs
+│   │   ├── method.rs
+│   │   ├── mod.rs
+│   │   ├── policy.rs
+│   │   ├── policy_enforcer.rs
+│   │   ├── request.rs
+│   │   └── resource.rs
 │   └── lib.rs
 
 ├── scripts/
@@ -37,6 +47,21 @@ compact and omits build output such as `target/`.
 │   ├── install-build-tools.sh
 │   └── native-clang-linker.sh
 ├── tests/
+│   ├── features/
+│   │   └── resource_policy_spike.feature
+│   ├── support/
+│   │   └── spike/
+│   │       ├── admission.rs
+│   │       ├── components.rs
+│   │       ├── frames.rs
+│   │       └── synthetic.rs
+│   ├── ui/
+│   │   └── ownership/
+│   ├── body_adapter_spike.rs
+│   ├── network_body_spike.rs
+│   ├── ownership_contract.rs
+│   ├── resource_policy_spike.rs
+│   ├── resource_policy_spike_bdd.rs
 │   └── stub.rs
 ├── tools/
 │   └── mold/
@@ -78,6 +103,8 @@ compact and omits build output such as `target/`.
   and contracts, distinguished from the generated implementation.
 - `docs/polonius-ownership-experiment.md`: Contains paired API examples,
   compiler evidence, ownership constraints, and experiment acceptance criteria.
+- `docs/resource-policy-ownership-spike.md`: Records the roadmap 1.1.3
+  compiler posture, witness ledger, reproduction commands, and evidence limits.
 - `docs/roadmap.md`: Sequences potential delivery using Goals, Ideas, Steps,
   and Tasks without date commitments.
 - `docs/adr-*.md`: Holds architectural decision records. Proposed records
@@ -92,6 +119,12 @@ compact and omits build output such as `target/`.
 
 - `src/lib.rs`: Contains the library crate root and exported public API
   surface.
+- `src/spike/`: Holds the roadmap 1.1.3 experimental specimen exported as
+  `peregrine_web::spike`. It is compile and runtime evidence, not a framework
+  API; see the [evidence ledger](resource-policy-ownership-spike.md).
+- `examples/resource_policy_spike.rs`: Runnable demonstration of the specimen.
+  It checks its outcomes programmatically and exits non-zero on a missing
+  observation.
 - `scripts/build-tools-*.sh`, `scripts/check-build-tools.sh`, and
   `scripts/install-build-tools.sh`: Resolve the pinned build tools and provide
   the install and prerequisite checks used by the Makefile.
@@ -100,6 +133,12 @@ compact and omits build output such as `target/`.
 
 - `tests/`: Holds integration and behavioural tests that exercise public
   behaviour.
+- `tests/support/spike/`: Shared fixtures for the spike's integration binaries.
+  Each binary includes only the modules it names, so the modules carry a
+  narrowly scoped `dead_code` allowance and must not be copied per suite.
+- `tests/ui/ownership/`: `trybuild` compile-pass and compile-fail fixtures,
+  each bound to one named ownership or trait requirement.
+- `tests/features/`: Gherkin feature files bound to `rstest-bdd` scenarios.
 - `tests/stub.rs`: Keeps the generated test directory valid until real tests
   replace it.
 - `tools/mold/`: Pins the supported `mold` release and archive checksums.

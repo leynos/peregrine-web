@@ -446,6 +446,37 @@ Keep formatting, lint, and tests sequential; do not bypass shared compiler
 admission or remove inherited compiler wrappers. Distinguish local green gates,
 CLI review, hosted assessment, and runtime conformance evidence.
 
+## Maintain the spike fixtures
+
+Roadmap task 1.1.3 left an experimental specimen under `src/spike/` and its
+evidence under `tests/`. Neither is a framework API. Treat a change to them as
+an experiment change: update the
+[evidence ledger](resource-policy-ownership-spike.md) in the same commit and
+rerun the focused targets it names.
+
+- `tests/ui/ownership/` holds `trybuild` fixtures. A reviewed `.stderr`
+  baseline records the pinned compiler's diagnostic; accept an update only
+  after confirming the finding is a real contract change. Never run
+  `TRYBUILD=overwrite` as a shortcut for a passing gate.
+- `tests/support/spike/` holds fixtures shared by several integration
+  binaries. `#[path]` inclusion means each binary compiles only the subset it
+  names, so the modules carry a narrowly scoped `dead_code` allowance with a
+  reason. Keep new shared fixtures there rather than copying them per test.
+- The enforcer fixture suspends on a `tokio::sync::Notify` rendezvous. Do not
+  drive that rendezvous for a request admission denies before the hook; the
+  wait would never be satisfied.
+- `tests/network_body_spike.rs` binds an ephemeral loopback port and joins or
+  aborts its server task. Deadlines there are failure bounds, not timing
+  assertions; do not convert them into sleeps.
+- The synthetic body is `Send` but not `Sync` by design. A change that makes
+  it `Sync` silently weakens the bound the body witnesses claim.
+
+Record compiler identity with the evidence. The specimen's ledger states the
+pinned nightly, the observed borrow-checker posture, and the canary command
+that produced it. Re-record the posture when the nightly moves rather than
+inferring it from the channel name, and keep compiler acceptance separate from
+application-level claims.
+
 ## Toolchain updates
 
 `rust-toolchain.toml` pins `nightly-2026-08-27`. Dependabot's `rust-toolchain`
