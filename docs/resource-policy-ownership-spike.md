@@ -151,8 +151,10 @@ Compiler changes therefore need a deliberate baseline review, never a blind
 enforcer records one observation, suspends on a `tokio::sync::Notify`
 rendezvous, then records a second observation after it resumes, so every
 equality below spans a real await boundary rather than a synchronous stand-in.
-`tests/resource_policy_spike_bdd.rs` repeats the outcomes as `rstest-bdd`
-scenarios bound to `tests/features/resource_policy_spike.feature`.
+Its resources and helpers live in `tests/support/spike/fixtures.rs`, which the
+cancellation binary includes as well. `tests/resource_policy_spike_bdd.rs`
+repeats the outcomes as `rstest-bdd` scenarios bound to
+`tests/features/resource_policy_spike.feature`.
 
 Table: V-IDENTITY witnesses and the behaviour each one establishes
 
@@ -200,6 +202,10 @@ Frame-level tests compile against a `Cell`-bearing synthetic body that is
 
 ## V-CANCEL: cancellation and drop witnesses
 
+`tests/resource_policy_cancellation.rs` owns these witnesses. They are a
+separate binary from the identity suite so each file stays within the
+repository's 400-line limit and each set can be reproduced on its own target.
+
 Table: V-CANCEL witnesses and the behaviour each one establishes
 
 | Witness                    | Test                                                         | Establishes                                                                                        |
@@ -231,6 +237,7 @@ the registration's retained allocation.
 
 ```sh
 make test TEST_FLAGS='--test resource_policy_spike'
+make test TEST_FLAGS='--test resource_policy_cancellation'
 make test TEST_FLAGS='--test resource_policy_spike_bdd'
 make test TEST_FLAGS='--test body_adapter_spike'
 make test TEST_FLAGS='--test network_body_spike'

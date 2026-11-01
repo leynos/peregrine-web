@@ -1,27 +1,21 @@
-//! Runtime evidence for resource identity, policy admission, and cancellation.
+//! Runtime evidence for resource identity and policy admission.
 //!
 //! Each test drives the real specimen seam in `peregrine_web::spike`. The
 //! enforcer fixture suspends between the admission decision and the responder,
 //! so identity observations are compared across an actual await rather than a
-//! synchronous stand-in. Cancellation tests poll a pending invocation and then
-//! drop it, which is the only way to observe what a dropped future released.
+//! synchronous stand-in. What a dropped or spawned invocation releases is
+//! observed in `resource_policy_cancellation`.
 
 #[path = "support/spike/admission.rs"]
 mod spike_admission;
 #[path = "support/spike/components.rs"]
 mod spike_components;
+#[path = "support/spike/fixtures.rs"]
+mod spike_fixtures;
 #[path = "support/spike/frames.rs"]
 mod spike_frames;
-#[path = "support/spike/synthetic.rs"]
-mod spike_synthetic;
 
-use std::{
-    error::Error,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-};
+use std::{error::Error, sync::Arc};
 
 use bytes::Bytes;
 use googletest::prelude::{eq, matches_pattern, verify_that};
@@ -36,8 +30,8 @@ use peregrine_web::spike::{
     InvocationOutcome,
     Method,
     Policy,
-    PolicyEnforcer,
     PolicyError,
+    RegisteredResource,
     RegistrationError,
     RequestView,
     ResourceRunner,
@@ -45,7 +39,7 @@ use peregrine_web::spike::{
     ScopeSet,
     adapt_body,
 };
-use rstest::{fixture, rstest};
+use rstest::rstest;
 use spike_admission::{
     AdmissionEvent,
     AdmissionPhase,
@@ -54,69 +48,121 @@ use spike_admission::{
     invoke_with_rendezvous,
 };
 use spike_components::{BillingResource, CatalogueResource, DependencyState, OwnedResource};
-use spike_frames::collect_frames;
-use spike_synthetic::{SyntheticBody, drop_counter, poll_once};
+use spike_fixtures::{
+    as_enforcer,
+    billing_dependency,
+    catalogue_dependency,
+    enforcer_with,
+    protected_catalogue,
+    public_catalogue,
+    scoped_catalogue,
+    verified,
+};
 use tokio::sync::mpsc::UnboundedReceiver;
 
-/// Converts a Googletest assertion failure into the error the harness prints.
+/// Receives the enforcer's pre-suspension and post-suspension observations.
+async fn await_admission_pair(
+    events: &mut UnboundedReceiver<AdmissionEvent>,
+) -> Result<(AdmissionEvent, AdmissionEvent), Box<dyn Error>> {
+    let before = events.recv().await.ok_or("a pre-await observation")?;
+    let after = events.recv().await.ok_or("a post-await observation")?;
+    Ok((before, after))
+}
+
+/// Asserts that only the phase changed across the enforcer's suspension.
+fn assert_only_the_phase_changed(before: &AdmissionEvent, after: &AdmissionEvent) {
+    pretty_assertions::assert_eq!(
+        (before.phase, after.phase),
+        (AdmissionPhase::BeforeAwait, AdmissionPhase::AfterAwait),
+        "the enforcer must observe one event before and one after its suspension"
+    );
+    pretty_assertions::assert_eq!(
+        (
+            &before.handle,
+            &before.observation,
+            &before.method,
+            &before.policy,
+            &before.path,
+            &before.identity,
+        ),
+        (
+            &after.handle,
+            &after.observation,
+            &after.method,
+            &after.policy,
+            &after.path,
+            &after.identity,
+        ),
+        "registration must freeze every observation except the phase across the await"
+    );
+}
+
+/// Invokes a registration across the enforcer's real suspension.
 ///
-/// `verify_that!` reports failures as `googletest::Result`, whose failure type
-/// is not `std::error::Error`. Tests here also propagate domain errors, so the
-/// assertion failure travels back to the harness as its rendered message.
-fn verified(outcome: googletest::Result<()>) -> Result<(), Box<dyn Error>> {
-    outcome.map_err(|failure| failure.to_string().into())
+/// Every caller presents the same authenticated request, so the only variation
+/// a caller supplies is the registration under test.
+async fn invoke_through_rendezvous(
+    enforcer: &Arc<FixtureEnforcer>,
+    runner: &ResourceRunner,
+    registered: &RegisteredResource,
+    body: &mut ErasedBody,
+) -> InvocationOutcome {
+    let headers = HeaderMap::new();
+    let identity = Identity::new("user-42");
+    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
+    invoke_with_rendezvous(
+        enforcer,
+        InvocationSubject {
+            runner,
+            registered,
+            view,
+            body,
+        },
+    )
+    .await
 }
 
-/// The dependency the catalogue fixture injects.
-#[fixture]
-fn catalogue_dependency() -> Arc<DependencyState> {
-    DependencyState::new("catalogue", "catalogue-record")
-}
-
-/// The dependency the billing fixture injects.
-#[fixture]
-fn billing_dependency() -> Arc<DependencyState> {
-    DependencyState::new("billing", "billing-record")
-}
-
-/// A catalogue resource whose policy is public.
-#[fixture]
-fn public_catalogue(catalogue_dependency: Arc<DependencyState>) -> Arc<CatalogueResource> {
-    CatalogueResource::new("catalogue", Policy::Public, catalogue_dependency)
-}
-
-/// A catalogue resource whose policy requires an authenticated identity.
-#[fixture]
-fn protected_catalogue(catalogue_dependency: Arc<DependencyState>) -> Arc<CatalogueResource> {
-    CatalogueResource::new("catalogue", Policy::Authenticated, catalogue_dependency)
-}
-
-/// A catalogue resource whose policy requires one scope.
-#[fixture]
-fn scoped_catalogue(
-    catalogue_dependency: Arc<DependencyState>,
-) -> Result<Arc<CatalogueResource>, PolicyError> {
-    let scope = ScopeName::new("catalogue:read")?;
-    let scopes = ScopeSet::new([scope])?;
-    Ok(CatalogueResource::new(
-        "catalogue",
-        Policy::Scopes(scopes),
-        catalogue_dependency,
-    ))
-}
-
-/// Builds a suspended-at-admission enforcer and the receiver of its events.
-fn enforcer_with(decision: Decision) -> (Arc<FixtureEnforcer>, UnboundedReceiver<AdmissionEvent>) {
-    FixtureEnforcer::new(decision)
-}
-
-/// Wraps an enforcer in the trait object the runner accepts.
-///
-/// The concrete clone is bound first so the unsizing coercion happens on the
-/// value rather than being pushed back into `Arc::clone`'s type parameter.
-fn as_enforcer(enforcer: &Arc<FixtureEnforcer>) -> Arc<dyn PolicyEnforcer> {
-    let concrete: Arc<FixtureEnforcer> = Arc::clone(enforcer);
-    concrete
+/// Asserts that admission observed the registration that retained the resource.
+fn assert_registration_was_retained(
+    before: &AdmissionEvent,
+    registered: &RegisteredResource,
+    resource: &CatalogueResource,
+) {
+    pretty_assertions::assert_eq!(
+        before.handle,
+        AllocationId::of(registered.resource()),
+        "admission must observe the handle of the retained resource"
+    );
+    pretty_assertions::assert_eq!(
+        before.method,
+        Method::Get,
+        "admission must observe the frozen method"
+    );
+    pretty_assertions::assert_eq!(
+        before.policy,
+        Policy::Authenticated,
+        "admission must observe the policy captured at registration"
+    );
+    pretty_assertions::assert_eq!(
+        before.path,
+        "/catalogue",
+        "admission must observe the request path"
+    );
+    pretty_assertions::assert_eq!(
+        before.identity.as_deref(),
+        Some("user-42"),
+        "admission must observe the presented principal"
+    );
+    pretty_assertions::assert_eq!(
+        before.observation.resource,
+        AllocationId::of(resource.state()),
+        "the declared resource identity must name the fixture's own state"
+    );
+    pretty_assertions::assert_eq!(
+        before.observation.dependency,
+        AllocationId::of(resource.dependency()),
+        "the declared dependency identity must name the fixture's own store"
+    );
 }
 
 #[rstest]
@@ -200,21 +246,9 @@ async fn enforcer_denial_withholds_the_request(
     let (enforcer, _events) = enforcer_with(Decision::Deny(DenialReason::EnforcerDenied));
     let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
     let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
-    let headers = HeaderMap::new();
-    let identity = Identity::new("user-42");
-    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
     let mut body = adapt_body(Empty::<Bytes>::new());
 
-    let outcome = invoke_with_rendezvous(
-        &enforcer,
-        InvocationSubject {
-            runner: &runner,
-            registered: &registered,
-            view,
-            body: &mut body,
-        },
-    )
-    .await;
+    let outcome = invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
 
     verified(verify_that!(
         outcome.denied(),
@@ -239,84 +273,13 @@ async fn identity_and_policy_survive_the_awaited_hook(
     let (enforcer, mut events) = enforcer_with(Decision::Permit);
     let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
     let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
-    let headers = HeaderMap::new();
-    let identity = Identity::new("user-42");
-    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
     let mut body = adapt_body(Empty::<Bytes>::new());
 
-    let outcome = invoke_with_rendezvous(
-        &enforcer,
-        InvocationSubject {
-            runner: &runner,
-            registered: &registered,
-            view,
-            body: &mut body,
-        },
-    )
-    .await;
+    let outcome = invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
 
-    let before = events.recv().await.ok_or("a pre-await observation")?;
-    let after = events.recv().await.ok_or("a post-await observation")?;
-    pretty_assertions::assert_eq!(
-        (before.phase, after.phase),
-        (AdmissionPhase::BeforeAwait, AdmissionPhase::AfterAwait),
-        "the enforcer must observe one event before and one after its suspension"
-    );
-    pretty_assertions::assert_eq!(
-        (
-            &before.handle,
-            &before.observation,
-            &before.method,
-            &before.policy,
-            &before.path,
-            &before.identity,
-        ),
-        (
-            &after.handle,
-            &after.observation,
-            &after.method,
-            &after.policy,
-            &after.path,
-            &after.identity,
-        ),
-        "registration must freeze every observation except the phase across the await"
-    );
-    let retained = AllocationId::of(registered.resource());
-    pretty_assertions::assert_eq!(
-        before.handle,
-        retained,
-        "admission must observe the handle of the retained resource"
-    );
-    pretty_assertions::assert_eq!(
-        before.method,
-        Method::Get,
-        "admission must observe the frozen method"
-    );
-    pretty_assertions::assert_eq!(
-        before.policy,
-        Policy::Authenticated,
-        "admission must observe the policy captured at registration"
-    );
-    pretty_assertions::assert_eq!(
-        before.path,
-        "/catalogue",
-        "admission must observe the request path"
-    );
-    pretty_assertions::assert_eq!(
-        before.identity.as_deref(),
-        Some("user-42"),
-        "admission must observe the presented principal"
-    );
-    pretty_assertions::assert_eq!(
-        before.observation.resource,
-        AllocationId::of(protected_catalogue.state()),
-        "the declared resource identity must name the fixture's own state"
-    );
-    pretty_assertions::assert_eq!(
-        before.observation.dependency,
-        AllocationId::of(protected_catalogue.dependency()),
-        "the declared dependency identity must name the fixture's own store"
-    );
+    let (before, after) = await_admission_pair(&mut events).await?;
+    assert_only_the_phase_changed(&before, &after);
+    assert_registration_was_retained(&before, &registered, &protected_catalogue);
     verified(verify_that!(outcome.responded().is_some(), eq(true)))?;
     verified(verify_that!(
         protected_catalogue.state().responder_calls(),
@@ -368,21 +331,9 @@ async fn scoped_policy_delegates_without_computing_scopes(
     let (enforcer, _events) = enforcer_with(Decision::Permit);
     let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
     let registered = runner.register(scoped.clone(), Method::Get)?;
-    let headers = HeaderMap::new();
-    let identity = Identity::new("user-42");
-    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
     let mut body = adapt_body(Empty::<Bytes>::new());
 
-    let outcome = invoke_with_rendezvous(
-        &enforcer,
-        InvocationSubject {
-            runner: &runner,
-            registered: &registered,
-            view,
-            body: &mut body,
-        },
-    )
-    .await;
+    let outcome = invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
 
     verified(verify_that!(outcome.responded().is_some(), eq(true)))?;
     verified(verify_that!(
@@ -390,132 +341,5 @@ async fn scoped_policy_delegates_without_computing_scopes(
         eq(true)
     ))?;
     verified(verify_that!(scoped.state().responder_calls(), eq(1)))?;
-    Ok(())
-}
-
-/// Builds a body whose drop is observable through a shared counter.
-fn body_with_probe() -> (ErasedBody, Arc<AtomicUsize>) {
-    let (probe, drops) = drop_counter();
-    let polls = Arc::new(AtomicUsize::new(0));
-    (
-        adapt_body(SyntheticBody::new(Vec::new(), Some(probe), polls)),
-        drops,
-    )
-}
-
-#[rstest]
-#[tokio::test]
-async fn dropping_a_pending_invocation_releases_the_owned_body_once(
-    protected_catalogue: Arc<CatalogueResource>,
-) -> Result<(), Box<dyn Error>> {
-    let (enforcer, _events) = enforcer_with(Decision::Permit);
-    let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
-    let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
-    let headers = HeaderMap::new();
-    let identity = Identity::new("user-42");
-    let (owned_body, drops) = body_with_probe();
-
-    let invocation = async move {
-        let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
-        let mut body = owned_body;
-        runner.invoke(&registered, view, &mut body).await
-    };
-    let mut pending = Box::pin(invocation);
-    assert!(
-        poll_once(pending.as_mut()).is_pending(),
-        "the fixture enforcer suspends, so the invocation must stay pending"
-    );
-    pretty_assertions::assert_eq!(
-        drops.load(Ordering::SeqCst),
-        0,
-        "the owned body must outlive the pending invocation"
-    );
-
-    drop(pending);
-
-    pretty_assertions::assert_eq!(
-        drops.load(Ordering::SeqCst),
-        1,
-        "dropping the invocation must release the owned body exactly once"
-    );
-    pretty_assertions::assert_eq!(
-        protected_catalogue.state().responder_calls(),
-        0,
-        "a cancelled invocation must not reach the responder"
-    );
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test]
-async fn a_dropped_future_returns_its_borrowed_arguments(
-    protected_catalogue: Arc<CatalogueResource>,
-) -> Result<(), Box<dyn Error>> {
-    let (enforcer, _events) = enforcer_with(Decision::Permit);
-    let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
-    let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
-    let headers = HeaderMap::new();
-    let identity = Identity::new("user-42");
-    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
-    let (mut body, drops) = body_with_probe();
-
-    {
-        let mut invocation = Box::pin(runner.invoke(&registered, view, &mut body));
-        assert!(
-            poll_once(invocation.as_mut()).is_pending(),
-            "the fixture enforcer suspends, so the invocation must stay pending"
-        );
-    }
-
-    pretty_assertions::assert_eq!(
-        drops.load(Ordering::SeqCst),
-        0,
-        "a caller-owned body must not be dropped by a cancelled invocation"
-    );
-    let frames = collect_frames(&mut body).await?;
-    pretty_assertions::assert_eq!(
-        frames,
-        Vec::new(),
-        "the caller must be able to consume the returned body"
-    );
-    drop(body);
-    pretty_assertions::assert_eq!(
-        drops.load(Ordering::SeqCst),
-        1,
-        "the caller releases its own body exactly once"
-    );
-    pretty_assertions::assert_eq!(
-        protected_catalogue.state().responder_calls(),
-        0,
-        "a cancelled invocation must not reach the responder"
-    );
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_fully_owned_invocation_can_be_spawned(
-    public_catalogue: Arc<CatalogueResource>,
-) -> Result<(), Box<dyn Error>> {
-    let runner = ResourceRunner::new();
-    let registered = Arc::new(runner.register(public_catalogue.clone(), Method::Get)?);
-    let headers = HeaderMap::new();
-
-    let invocation = tokio::spawn(async move {
-        let view = RequestView::new(Method::Get, "/catalogue", &headers, None);
-        let mut body = adapt_body(Empty::<Bytes>::new());
-        runner.invoke(&registered, view, &mut body).await
-    });
-
-    let outcome = invocation.await?;
-
-    verified(verify_that!(
-        matches!(outcome, InvocationOutcome::Responded(_)),
-        eq(true)
-    ))?;
-    verified(verify_that!(
-        public_catalogue.state().responder_calls(),
-        eq(1)
-    ))?;
     Ok(())
 }

@@ -125,9 +125,11 @@ the required design/ADR change; obtain explicit approval for deviations.
     `/tmp/green3-ownership-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
 - [x] M2: exercise identity, policy admission, and body adapters.
   - [x] (2026-11-01) Added four integration targets:
-    `tests/resource_policy_spike.rs` (11 cases covering public and protected
-    admission, identity across a real suspension, unselected resources, scope
-    rejection, and cancellation or drop of owned and borrowed arguments),
+    `tests/resource_policy_spike.rs` and `tests/resource_policy_cancellation.rs`
+    (8 and 3 cases covering public and protected admission, identity across a
+    real suspension, unselected resources, scope rejection, and cancellation or
+    drop of owned and borrowed arguments; split after CodeScene flagged an
+    oversized test in the combined file),
     `tests/resource_policy_spike_bdd.rs` (five `rstest-bdd` scenarios from
     `tests/features/resource_policy_spike.feature`),
     `tests/body_adapter_spike.rs` (seven cases, including a 64-case generated
@@ -181,6 +183,17 @@ the required design/ADR change; obtain explicit approval for deviations.
 
 ## Surprises & discoveries
 
+- 2026-11-01: The hosted CodeScene check rejected the first published candidate
+  for a `Large Method` (89 lines) in
+  `identity_and_policy_survive_the_awaited_hook`, not for a style preference:
+  the test inlined a whole observation comparison. Extracting the comparison
+  helpers exposed a second finding, `Code Duplication`, because three tests
+  each rebuilt the same rendezvous invocation; one helper now drives all three.
+  The combined file still exceeded the 400-line limit once the fixtures moved
+  out, so the cancellation cases moved to
+  `tests/resource_policy_cancellation.rs` and the shared fixtures to
+  `tests/support/spike/fixtures.rs`. Both files now score 10.00, so the
+  repository's own limits and the hosted review agree.
 - 2026-11-01: `mapsplice` 0.1.0 cannot replace a roadmap task that another
   task declares as a dependency. Replacing 1.1.3 failed with
   `dangling_dependency` for both `1.1.3` and `1.1.2` anchors, and a scratch
