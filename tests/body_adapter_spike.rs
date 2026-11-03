@@ -3,184 +3,71 @@
 //! The synthetic body is `Send` but deliberately not `Sync`, so every test that
 //! compiles here also witnesses the bound the spike claims. Frames are compared
 //! frame by frame, including empty data frames, because a concatenated-bytes
-//! oracle cannot see a dropped empty frame or a changed frame boundary.
+//! oracle cannot see a dropped empty frame or a changed frame boundary. The
+//! generated partition property lives in `body_adapter_property`; both binaries
+//! build their cases from `tests/support/spike/cases.rs`.
 
+#[path = "support/spike/cases.rs"]
+mod spike_cases;
 #[path = "support/spike/frames.rs"]
 mod spike_frames;
 #[path = "support/spike/synthetic.rs"]
 mod spike_synthetic;
 
-#[cfg(test)]
-mod runtime_support {
-    //! Test-only support that the frame and property tests share.
-    //!
-    //! The module is test-only so lints that distinguish test code from
-    //! production code can see that the helpers here are not shipped.
-
-    /// Builds a current-thread runtime for draining bodies in synchronous tests.
-    pub(super) fn current_thread_runtime() -> tokio::runtime::Runtime {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("a current-thread runtime should build")
-    }
-}
-
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::{sync::atomic::Ordering, task::Poll};
 
 use bytes::Bytes;
-use http::{
-    HeaderMap,
-    header::{HeaderName, HeaderValue},
-};
 use http_body_util::BodyExt;
-use peregrine_web::spike::{BodyError, ErasedBody, adapt_body};
-use proptest::prelude::*;
-use runtime_support::current_thread_runtime;
-use spike_frames::{CollectedFrame, collect_frames, normalise_trailers};
-use spike_synthetic::{DropProbe, FrameStep, SyntheticBody, drop_counter, poll_once};
+use peregrine_web::spike::BodyError;
+use spike_cases::{
+    FrameCase,
+    current_thread_runtime,
+    empty_body,
+    expected_frames,
+    headers_for,
+    normalised,
+    steps_for,
+    synthetic_body,
+};
+use spike_frames::{CollectedFrame, collect_frames};
+use spike_synthetic::{FrameStep, MAX_POLLS, drop_counter, poll_once};
 
-/// Trailer names that are always syntactically valid.
-const TRAILER_NAMES: [&str; 3] = ["x-checksum", "x-tenant", "x-trace"];
-
-/// A generated frame partition with optional trailers.
-#[derive(Clone, Debug)]
-struct FrameCase {
-    /// The data chunks in emission order, including deliberately empty ones.
-    chunks: Vec<Vec<u8>>,
-    /// Trailer name/value pairs, or `None` when the case carries no trailers.
-    trailers: Option<Vec<(&'static str, String)>>,
-}
-
-impl FrameCase {
-    /// Returns a stable description used in assertion messages.
-    fn description(&self) -> String {
-        format!(
-            "chunks={}, bytes={}, trailers={}",
-            self.chunks.len(),
-            self.chunks.iter().map(Vec::len).sum::<usize>(),
-            self.trailers.as_ref().map_or(0, Vec::len),
-        )
-    }
-}
-
-/// Splits a payload into `count` contiguous chunks, including empty ones.
-fn partition(payload: &[u8], count: usize) -> Vec<Vec<u8>> {
-    if payload.is_empty() || count == 0 {
-        return vec![Vec::new(); count];
-    }
-    let chunk_size = payload.len().div_ceil(count);
-    let mut chunks: Vec<Vec<u8>> = payload.chunks(chunk_size).map(<[u8]>::to_vec).collect();
-    chunks.resize(count, Vec::new());
-    chunks
-}
-
-/// Generates an ASCII value that is always a legal header value.
-fn header_value() -> impl Strategy<Value = String> {
-    proptest::collection::vec(prop::sample::select(b"0123456789abcdef".to_vec()), 0..=16)
-        .prop_map(|bytes| bytes.into_iter().map(char::from).collect())
-}
-
-/// Generates one trailer pair drawn from the always-valid names.
-fn trailer_pair() -> impl Strategy<Value = (&'static str, String)> {
-    (0..TRAILER_NAMES.len()).prop_flat_map(|index| {
-        // `get` keeps the generator total even if the name table is edited.
-        let name = TRAILER_NAMES.get(index).copied().unwrap_or("x-trace");
-        header_value().prop_map(move |value| (name, value))
-    })
-}
-
-/// Generates frame partitions inside the spike's documented bounds.
-fn frame_cases() -> impl Strategy<Value = FrameCase> {
-    let payload_and_count = prop_oneof![
-        Just((Vec::<u8>::new(), 0usize)),
+/// Builds the four documented frame classes as concrete cases.
+///
+/// The classes cross body emptiness with trailer presence, so a witness exists
+/// for each combination rather than only for the generated mixture.
+fn frame_classes() -> Vec<(&'static str, FrameCase)> {
+    let trailers = || Some(vec![("x-checksum", "abc123".to_owned())]);
+    vec![
         (
-            proptest::collection::vec(any::<u8>(), 0..=4096),
-            1usize..=32usize
+            "empty body without trailers",
+            FrameCase {
+                chunks: Vec::new(),
+                trailers: None,
+            },
         ),
-    ];
-    let trailer_strategy = prop::option::of(prop::collection::vec(
-        trailer_pair(),
-        0..=TRAILER_NAMES.len(),
-    ));
-    (payload_and_count, trailer_strategy).prop_map(|((payload, count), trailers)| FrameCase {
-        chunks: partition(&payload, count),
-        trailers,
-    })
-}
-
-/// Builds the scripted steps for one generated case.
-fn steps_for(case: &FrameCase) -> Vec<FrameStep> {
-    let mut steps: Vec<FrameStep> = case
-        .chunks
-        .iter()
-        .cloned()
-        .map(|chunk| FrameStep::Data(Bytes::from(chunk)))
-        .collect();
-    if let Some(pairs) = case.trailers.as_ref() {
-        steps.push(FrameStep::Trailers(headers_for(pairs)));
-    }
-    steps
-}
-
-/// Builds the trailers frame a case emits.
-fn headers_for(pairs: &[(&'static str, String)]) -> HeaderMap {
-    let mut headers = HeaderMap::new();
-    for (name, value) in pairs {
-        if let Ok(parsed) = HeaderValue::from_str(value) {
-            headers.append(HeaderName::from_static(name), parsed);
-        }
-    }
-    headers
-}
-
-/// Builds the frame sequence a case must reproduce, independently of the body.
-fn expected_frames(case: &FrameCase) -> Vec<CollectedFrame> {
-    let mut frames: Vec<CollectedFrame> = case
-        .chunks
-        .iter()
-        .cloned()
-        .map(|chunk| CollectedFrame::Data(Bytes::from(chunk)))
-        .collect();
-    if let Some(pairs) = case.trailers.as_ref() {
-        frames.push(CollectedFrame::Trailers(normalise_trailers(&headers_for(
-            pairs,
-        ))));
-    }
-    frames
-}
-
-/// Sorts trailer pairs so header-map iteration order cannot flake a comparison.
-fn normalised(frames: Vec<CollectedFrame>) -> Vec<CollectedFrame> {
-    frames
-        .into_iter()
-        .map(|frame| match frame {
-            CollectedFrame::Trailers(mut pairs) => {
-                pairs.sort();
-                CollectedFrame::Trailers(pairs)
-            }
-            data @ CollectedFrame::Data(_) => data,
-        })
-        .collect()
-}
-
-/// Builds an erased synthetic body with an optional drop probe.
-fn synthetic_body(
-    steps: Vec<FrameStep>,
-    probe: Option<DropProbe>,
-) -> (ErasedBody, Arc<AtomicUsize>) {
-    let polls = Arc::new(AtomicUsize::new(0));
-    let body: ErasedBody = adapt_body(SyntheticBody::new(steps, probe, Arc::clone(&polls)));
-    (body, polls)
-}
-
-/// Builds an erased body with no scripted steps.
-fn empty_body() -> ErasedBody {
-    let (body, _polls) = synthetic_body(Vec::new(), None);
-    body
+        (
+            "empty body with trailers",
+            FrameCase {
+                chunks: Vec::new(),
+                trailers: trailers(),
+            },
+        ),
+        (
+            "non-empty body without trailers",
+            FrameCase {
+                chunks: vec![b"payload".to_vec()],
+                trailers: None,
+            },
+        ),
+        (
+            "non-empty body with trailers",
+            FrameCase {
+                chunks: vec![b"payload".to_vec()],
+                trailers: trailers(),
+            },
+        ),
+    ]
 }
 
 #[test]
@@ -360,37 +247,78 @@ fn dropping_a_partially_consumed_body_releases_it_once() {
     );
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
-
-    #[test]
-    fn generated_partitions_are_reproduced_frame_by_frame(case in frame_cases()) {
-        let runtime = current_thread_runtime();
+#[test]
+fn every_documented_frame_class_is_reproduced() {
+    let runtime = current_thread_runtime();
+    for (class, case) in frame_classes() {
         let (mut body, _polls) = synthetic_body(steps_for(&case), None);
         let frames = runtime
             .block_on(collect_frames(&mut body))
-            .expect("generated frames must not fail");
+            .expect("a documented frame class must not fail");
 
-        prop_assert_eq!(
-            normalised(frames.clone()),
+        assert_eq!(
+            normalised(frames),
             normalised(expected_frames(&case)),
-            "frame sequence differed for {}",
-            case.description(),
-        );
-        let actual_bytes: Vec<u8> = frames
-            .into_iter()
-            .filter_map(|frame| match frame {
-                CollectedFrame::Data(bytes) => Some(bytes.to_vec()),
-                CollectedFrame::Trailers(_) => None,
-            })
-            .flatten()
-            .collect();
-        let expected_bytes: Vec<u8> = case.chunks.iter().flatten().copied().collect();
-        prop_assert_eq!(
-            actual_bytes,
-            expected_bytes,
-            "concatenated bytes differed for {}",
-            case.description(),
+            "the {class} class must be reproduced frame by frame"
         );
     }
+}
+
+#[test]
+fn empty_body_with_trailers_yields_only_the_trailers_frame() {
+    let case = FrameCase {
+        chunks: Vec::new(),
+        trailers: Some(vec![("x-checksum", "abc123".to_owned())]),
+    };
+    let runtime = current_thread_runtime();
+    let (mut body, _polls) = synthetic_body(steps_for(&case), None);
+
+    let frames = runtime
+        .block_on(collect_frames(&mut body))
+        .expect("an empty body with trailers must not fail");
+
+    assert_eq!(
+        frames.len(),
+        1,
+        "an empty body with trailers must yield exactly one frame, got {frames:?}"
+    );
+    match frames.as_slice() {
+        [CollectedFrame::Trailers(pairs)] => {
+            let expected = vec![("x-checksum".to_owned(), b"abc123".to_vec())];
+            assert_eq!(
+                pairs, &expected,
+                "the only frame must carry the scripted trailer unchanged"
+            );
+        }
+        other => panic!("the only frame must be a trailers frame, got {other:?}"),
+    }
+}
+
+#[test]
+fn synthetic_poll_bound_is_enforced() {
+    let steps = (0..MAX_POLLS).map(|_| FrameStep::Pending).collect();
+    let (mut body, polls) = synthetic_body(steps, None);
+
+    for index in 0..MAX_POLLS {
+        let mut frame = Box::pin(body.frame());
+        assert!(
+            poll_once(frame.as_mut()).is_pending(),
+            "poll {index} is within the synthetic bound and must stay pending"
+        );
+    }
+
+    let mut beyond = Box::pin(body.frame());
+    match poll_once(beyond.as_mut()) {
+        Poll::Ready(Some(Err(BodyError::Upstream { source }))) => assert_eq!(
+            source.to_string(),
+            "synthetic body exceeded its poll bound",
+            "the poll after the bound must report the fixture's own error"
+        ),
+        other => panic!("the poll after the bound must fail, got {other:?}"),
+    }
+    assert_eq!(
+        polls.load(Ordering::SeqCst),
+        MAX_POLLS,
+        "the observed poll count must stop at the bound"
+    );
 }

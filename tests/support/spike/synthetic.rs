@@ -33,6 +33,9 @@ use bytes::Bytes;
 use http::HeaderMap;
 use http_body::{Body, Frame, SizeHint};
 
+/// Maximum poll observations one synthetic body accepts before failing.
+pub const MAX_POLLS: usize = 64;
+
 /// One scripted step in a synthetic body.
 #[derive(Debug)]
 pub enum FrameStep {
@@ -88,6 +91,11 @@ impl Body for SyntheticBody {
         _cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Frame<Bytes>, SyntheticError>>> {
         let this = self.get_mut();
+        if this.polls.get() >= MAX_POLLS {
+            return Poll::Ready(Some(Err(SyntheticError::new(
+                "synthetic body exceeded its poll bound",
+            ))));
+        }
         this.polls.set(this.polls.get() + 1);
         this.poll_counter.fetch_add(1, Ordering::SeqCst);
         match this.steps.pop_front() {

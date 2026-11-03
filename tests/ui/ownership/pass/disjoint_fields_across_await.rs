@@ -1,31 +1,77 @@
-//! A `Send` future borrows disjoint context fields across a real suspension.
+//! A `Send` invocation future borrows disjoint context fields across an await.
 
-use std::future::pending;
+use std::sync::Arc;
 
-/// Request and response state that a handler borrows separately.
-#[derive(Default)]
+use async_trait::async_trait;
+use bytes::Bytes;
+use http::HeaderMap;
+use http_body_util::Empty;
+use peregrine_web::spike::{
+    ErasedBody,
+    Method,
+    Policy,
+    RegisteredResource,
+    RequestView,
+    Resource,
+    ResourceError,
+    ResourceObservation,
+    ResourceRunner,
+    ResponseDraft,
+    adapt_body,
+};
+
+/// A public resource that never touches the request body.
+struct Catalogue;
+
+#[async_trait]
+impl Resource for Catalogue {
+    fn policy(&self, _method: Method) -> &Policy { &Policy::Public }
+
+    fn observation(&self) -> ResourceObservation { unimplemented!("witnessed in tests") }
+
+    async fn get(
+        &self,
+        _view: RequestView<'_>,
+        _body: &mut ErasedBody,
+    ) -> Result<ResponseDraft, ResourceError> {
+        Ok(ResponseDraft::ok(Bytes::new()))
+    }
+}
+
+/// Request state a handler borrows field by field.
 struct Context {
-    /// The request-side field borrowed first.
-    request: String,
-    /// The response-side field borrowed after the await.
-    response: Vec<u8>,
+    /// Immutable request metadata, borrowed by the view.
+    headers: HeaderMap,
+    /// The mutable request body, borrowed separately from the metadata.
+    body: ErasedBody,
+    /// The registration selected for this request.
+    registered: RegisteredResource,
+    /// The runner that owns admission.
+    runner: ResourceRunner,
 }
 
 /// Asserts at compile time that a value is `Send`.
 fn assert_send<T: Send>(_value: &T) {}
 
-/// A handler whose future must stay `Send` across a suspension point.
-async fn handler(context: &mut Context) -> usize {
-    let request = &mut context.request;
-    request.push_str("/items");
-    pending::<()>().await;
-    let response = &mut context.response;
-    response.extend_from_slice(request.as_bytes());
-    response.len()
-}
-
 fn main() {
-    let mut context = Context::default();
-    let future = handler(&mut context);
+    let runner = ResourceRunner::new();
+    let registered = runner
+        .register(Arc::new(Catalogue), Method::Get)
+        .expect("a public resource registers without an enforcer");
+    let mut context = Context {
+        headers: HeaderMap::new(),
+        body: adapt_body(Empty::<Bytes>::new()),
+        registered,
+        runner,
+    };
+
+    let Context {
+        headers,
+        body,
+        registered,
+        runner,
+    } = &mut context;
+    let view = RequestView::new(Method::Get, "/catalogue", headers, None);
+    let future = runner.invoke(registered, view, body);
     assert_send(&future);
 }

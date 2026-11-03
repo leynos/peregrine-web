@@ -70,13 +70,13 @@ answers. This ADR preserves their outcome so later slices do not rediscover it.
 
 ## Options considered
 
-| Topic        | Selected shape                                                      | Alternative                                              | Why the alternative was not selected                                                                     |
-| ------------ | ------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Body erasure | `UnsyncBoxBody<Bytes, BodyError>`                                   | `BoxBody<Bytes, BodyError>`                              | `BoxBody` is `Sync`; requiring it would reject Hyper's own incoming body and any `Cell`-bearing body     |
-| Resource     | Dyn-compatible `Resource` trait object behind `Arc`                 | Generic resource parameter on every registration call    | Registration storage and the runner become generic or duplicate the dispatch path per concrete type      |
-| Enforcement  | `Arc<dyn PolicyEnforcer>` built once at the composition root        | Per-resource generic enforcer or a route-policy registry | A registry reintroduces the table this design removes; a generic parameter infects every registration    |
-| Invocation   | `&mut ErasedBody` supplied by the caller                            | Invocation owns the body exclusively                     | Caller ownership keeps the body usable after cancellation; the owned form remains available for spawning |
-| Policy gate  | Synchronous `policy()` checked at registration and before admission | Asynchronous policy resolution inside the responder      | A responder-time check cannot deny before the hook and makes every responder repeat the same guard       |
+| Topic        | Selected shape                                                     | Alternative                                              | Why the alternative was not selected                                                                     |
+| ------------ | ------------------------------------------------------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Body erasure | `UnsyncBoxBody<Bytes, BodyError>`                                  | `BoxBody<Bytes, BodyError>`                              | `BoxBody` is `Sync`; requiring it would reject Hyper's own incoming body and any `Cell`-bearing body     |
+| Resource     | Dyn-compatible `Resource` trait object behind `Arc`                | Generic resource parameter on every registration call    | Registration storage and the runner become generic or duplicate the dispatch path per concrete type      |
+| Enforcement  | `Arc<dyn PolicyEnforcer>` built once at the composition root       | Per-resource generic enforcer or a route-policy registry | A registry reintroduces the table this design removes; a generic parameter infects every registration    |
+| Invocation   | `&mut ErasedBody` supplied by the caller                           | Invocation owns the body exclusively                     | Caller ownership keeps the body usable after cancellation; the owned form remains available for spawning |
+| Policy gate  | `policy()` read once at registration; the snapshot gates admission | Asynchronous policy resolution inside the responder      | A responder-time check cannot deny before the hook and makes every responder repeat the same guard       |
 
 _Table 1: Tested boundary shapes and the alternatives rejected in the spike._
 
@@ -107,10 +107,10 @@ server, or production authorization path.
 ## Known risks and limitations
 
 The enforcer is a fixture; no authentication, authorization, or session policy
-is implemented. The specimen performs a single synchronous policy read per
-invocation, which is enough to freeze identity but says nothing about policy
-caching or revocation. `async-trait` boxes each responder future, so the
-allocation cost of this erasure is unmeasured.
+is implemented. The specimen reads the policy once at registration and admits
+against that snapshot, so a policy change after registration is not observed;
+the spike says nothing about policy caching or revocation. `async-trait` boxes
+each responder future, so the allocation cost of this erasure is unmeasured.
 
 `UnsyncBoxBody` deliberately excludes `Sync` consumers. Any later requirement
 to share a body between threads would need a different erasure and a separated

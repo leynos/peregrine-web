@@ -99,6 +99,59 @@ async fn dropping_a_pending_invocation_releases_the_owned_body_once(
 
 #[rstest]
 #[tokio::test]
+async fn dropping_a_pending_invocation_releases_body_and_request_guard(
+    protected_catalogue: Arc<CatalogueResource>,
+) -> Result<(), Box<dyn Error>> {
+    let (enforcer, _events) = enforcer_with(peregrine_web::spike::Decision::Permit);
+    let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
+    let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
+    let headers = HeaderMap::new();
+    let identity = Identity::new("user-42");
+    let (owned_body, body_drops) = body_with_probe();
+    let (guard, guard_drops) = drop_counter();
+
+    let invocation = async move {
+        // The guard stands in for request-local state that is not the body, so
+        // the two counters show that cancellation releases both owners.
+        let _guard = guard;
+        let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
+        let mut body = owned_body;
+        runner.invoke(&registered, view, &mut body).await
+    };
+    let mut pending = Box::pin(invocation);
+    assert!(
+        poll_once(pending.as_mut()).is_pending(),
+        "the fixture enforcer suspends, so the invocation must stay pending"
+    );
+    pretty_assertions::assert_eq!(
+        (
+            body_drops.load(Ordering::SeqCst),
+            guard_drops.load(Ordering::SeqCst)
+        ),
+        (0, 0),
+        "a pending invocation must still own both the body and the request guard"
+    );
+
+    drop(pending);
+
+    pretty_assertions::assert_eq!(
+        (
+            body_drops.load(Ordering::SeqCst),
+            guard_drops.load(Ordering::SeqCst)
+        ),
+        (1, 1),
+        "cancellation must release the body and the request guard exactly once each"
+    );
+    pretty_assertions::assert_eq!(
+        protected_catalogue.state().responder_calls(),
+        0,
+        "a cancelled invocation must not reach the responder"
+    );
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
 async fn a_dropped_future_returns_its_borrowed_arguments(
     protected_catalogue: Arc<CatalogueResource>,
 ) -> Result<(), Box<dyn Error>> {

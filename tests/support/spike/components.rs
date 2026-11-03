@@ -42,9 +42,6 @@ use peregrine_web::spike::{
 
 use crate::spike_frames::drain_body;
 
-/// Maximum request body the fixture responder accepts before failing.
-pub const MAX_BODY_BYTES: usize = 4096;
-
 /// An injected dependency owned by a fixture resource.
 pub struct DependencyState {
     /// A label owned by this allocation.
@@ -245,11 +242,6 @@ async fn respond<T: OwnedResource>(
 ) -> Result<ResponseDraft, ResourceError> {
     resource.state().record_responder_call();
     let drained = drain_body(body).await?;
-    if drained.data.len() > MAX_BODY_BYTES {
-        return Err(ResourceError::Failed {
-            message: format!("request body exceeded {MAX_BODY_BYTES} bytes"),
-        });
-    }
     resource.state().record_trailers(drained.trailers);
     resource.dependency().record_call();
     Ok(ResponseDraft::ok(

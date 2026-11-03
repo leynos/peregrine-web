@@ -101,14 +101,14 @@ fail for one named ownership, borrow, or trait requirement, and each reviewed
 
 Table: V-OWN compile-pass witnesses and what each one establishes
 
-| Witness                             | Fixture                                | Establishes                                                                  |
-| ----------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------- |
-| Heterogeneous collection            | `pass/heterogeneous_collection.rs`     | Two concrete resource types share one erased interface in a collection       |
-| Shared resource state               | `pass/shared_resource_state.rs`        | Two registrations retain the same resource allocation                        |
-| Disjoint field borrows across await | `pass/disjoint_fields_across_await.rs` | A `Send` future borrows disjoint context fields across a suspension          |
-| `Send` but not `Sync` body          | `pass/send_not_sync_body.rs`           | An erased `Cell`-bearing body crosses an await while the future stays `Send` |
-| Owned escape counterparts           | `pass/owned_escapes.rs`                | Every rejected escape has an owned form that compiles                        |
-| `Rc` ends before await              | `pass/rc_scope_ends_before_await.rs`   | A non-`Send` local scoped before the await does not prohibit a `Send` future |
+| Witness                             | Fixture                                | Establishes                                                                        |
+| ----------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------- |
+| Heterogeneous collection            | `pass/heterogeneous_collection.rs`     | Two concrete resource types share one erased interface in a collection             |
+| Shared resource state               | `pass/shared_resource_state.rs`        | Two registrations retain the same resource allocation                              |
+| Disjoint field borrows across await | `pass/disjoint_fields_across_await.rs` | The real `ResourceRunner::invoke` future stays `Send` over disjoint context fields |
+| `Send` but not `Sync` body          | `pass/send_not_sync_body.rs`           | An erased `Cell`-bearing body crosses an await while the future stays `Send`       |
+| Owned escape counterparts           | `pass/owned_escapes.rs`                | Every rejected escape has an owned form that compiles                              |
+| `Rc` ends before await              | `pass/rc_scope_ends_before_await.rs`   | A non-`Send` local scoped before the await does not prohibit a `Send` future       |
 
 Table: V-OWN compile-fail witnesses, the requirement each one violates, and the
 diagnostic the pinned compiler emitted
@@ -147,20 +147,23 @@ Compiler changes therefore need a deliberate baseline review, never a blind
 
 ## V-IDENTITY: identity and admission witnesses
 
-`tests/resource_policy_spike.rs` drives the runner directly. The fixture
-enforcer records one observation, suspends on a `tokio::sync::Notify`
-rendezvous, then records a second observation after it resumes, so every
-equality below spans a real await boundary rather than a synchronous stand-in.
-Its resources and helpers live in `tests/support/spike/fixtures.rs`, which the
-cancellation binary includes as well. `tests/resource_policy_spike_bdd.rs`
-repeats the outcomes as `rstest-bdd` scenarios bound to
-`tests/features/resource_policy_spike.feature`.
+`tests/resource_policy_identity.rs` owns the identity witnesses and
+`tests/resource_policy_spike.rs` owns the admission outcomes; both drive the
+runner directly. The fixture enforcer records one observation, suspends on a
+`tokio::sync::Notify` rendezvous, then records a second observation after it
+resumes, so every equality below spans a real await boundary rather than a
+synchronous stand-in. Its resources and helpers live in
+`tests/support/spike/fixtures.rs`, which the cancellation binary includes as
+well. `tests/resource_policy_spike_bdd.rs` repeats the outcomes as `rstest-bdd`
+scenarios bound to `tests/features/resource_policy_spike.feature`.
 
 Table: V-IDENTITY witnesses and the behaviour each one establishes
 
 | Witness                    | Test                                               | Establishes                                                                                                  |
 | -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Identity across suspension | `identity_and_policy_survive_the_awaited_hook`     | Handle, observation, method, policy, path, and principal are identical before and after the enforcer's await |
+| Repeated admissions        | `repeated_admissions_observe_the_frozen_policy`    | Two admissions of one registration observe the same registration-time policy snapshot                        |
+| Same-type instances        | `same_type_instances_keep_distinct_identity`       | Two instances of one concrete type keep distinct allocation identities and only the selected one responds    |
 | Denial before the hook     | `missing_identity_is_denied_before_the_hook_runs`  | An anonymous protected request is denied with `MissingIdentity` and never reaches the enforcer               |
 | Enforcer denial            | `enforcer_denial_withholds_the_request`            | A `Decision::Deny` reaches neither the responder nor the dependency                                          |
 | Protected registration     | `protected_registration_requires_an_enforcer`      | A protected resource cannot register without an enforcement hook                                             |
@@ -178,9 +181,11 @@ being denied before the hook.
 
 `tests/body_adapter_spike.rs` compares frames, not concatenated bytes, because
 a byte oracle cannot see a dropped empty frame or a moved boundary.
-`tests/network_body_spike.rs` drives a real Hyper `Incoming` body through the
-same `adapt_body` and `ResourceRunner::invoke` seam on an ephemeral loopback
-port.
+`tests/body_adapter_property.rs` generates the same frame classes from
+`tests/support/spike/cases.rs`, so the named witnesses and the property cannot
+drift apart. `tests/network_body_spike.rs` drives a real Hyper `Incoming` body
+through the same `adapt_body` and `ResourceRunner::invoke` seam on an ephemeral
+loopback port.
 
 Table: V-BODY witnesses and the behaviour each one establishes
 
@@ -192,6 +197,9 @@ Table: V-BODY witnesses and the behaviour each one establishes
 | Pending then ready   | `pending_then_ready_is_polled_again`                       | A pending poll does not lose the next frame; polls cover pending, data, and end   |
 | Terminal error       | `terminal_error_is_reported_once`                          | An upstream error surfaces as `BodyError::Upstream` with its text intact          |
 | Partial consumption  | `dropping_a_partially_consumed_body_releases_it_once`      | A half-read body owns its resources until dropped, then releases them once        |
+| Frame classes        | `every_documented_frame_class_is_reproduced`               | Each emptiness/trailer combination is reproduced frame by frame                   |
+| Empty with trailers  | `empty_body_with_trailers_yields_only_the_trailers_frame`  | An empty body with trailers yields exactly one trailers frame                     |
+| Poll bound           | `synthetic_poll_bound_is_enforced`                         | The fixture body fails after its documented poll bound instead of looping         |
 | Generated partitions | `generated_partitions_are_reproduced_frame_by_frame`       | Sixty-four generated partitions, with optional trailers, reproduce frame by frame |
 | One invocation path  | `synthetic_and_network_requests_share_one_invocation_path` | A synthetic and a network request reach the same dependency, one call each        |
 | Network trailers     | `chunked_request_trailers_reach_the_resource`              | Chunked trailers arrive at the resource through Hyper                             |
@@ -208,11 +216,12 @@ repository's 400-line limit and each set can be reproduced on its own target.
 
 Table: V-CANCEL witnesses and the behaviour each one establishes
 
-| Witness                    | Test                                                         | Establishes                                                                                        |
-| -------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Owned body, cancelled call | `dropping_a_pending_invocation_releases_the_owned_body_once` | Dropping a pending invocation releases the owned body exactly once and never reaches the responder |
-| Borrowed arguments         | `a_dropped_future_returns_its_borrowed_arguments`            | A cancelled invocation leaves a caller-owned body usable and still owned by the caller             |
-| Spawned invocation         | `a_fully_owned_invocation_can_be_spawned`                    | A fully owned invocation crosses a multi-thread runtime boundary and responds once                 |
+| Witness                    | Test                                                            | Establishes                                                                                        |
+| -------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Owned body, cancelled call | `dropping_a_pending_invocation_releases_the_owned_body_once`    | Dropping a pending invocation releases the owned body exactly once and never reaches the responder |
+| Body and request guard     | `dropping_a_pending_invocation_releases_body_and_request_guard` | Cancellation releases the body and a separate request-local guard exactly once each                |
+| Borrowed arguments         | `a_dropped_future_returns_its_borrowed_arguments`               | A cancelled invocation leaves a caller-owned body usable and still owned by the caller             |
+| Spawned invocation         | `a_fully_owned_invocation_can_be_spawned`                       | A fully owned invocation crosses a multi-thread runtime boundary and responds once                 |
 
 ## Negative controls
 
@@ -237,16 +246,21 @@ the registration's retained allocation.
 
 ```sh
 make test TEST_FLAGS='--test resource_policy_spike'
+make test TEST_FLAGS='--test resource_policy_identity'
 make test TEST_FLAGS='--test resource_policy_cancellation'
 make test TEST_FLAGS='--test resource_policy_spike_bdd'
 make test TEST_FLAGS='--test body_adapter_spike'
+make test TEST_FLAGS='--test body_adapter_property'
 make test TEST_FLAGS='--test network_body_spike'
+make test TEST_FLAGS='--test resource_policy_example'
 cargo run --example resource_policy_spike
 ```
 
-All four targets passed after the faults were reverted, and the example exited
-zero without printing diagnostics. The network cases bind an ephemeral loopback
-port and join their server task rather than sleeping.
+All eight targets passed after the faults were reverted, and the example exited
+zero without printing diagnostics. `resource_policy_example` loads the example
+file as a module, so the assertions the reader is invited to run are exercised
+by `cargo test` as well. The network cases bind an ephemeral loopback port and
+join their server task rather than sleeping.
 
 ## What the runtime evidence does not establish
 
