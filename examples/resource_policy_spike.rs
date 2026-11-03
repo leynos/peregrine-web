@@ -222,7 +222,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Drives every demonstration and returns the first failed expectation.
-async fn demonstrate() -> Result<(), Box<dyn Error>> {
+///
+/// Public so `tests/resource_policy_example.rs` can load this file as a module
+/// and exercise the same demonstrations under `cargo test`.
+///
+/// # Errors
+///
+/// Returns the first failed registration, denied admission, or unexpected
+/// response the demonstrations observe. A passing run means every documented
+/// outcome still holds.
+pub async fn demonstrate() -> Result<(), Box<dyn Error>> {
     demonstrate_public_path().await?;
     demonstrate_protected_path().await?;
     demonstrate_missing_enforcer()?;

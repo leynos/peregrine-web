@@ -52,16 +52,21 @@ compact and omits build output such as `target/`.
 │   ├── support/
 │   │   └── spike/
 │   │       ├── admission.rs
+│   │       ├── cases.rs
 │   │       ├── components.rs
 │   │       ├── fixtures.rs
 │   │       ├── frames.rs
+│   │       ├── network.rs
 │   │       └── synthetic.rs
 │   ├── ui/
 │   │   └── ownership/
+│   ├── body_adapter_property.rs
 │   ├── body_adapter_spike.rs
 │   ├── network_body_spike.rs
 │   ├── ownership_contract.rs
 │   ├── resource_policy_cancellation.rs
+│   ├── resource_policy_example.rs
+│   ├── resource_policy_identity.rs
 │   ├── resource_policy_spike.rs
 │   ├── resource_policy_spike_bdd.rs
 │   └── stub.rs

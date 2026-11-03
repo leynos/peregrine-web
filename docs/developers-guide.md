@@ -468,6 +468,13 @@ rerun the focused targets it names.
 - `tests/network_body_spike.rs` binds an ephemeral loopback port and joins or
   aborts its server task. Deadlines there are failure bounds, not timing
   assertions; do not convert them into sleeps.
+- `tests/support/spike/cases.rs` builds the frame cases that both
+  `body_adapter_spike` and `body_adapter_property` use. Change a case there
+  rather than in one binary, or the named witnesses and the generated property
+  will describe different frame classes.
+- `tests/resource_policy_example.rs` loads `examples/resource_policy_spike.rs`
+  as a module so `cargo test` exercises the example's own assertions. Keep the
+  example's `demonstrate` function public and free of printing.
 - The synthetic body is `Send` but not `Sync` by design. A change that makes
   it `Sync` silently weakens the bound the body witnesses claim.
 

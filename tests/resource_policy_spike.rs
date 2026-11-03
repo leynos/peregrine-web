@@ -22,16 +22,11 @@ use googletest::prelude::{eq, matches_pattern, verify_that};
 use http::HeaderMap;
 use http_body_util::Empty;
 use peregrine_web::spike::{
-    AllocationId,
     Decision,
     DenialReason,
-    ErasedBody,
-    Identity,
-    InvocationOutcome,
     Method,
     Policy,
     PolicyError,
-    RegisteredResource,
     RegistrationError,
     RequestView,
     ResourceRunner,
@@ -40,130 +35,18 @@ use peregrine_web::spike::{
     adapt_body,
 };
 use rstest::rstest;
-use spike_admission::{
-    AdmissionEvent,
-    AdmissionPhase,
-    FixtureEnforcer,
-    InvocationSubject,
-    invoke_with_rendezvous,
-};
 use spike_components::{BillingResource, CatalogueResource, DependencyState, OwnedResource};
 use spike_fixtures::{
     as_enforcer,
     billing_dependency,
     catalogue_dependency,
     enforcer_with,
+    invoke_through_rendezvous,
     protected_catalogue,
     public_catalogue,
     scoped_catalogue,
     verified,
 };
-use tokio::sync::mpsc::UnboundedReceiver;
-
-/// Receives the enforcer's pre-suspension and post-suspension observations.
-async fn await_admission_pair(
-    events: &mut UnboundedReceiver<AdmissionEvent>,
-) -> Result<(AdmissionEvent, AdmissionEvent), Box<dyn Error>> {
-    let before = events.recv().await.ok_or("a pre-await observation")?;
-    let after = events.recv().await.ok_or("a post-await observation")?;
-    Ok((before, after))
-}
-
-/// Asserts that only the phase changed across the enforcer's suspension.
-fn assert_only_the_phase_changed(before: &AdmissionEvent, after: &AdmissionEvent) {
-    pretty_assertions::assert_eq!(
-        (before.phase, after.phase),
-        (AdmissionPhase::BeforeAwait, AdmissionPhase::AfterAwait),
-        "the enforcer must observe one event before and one after its suspension"
-    );
-    pretty_assertions::assert_eq!(
-        (
-            &before.handle,
-            &before.observation,
-            &before.method,
-            &before.policy,
-            &before.path,
-            &before.identity,
-        ),
-        (
-            &after.handle,
-            &after.observation,
-            &after.method,
-            &after.policy,
-            &after.path,
-            &after.identity,
-        ),
-        "registration must freeze every observation except the phase across the await"
-    );
-}
-
-/// Invokes a registration across the enforcer's real suspension.
-///
-/// Every caller presents the same authenticated request, so the only variation
-/// a caller supplies is the registration under test.
-async fn invoke_through_rendezvous(
-    enforcer: &Arc<FixtureEnforcer>,
-    runner: &ResourceRunner,
-    registered: &RegisteredResource,
-    body: &mut ErasedBody,
-) -> InvocationOutcome {
-    let headers = HeaderMap::new();
-    let identity = Identity::new("user-42");
-    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
-    invoke_with_rendezvous(
-        enforcer,
-        InvocationSubject {
-            runner,
-            registered,
-            view,
-            body,
-        },
-    )
-    .await
-}
-
-/// Asserts that admission observed the registration that retained the resource.
-fn assert_registration_was_retained(
-    before: &AdmissionEvent,
-    registered: &RegisteredResource,
-    resource: &CatalogueResource,
-) {
-    pretty_assertions::assert_eq!(
-        before.handle,
-        AllocationId::of(registered.resource()),
-        "admission must observe the handle of the retained resource"
-    );
-    pretty_assertions::assert_eq!(
-        before.method,
-        Method::Get,
-        "admission must observe the frozen method"
-    );
-    pretty_assertions::assert_eq!(
-        before.policy,
-        Policy::Authenticated,
-        "admission must observe the policy captured at registration"
-    );
-    pretty_assertions::assert_eq!(
-        before.path,
-        "/catalogue",
-        "admission must observe the request path"
-    );
-    pretty_assertions::assert_eq!(
-        before.identity.as_deref(),
-        Some("user-42"),
-        "admission must observe the presented principal"
-    );
-    pretty_assertions::assert_eq!(
-        before.observation.resource,
-        AllocationId::of(resource.state()),
-        "the declared resource identity must name the fixture's own state"
-    );
-    pretty_assertions::assert_eq!(
-        before.observation.dependency,
-        AllocationId::of(resource.dependency()),
-        "the declared dependency identity must name the fixture's own store"
-    );
-}
 
 #[rstest]
 #[tokio::test]
@@ -261,29 +144,6 @@ async fn enforcer_denial_withholds_the_request(
     verified(verify_that!(
         protected_catalogue.dependency().calls(),
         eq(0)
-    ))?;
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test]
-async fn identity_and_policy_survive_the_awaited_hook(
-    protected_catalogue: Arc<CatalogueResource>,
-) -> Result<(), Box<dyn Error>> {
-    let (enforcer, mut events) = enforcer_with(Decision::Permit);
-    let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
-    let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
-    let mut body = adapt_body(Empty::<Bytes>::new());
-
-    let outcome = invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
-
-    let (before, after) = await_admission_pair(&mut events).await?;
-    assert_only_the_phase_changed(&before, &after);
-    assert_registration_was_retained(&before, &registered, &protected_catalogue);
-    verified(verify_that!(outcome.responded().is_some(), eq(true)))?;
-    verified(verify_that!(
-        protected_catalogue.state().responder_calls(),
-        eq(1)
     ))?;
     Ok(())
 }

@@ -18,8 +18,15 @@
 
 use bytes::Bytes;
 use http::HeaderMap;
+use http_body::Frame;
 use http_body_util::BodyExt;
 use peregrine_web::spike::{BodyError, ErasedBody, ResourceError};
+
+/// Maximum accumulated request-body bytes a fixture drain accepts.
+pub const MAX_BODY_BYTES: usize = 4096;
+
+/// Maximum trailer pairs a fixture drain accepts in one body.
+pub const MAX_TRAILER_PAIRS: usize = 4;
 
 /// What one request body yielded: its data bytes and its trailer pairs.
 #[derive(Debug, Default)]
@@ -30,23 +37,63 @@ pub struct DrainedBody {
     pub trailers: Vec<(String, Vec<u8>)>,
 }
 
-/// Drains an erased body, stopping at its terminal error.
+/// Drains an erased body, stopping at its terminal error or its first bound.
+///
+/// The bounds are checked before each extension, so an over-long body fails
+/// without first allocating everything the peer sent. A deadline bounds time,
+/// not memory.
 pub async fn drain_body(body: &mut ErasedBody) -> Result<DrainedBody, ResourceError> {
     let mut drained = DrainedBody::default();
     while let Some(next) = body.frame().await {
         let frame = next.map_err(|source| ResourceError::Body {
             source: Box::new(source),
         })?;
-        match frame.into_trailers() {
-            Ok(headers) => drained.trailers.extend(normalise_trailers(&headers)),
-            Err(rest) => {
-                if let Ok(data) = rest.into_data() {
-                    drained.data.extend_from_slice(&data);
-                }
-            }
-        }
+        drained.record(frame)?;
     }
     Ok(drained)
+}
+
+impl DrainedBody {
+    /// Records one frame, enforcing the matching fixture bound first.
+    ///
+    /// Splitting the two frame shapes keeps each bound check at the same
+    /// nesting level, so the control flow stays readable as further bounds are
+    /// added.
+    fn record(&mut self, frame: Frame<Bytes>) -> Result<(), ResourceError> {
+        match frame.into_trailers() {
+            Ok(headers) => self.record_trailers(&headers),
+            Err(rest) => self.record_data(rest),
+        }
+    }
+
+    /// Appends one trailer frame after checking the trailer-pair bound.
+    fn record_trailers(&mut self, headers: &HeaderMap) -> Result<(), ResourceError> {
+        let pairs = normalise_trailers(headers);
+        if self.trailers.len() + pairs.len() > MAX_TRAILER_PAIRS {
+            return Err(bound_exceeded("trailer pairs", MAX_TRAILER_PAIRS));
+        }
+        self.trailers.extend(pairs);
+        Ok(())
+    }
+
+    /// Appends one data frame after checking the accumulated-byte bound.
+    fn record_data(&mut self, frame: Frame<Bytes>) -> Result<(), ResourceError> {
+        let Ok(data) = frame.into_data() else {
+            return Ok(());
+        };
+        if self.data.len() + data.len() > MAX_BODY_BYTES {
+            return Err(bound_exceeded("body bytes", MAX_BODY_BYTES));
+        }
+        self.data.extend_from_slice(&data);
+        Ok(())
+    }
+}
+
+/// Builds the fixture failure for an exceeded body bound.
+fn bound_exceeded(what: &str, limit: usize) -> ResourceError {
+    ResourceError::Failed {
+        message: format!("request {what} exceeded the fixture bound of {limit}"),
+    }
 }
 
 /// One collected body frame in a comparable form.

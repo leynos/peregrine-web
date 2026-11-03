@@ -160,7 +160,7 @@ the required design/ADR change; obtain explicit approval for deviations.
     implementation: 11, 5, 7, and 3 cases passed; `cargo run --example
     resource_policy_spike` exited 0 with no output. Log:
     `/tmp/m2-green-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
-- [ ] M3: reconcile evidence and documentation; mark 1.1.3 done.
+- [x] M3: reconcile evidence and documentation; mark 1.1.3 done.
   - [x] (2026-11-01) Reconciled the design with the tested shapes: §3 records
     `UnsyncBoxBody<Bytes, BodyError>`, §4 records the provisional policy and
     enforcement surface, §11 connects the witnesses to I3 and I6, and §12
@@ -180,6 +180,17 @@ the required design/ADR change; obtain explicit approval for deviations.
     tool limitation was already recorded for 1.1.1 in the 1.1 execplan. The
     exact checkbox and status change was applied as a reviewed manual edit, and
     the roadmap's opening status paragraph now names the completed spike.
+  - [x] (2026-11-03) Reconciled the review findings. The identity witnesses
+    moved to `tests/resource_policy_identity.rs` with two new cases (repeated
+    admissions against the frozen policy, and two instances of one concrete
+    type keeping distinct identities); the cancellation suite gained a witness
+    that a dropped pending invocation releases both the body and a separate
+    request-local guard; the compile-pass fixture now asserts `Send` for the
+    real `ResourceRunner::invoke` future over disjoint context fields; and
+    `tests/resource_policy_example.rs` loads the published example so
+    `cargo test` exercises it. ADR 007 and the evidence ledger were corrected
+    to describe the registration-time policy snapshot rather than a
+    per-invocation read.
 
 ## Surprises & discoveries
 
@@ -210,9 +221,10 @@ scoped file searches supplied the evidence; no semantic index result is
 claimed. CodeGraph should be retried before implementation's abstraction sweep.
 
 The dated nightly, Cargo configuration, and Makefile contain no explicit
-checker selection. The current posture is therefore `unknown`, pending the
-canary in M1; the historical four-way probe results do not establish today's
-effective wrapper/configuration posture.
+checker selection, so planning left the posture `unknown` pending the M1
+canary; the historical four-way probe results did not establish the effective
+wrapper/configuration posture. M1 resolved it: the canary exited 0 by default
+and 101 with `-Zpolonius=off`, so the posture is `polonius-alpha`.
 
 ## Decision log
 
@@ -243,6 +255,15 @@ effective wrapper/configuration posture.
   by only one binary is dead code in the others and would fail `-D warnings`;
   the documented module-scoped `#![allow(dead_code)]` keeps the allowance
   narrow.
+- 2026-11-03, accepted: registration keeps the policy snapshot it captured
+  rather than re-reading `resource.policy(method)` per invocation. The
+  assessment offered per-invocation reference capture as an alternative; the
+  snapshot is retained because it is what the spike set out to test — that a
+  registration freezes the method and policy it was admitted under — and
+  because a per-invocation read would make the admitted policy depend on
+  mutable resource state the `Resource` contract does not permit. The
+  consequence is recorded rather than hidden: a policy change after
+  registration is not observed, and ADR 007's risk section now says so.
 
 ## Outcomes & retrospective
 

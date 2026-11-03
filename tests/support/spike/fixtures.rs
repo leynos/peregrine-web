@@ -17,12 +17,27 @@
 
 use std::{error::Error, sync::Arc};
 
-use peregrine_web::spike::{Decision, Policy, PolicyEnforcer, PolicyError, ScopeName, ScopeSet};
+use http::HeaderMap;
+use peregrine_web::spike::{
+    Decision,
+    ErasedBody,
+    Identity,
+    InvocationOutcome,
+    Method,
+    Policy,
+    PolicyEnforcer,
+    PolicyError,
+    RegisteredResource,
+    RequestView,
+    ResourceRunner,
+    ScopeName,
+    ScopeSet,
+};
 use rstest::fixture;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{
-    spike_admission::{AdmissionEvent, FixtureEnforcer},
+    spike_admission::{AdmissionEvent, FixtureEnforcer, InvocationSubject, invoke_with_rendezvous},
     spike_components::{CatalogueResource, DependencyState},
 };
 
@@ -78,6 +93,31 @@ pub fn enforcer_with(
     decision: Decision,
 ) -> (Arc<FixtureEnforcer>, UnboundedReceiver<AdmissionEvent>) {
     FixtureEnforcer::new(decision)
+}
+
+/// Invokes a registration across the enforcer's real suspension.
+///
+/// Every caller presents the same authenticated request, so the only variation
+/// a caller supplies is the registration under test.
+pub async fn invoke_through_rendezvous(
+    enforcer: &Arc<FixtureEnforcer>,
+    runner: &ResourceRunner,
+    registered: &RegisteredResource,
+    body: &mut ErasedBody,
+) -> InvocationOutcome {
+    let headers = HeaderMap::new();
+    let identity = Identity::new("user-42");
+    let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
+    invoke_with_rendezvous(
+        enforcer,
+        InvocationSubject {
+            runner,
+            registered,
+            view,
+            body,
+        },
+    )
+    .await
 }
 
 /// Wraps an enforcer in the trait object the runner accepts.
