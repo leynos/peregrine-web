@@ -192,13 +192,18 @@ the required design/ADR change; obtain explicit approval for deviations.
     to describe the registration-time policy snapshot rather than a
     per-invocation read.
   - [x] (2026-11-03) Closed the two acceptance gaps the reassessment found.
-    `DrainedBody::record_trailers` now checks `HeaderMap::len` before calling
-    `normalize_trailers`, so an over-long trailer set is rejected before it is
-    copied, and `normalize_trailers` expands repeated names instead of
-    collapsing them; `tests/spike_fixture_bounds.rs` pins the bound from below,
-    above, across frames, and for repeated names. The fixture responder now
-    records the request bytes it drained, and both network success witnesses
-    assert `b"hello"`, so a same-length payload substitution fails.
+    `DrainedBody::record_trailers` now checks the cumulative `HeaderMap::len`
+    before calling `normalize_trailers`, so an over-long trailer set is
+    rejected before it is copied; `normalize_trailers` collects every stored
+    value through `keys()` and `get_all()`; and
+    `tests/spike_fixture_bounds.rs` pins the bound from below, above, across
+    frames, and for repeated names. The fixture responder now records the
+    request bytes it drained, and both network success witnesses assert
+    `b"hello"`, so a same-length payload substitution fails.
+  - [x] (2026-11-05) Corrected the iterator explanation after the follow-up
+    reassessment: `HeaderMap::iter` visits every stored value, so the
+    pre-copy bound check is about ordering, not about collapsed repeats.
+    Recorded the M1 dependency review (licence, minimum compiler, features).
 
 ## Surprises & discoveries
 
@@ -273,12 +278,30 @@ and 101 with `-Zpolonius=off`, so the posture is `polonius-alpha`.
   consequence is recorded rather than hidden: a policy change after
   registration is not observed, and ADR 007's risk section now says so.
 - 2026-11-03, accepted: the fixture checks its trailer bound against
-  `HeaderMap::len`, which counts repeated values, before copying anything.
-  `HeaderMap::iter` yields each name once, so normalizing first both
-  under-counted repeated names and copied an over-long set before rejecting it;
-  the fixture now fails before the allocation. The network witnesses compare
-  the bytes a responder actually received rather than only their length, so
-  byte-preservation is evidenced rather than inferred from a matching count.
+  `HeaderMap::len`, which counts every stored value, before copying anything,
+  so an over-long set fails before the allocation rather than after it. The
+  order of the check is the repair. `HeaderMap::iter` visits every value,
+  including repeats; an earlier note here wrongly said it collapsed repeated
+  names, and a 2026-11-05 follow-up corrected that explanation.
+  `normalize_trailers` keeps the explicit `keys()` plus `get_all()` walk so the
+  one-pair-per-value result is visible where it is built. The network witnesses
+  compare the bytes a responder actually received rather than only their
+  length, so byte-preservation is evidenced rather than inferred from a
+  matching count.
+- 2026-11-05, accepted: the dependency review required before adding these
+  crates is recorded in
+  [Dependency review](resource-policy-ownership-spike.md#dependency-review)
+  rather than only asserted here. It was taken from the committed `Cargo.lock`
+  with `cargo metadata --format-version 1 --locked --offline`, so the licence,
+  `rust-version`, and feature declarations are the resolved ones and the
+  successful `--locked` run is the lockfile-resolution evidence. `mockable`
+  3.0.0 declares MIT through `license-file` instead of an SPDX `license` field;
+  that is recorded as a metadata gap in the crate, not treated as an unlicensed
+  dependency. Every non-permissive-looking licence in the graph is a
+  multi-licence with a permissive branch, and the highest declared
+  `rust-version` is 1.91, below the pinned 1.100.0-nightly. No manifest change
+  followed: the review confirmed the enabled feature sets are the smallest that
+  compiles the specimen.
 
 ## Outcomes & retrospective
 
@@ -646,9 +669,11 @@ Hyper. Test additions are `trybuild`, `rstest-bdd` and its required macros,
 `googletest`, and `pretty_assertions`; reuse `rstest` and `proptest`. Enable
 only the server, HTTP/1, I/O, runtime, synchronization, and time features
 actually exercised. Check exact release compatibility, minimum compiler
-declarations, licences, and lockfile resolution during M1. Do not add
-`matchit`, a database, an identity provider, a serialization framework, or
-global tracing/metrics subscribers. Task 1.2.1 still owns the maintained
+declarations, licences, and lockfile resolution during M1; the result is
+recorded under
+[Dependency review](resource-policy-ownership-spike.md#dependency-review). Do
+not add `matchit`, a database, an identity provider, a serialization framework,
+or global tracing/metrics subscribers. Task 1.2.1 still owns the maintained
 dependency and feature baseline.
 
 An explicit boxed-future trait could satisfy the same bounds but adds manual

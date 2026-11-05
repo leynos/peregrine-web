@@ -128,10 +128,9 @@ pub async fn collect_frames(body: &mut ErasedBody) -> Result<Vec<CollectedFrame>
 
 /// Converts trailers into an ordered, comparable representation.
 ///
-/// [`HeaderMap::iter`] yields each name once even when it carries repeated
-/// values, so repeats are expanded explicitly. The fixture witness compares
-/// what a body actually carried, and silently dropping a repeated trailer would
-/// weaken that comparison.
+/// [`HeaderMap::keys`] yields each distinct name once, so every name's values
+/// are collected with [`HeaderMap::get_all`]. The result therefore holds one
+/// pair per stored value, which is what the fixture witness compares.
 pub fn normalize_trailers(headers: &HeaderMap) -> Vec<(String, Vec<u8>)> {
     let mut pairs = Vec::with_capacity(headers.len());
     for name in headers.keys() {

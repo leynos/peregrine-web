@@ -91,6 +91,96 @@ the retained evidence. Logs are in `/tmp/canary-1-1-3-*.out` on the recording
 host. This experiment makes no compiler commitment, and the default posture
 could change with a future nightly.
 
+### Dependency review
+
+The spike plan requires exact release compatibility, minimum-compiler
+declarations, licences, and lockfile resolution to be checked at M1 rather than
+assumed. The review below was taken from the committed `Cargo.lock` with
+`cargo metadata --format-version 1 --locked --offline`, which reads the licence,
+`rust-version`, and feature declarations of every resolved package. `--locked`
+also fails if the lockfile and the manifests disagree, so a successful run is
+the lockfile-resolution evidence: 225 non-root packages resolve from 22 direct
+requirements without a lockfile rewrite.
+
+Table: Direct runtime dependencies, their requirements, and their resolved
+metadata
+
+| Dependency       | Requirement | Resolved | Licence           | `rust-version` | Features enabled |
+| ---------------- | ----------- | -------- | ----------------- | -------------- | ---------------- |
+| `async-trait`    | `^0.1.92`   | 0.1.92   | MIT OR Apache-2.0 | 1.71           | default          |
+| `bytes`          | `^1.12.1`   | 1.12.1   | MIT               | 1.57           | `default`, `std` |
+| `http`           | `^1.5.0`    | 1.5.0    | MIT OR Apache-2.0 | 1.57.0         | `default`, `std` |
+| `http-body`      | `^1.1.0`    | 1.1.0    | MIT               | 1.61           | default          |
+| `http-body-util` | `^0.1.5`    | 0.1.5    | MIT               | 1.61           | default          |
+| `thiserror`      | `^2.0.21`   | 2.0.21   | MIT OR Apache-2.0 | 1.77           | `default`, `std` |
+
+Table: Direct development dependencies, their requirements, and their resolved
+metadata
+
+| Dependency          | Requirement | Resolved          | Licence                                             | `rust-version` | Features enabled                                                                                                  |
+| ------------------- | ----------- | ----------------- | --------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `camino`            | `^1.2.0`    | 1.2.6             | MIT OR Apache-2.0                                   | 1.61.0         | `serde1`                                                                                                          |
+| `cap-std`           | `^4.0.3`    | 4.0.3             | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | not declared   | `default`, `fs_utf8`, `camino`                                                                                    |
+| `googletest`        | `^0.14.4`   | 0.14.4            | Apache-2.0                                          | 1.85.0         | default                                                                                                           |
+| `hyper`             | `^1.12.0`   | 1.12.0            | MIT                                                 | 1.63           | `default`, `http1`, `server`                                                                                      |
+| `hyper-util`        | `^0.1.21`   | 0.1.21            | MIT                                                 | 1.85           | `default`, `tokio`                                                                                                |
+| `mockable`          | `^3.0.0`    | 3.0.0             | MIT, by `license-file`                              | not declared   | none (default features off)                                                                                       |
+| `pretty_assertions` | `^1.4.1`    | 1.4.1             | MIT OR Apache-2.0                                   | not declared   | `default`, `std`                                                                                                  |
+| `proptest`          | `^1.9.0`    | 1.11.0            | MIT OR Apache-2.0                                   | 1.85           | `default`, `bit-set`, `fork`, `regex-syntax`, `rusty-fork`, `std`, `tempfile`, `timeout`                          |
+| `rstest`            | `^0.27.0`   | 0.27.0            | MIT OR Apache-2.0                                   | 1.85.0         | none (default features off)                                                                                       |
+| `rstest-bdd`        | `^0.6.0`    | 0.6.0             | ISC                                                 | 1.88           | `default`, `diagnostics`, `serde`, `serde_json`                                                                   |
+| `rstest-bdd-macros` | `^0.6.0`    | 0.6.0             | ISC                                                 | 1.88           | `default`                                                                                                         |
+| `serde`             | `^1.0.228`  | 1.0.229           | MIT OR Apache-2.0                                   | 1.56           | `alloc`, `default`, `derive`, `std`                                                                               |
+| `serde_yaml`        | `^0.9.34`   | 0.9.34+deprecated | MIT OR Apache-2.0                                   | 1.64           | default                                                                                                           |
+| `tokio`             | `^1.54.1`   | 1.54.1            | MIT                                                 | 1.85           | `default`, `io-util`, `macros`, `net`, `rt`, `rt-multi-thread`, `sync`, `time` (plus enabled transitive features) |
+| `toml`              | `^1.1.3`    | 1.1.6+spec-1.1.0  | MIT OR Apache-2.0                                   | 1.85           | `default`, `display`, `parse`, `serde`, `std`                                                                     |
+| `trybuild`          | `^1.0.122`  | 1.0.122           | MIT OR Apache-2.0                                   | 1.88           | default                                                                                                           |
+
+Every requirement is a caret requirement in `Cargo.toml`, and every resolved
+version lies inside its requirement, so the lockfile records a
+SemVer-compatible resolution rather than an override.
+
+Two declarations are not SPDX `license` fields and were checked by hand.
+`mockable` 3.0.0 declares `license-file = "LICENSE"`, whose text is the MIT
+licence, so the missing SPDX field is a metadata gap in that crate rather than
+an unlicensed dependency. `cap-std` 4.0.3 declares its triple-licensed
+`Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT` field but no
+`rust-version`; its `fs_utf8` feature is the only one enabled, and it is what
+pulls in `camino`, which the manifest also requests directly.
+
+Every other package in the resolved graph offers a permissive option. The
+non-permissive-looking declarations are all dual or triple licences whose
+permissive branch is selectable: `r-efi` offers MIT, `self_cell` offers
+Apache-2.0, `ryu` offers Apache-2.0, and the Unicode data crates carry
+Unicode-3.0. No package in the graph is GPL-only or otherwise incompatible with
+this repository's ISC licence.
+
+Minimum-compiler declarations are all below the pinned toolchain. Of the 225
+resolved packages, 169 declare `rust-version` and the highest is 1.91
+(`cargo-platform`, a transitive build dependency of `trybuild`); the pinned
+compiler is 1.100.0-nightly. The 56 packages without a declaration, including
+the three direct ones above, therefore state no requirement this toolchain
+could fail to meet. That is a statement about the declaration only: it is not
+evidence that such a package would build on an older compiler, and none was
+tested. What the gate evidence does establish is that all 225 compile on the
+pinned toolchain.
+
+Feature enablement was reviewed against actual use. Hyper is limited to `http1`
+and `server`, and `hyper-util` to `tokio`; both appear only in the loopback
+fixture. Tokio's `io-util`, `macros`, `net`, `rt`, `rt-multi-thread`, `sync`,
+and `time` are each exercised by the network fixture, the asynchronous
+witnesses, and the example. `cap-std` enables only `fs_utf8` on top of its
+empty default set, and `rstest` and `mockable` are brought in with default
+features disabled. This is the smallest set that compiles the specimen; task
+1.2.1 still owns the maintained dependency and feature baseline.
+
+The resolved graph contains eight duplicate crate names at different versions:
+`getrandom`, `io-lifetimes`, `r-efi`, `syn`, `thiserror`, `thiserror-impl`,
+`toml`, and `windows-sys`. Each duplicate is transitive, arriving through
+`trybuild`, `proptest`, or the `cap-std` family; no direct requirement is
+duplicated, and pruning them would mean changing a dev-dependency rather than
+this spike's manifest.
+
 ## V-OWN: compile witnesses
 
 `tests/ownership_contract.rs` runs `trybuild` over
