@@ -27,7 +27,7 @@ use peregrine_web::spike::{ErasedBody, adapt_body};
 use proptest::prelude::*;
 
 use crate::{
-    spike_frames::{CollectedFrame, normalise_trailers},
+    spike_frames::{CollectedFrame, normalize_trailers},
     spike_synthetic::{DropProbe, FrameStep, SyntheticBody},
 };
 
@@ -143,7 +143,7 @@ pub fn expected_frames(case: &FrameCase) -> Vec<CollectedFrame> {
         .map(|chunk| CollectedFrame::Data(Bytes::from(chunk)))
         .collect();
     if let Some(pairs) = case.trailers.as_ref() {
-        frames.push(CollectedFrame::Trailers(normalise_trailers(&headers_for(
+        frames.push(CollectedFrame::Trailers(normalize_trailers(&headers_for(
             pairs,
         ))));
     }

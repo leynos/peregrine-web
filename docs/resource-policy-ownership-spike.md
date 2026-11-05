@@ -185,25 +185,30 @@ a byte oracle cannot see a dropped empty frame or a moved boundary.
 `tests/support/spike/cases.rs`, so the named witnesses and the property cannot
 drift apart. `tests/network_body_spike.rs` drives a real Hyper `Incoming` body
 through the same `adapt_body` and `ResourceRunner::invoke` seam on an ephemeral
-loopback port.
+loopback port. `tests/spike_fixture_bounds.rs` pins the fixture's
+pre-accumulation trailer bound from below, above, across frames, and for
+repeated trailer names.
 
 Table: V-BODY witnesses and the behaviour each one establishes
 
-| Witness              | Test                                                       | Establishes                                                                       |
-| -------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Empty input          | `empty_input_yields_no_frames`                             | An empty body emits no frames                                                     |
-| Frame boundaries     | `several_data_frames_preserve_boundaries`                  | Three frames, including an empty one, survive unchanged                           |
-| Trailers             | `trailers_are_forwarded_verbatim`                          | Every trailer name and value is forwarded unchanged                               |
-| Pending then ready   | `pending_then_ready_is_polled_again`                       | A pending poll does not lose the next frame; polls cover pending, data, and end   |
-| Terminal error       | `terminal_error_is_reported_once`                          | An upstream error surfaces as `BodyError::Upstream` with its text intact          |
-| Partial consumption  | `dropping_a_partially_consumed_body_releases_it_once`      | A half-read body owns its resources until dropped, then releases them once        |
-| Frame classes        | `every_documented_frame_class_is_reproduced`               | Each emptiness/trailer combination is reproduced frame by frame                   |
-| Empty with trailers  | `empty_body_with_trailers_yields_only_the_trailers_frame`  | An empty body with trailers yields exactly one trailers frame                     |
-| Poll bound           | `synthetic_poll_bound_is_enforced`                         | The fixture body fails after its documented poll bound instead of looping         |
-| Generated partitions | `generated_partitions_are_reproduced_frame_by_frame`       | Sixty-four generated partitions, with optional trailers, reproduce frame by frame |
-| One invocation path  | `synthetic_and_network_requests_share_one_invocation_path` | A synthetic and a network request reach the same dependency, one call each        |
-| Network trailers     | `chunked_request_trailers_reach_the_resource`              | Chunked trailers arrive at the resource through Hyper                             |
-| Truncated request    | `truncated_content_length_surfaces_the_body_error`         | A short body surfaces the adapter's error, not a silent success                   |
+| Witness              | Test                                                       | Establishes                                                                                         |
+| -------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Empty input          | `empty_input_yields_no_frames`                             | An empty body emits no frames                                                                       |
+| Frame boundaries     | `several_data_frames_preserve_boundaries`                  | Three frames, including an empty one, survive unchanged                                             |
+| Trailers             | `trailers_are_forwarded_verbatim`                          | Every trailer name and value is forwarded unchanged                                                 |
+| Pending then ready   | `pending_then_ready_is_polled_again`                       | A pending poll does not lose the next frame; polls cover pending, data, and end                     |
+| Terminal error       | `terminal_error_is_reported_once`                          | An upstream error surfaces as `BodyError::Upstream` with its text intact                            |
+| Partial consumption  | `dropping_a_partially_consumed_body_releases_it_once`      | A half-read body owns its resources until dropped, then releases them once                          |
+| Frame classes        | `every_documented_frame_class_is_reproduced`               | Each emptiness/trailer combination is reproduced frame by frame                                     |
+| Empty with trailers  | `empty_body_with_trailers_yields_only_the_trailers_frame`  | An empty body with trailers yields exactly one trailers frame                                       |
+| Poll bound           | `synthetic_poll_bound_is_enforced`                         | The fixture body fails after its documented poll bound instead of looping                           |
+| Generated partitions | `generated_partitions_are_reproduced_frame_by_frame`       | Sixty-four generated partitions, with optional trailers, reproduce frame by frame                   |
+| One invocation path  | `synthetic_and_network_requests_share_one_invocation_path` | A synthetic and a network request carry `hello` byte for byte to the same dependency, one call each |
+| Network trailers     | `chunked_request_trailers_reach_the_resource`              | Chunked body bytes and trailers arrive at the resource unchanged through Hyper                      |
+| Truncated request    | `truncated_content_length_surfaces_the_body_error`         | A short body surfaces the adapter's error, not a silent success                                     |
+| Trailer bound        | `exactly_four_distinct_trailer_pairs_are_accepted`         | Four trailer pairs are accepted and stored                                                          |
+| Trailer overflow     | `trailer_pairs_accumulate_across_frames_before_rejection`  | Pairs accumulate across frames, and the fifth is rejected before it is copied                       |
+| Repeated names       | `a_repeated_trailer_name_counts_individual_values`         | A repeated trailer name counts as one pair per value, not one pair per name                         |
 
 Frame-level tests compile against a `Cell`-bearing synthetic body that is
 `Send` but not `Sync`, so the tests themselves witness the claimed bound.
@@ -252,11 +257,12 @@ make test TEST_FLAGS='--test resource_policy_spike_bdd'
 make test TEST_FLAGS='--test body_adapter_spike'
 make test TEST_FLAGS='--test body_adapter_property'
 make test TEST_FLAGS='--test network_body_spike'
+make test TEST_FLAGS='--test spike_fixture_bounds'
 make test TEST_FLAGS='--test resource_policy_example'
 cargo run --example resource_policy_spike
 ```
 
-All eight targets passed after the faults were reverted, and the example exited
+All nine targets passed after the faults were reverted, and the example exited
 zero without printing diagnostics. `resource_policy_example` loads the example
 file as a module, so the assertions the reader is invited to run are exercised
 by `cargo test` as well. The network cases bind an ephemeral loopback port and
