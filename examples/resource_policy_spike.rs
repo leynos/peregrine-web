@@ -211,6 +211,8 @@ fn demonstrate_missing_enforcer() -> Result<(), Box<dyn Error>> {
     }
 }
 
+/// Runs the public, protected, and missing-enforcer demonstrations in sequence,
+/// returning an error that exits the example non-zero when one fails.
 fn main() -> Result<(), Box<dyn Error>> {
     // Build the runtime explicitly so a construction failure propagates as an
     // error: `#[tokio::main]` panics from inside the generated `main`, which the

@@ -17,7 +17,7 @@ The specimen answers four bounded questions:
 
 - Can a resource object own its typed policy and its injected dependencies?
 - Can registration freeze the effective method and policy before admission?
-- Can an erased response body stay `Send` but not `Sync` across a real await?
+- Can an erased request body stay `Send` but not `Sync` across a real await?
 - Can one conditional invocation be expressed without route-policy tables,
   service locators, or shared mutable application state?
 
@@ -364,7 +364,7 @@ join their server task rather than sleeping.
   policy is implemented or evaluated.
 - The network harness serves one request with Hyper's lower-level connection
   API; it does not demonstrate routing, connection reuse, or load behaviour.
-- The cancellation witnesses drop futured invocations at one known suspension
+- The cancellation witnesses drop in-flight invocations at one known suspension
   point. They do not explore cancellation at every await or under load.
 - Frame-level equality holds for the generated partitions in this suite, not
   for arbitrary bodies or arbitrary upstream error types.

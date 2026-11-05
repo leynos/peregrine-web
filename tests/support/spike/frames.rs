@@ -7,9 +7,12 @@
 //!
 //! # Lint scope
 //!
-//! Each integration binary includes a different subset of the fixture modules,
-//! so an item used only by a sibling binary looks unused here. The allowance is
-//! confined to this fixture module rather than the whole test crate.
+//! Several integration binaries include this module through `#[path]`, and each
+//! compiles its own copy, so an item that only a sibling binary uses looks
+//! unused here. The allowance is confined to this fixture module rather than
+//! the whole test crate; a module with a single consumer carries none.
+//! Splitting the fixtures per consumer would duplicate them, and per-item
+//! allowances would scatter the same suppression through ordinary fixture code.
 
 #![allow(
     dead_code,

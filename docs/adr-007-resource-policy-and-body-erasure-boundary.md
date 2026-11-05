@@ -48,8 +48,8 @@ answers. This ADR preserves their outcome so later slices do not rediscover it.
 
 ### Functional requirements
 
-- A resource declares a method-independent policy that is `Public`,
-  `Authenticated`, or a non-empty `Scopes` set.
+- A resource returns an immutable policy for the frozen method, and that policy
+  is `Public`, `Authenticated`, or a non-empty `Scopes` set.
 - Registration rejects a policy that requires enforcement when the runner has
   no enforcer installed.
 - Admission observes the retained resource, its declared observation, the

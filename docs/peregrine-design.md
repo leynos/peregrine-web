@@ -353,17 +353,20 @@ before acceptance. Rate-limit and audit classifications are extension
 candidates; they do not imply built-in policy engines.
 
 The first spike compiled and exercised a provisional form of that surface. A
-`Send + Sync`, dyn-compatible resource owns a method-independent `Policy` of
-`Public`, `Authenticated`, or a non-empty scope set; an empty set is a typed
-rejection. Registration captures the frozen method and policy and retains the
-resource handle, and it rejects a policy that requires enforcement when the
-runner has no enforcer installed. The enforcer is one erased async trait object
-supplied at the composition root. Admission receives the retained handle, its
-declared observation, the frozen method, the captured policy, the request path,
-and an optional identity; an anonymous protected request is denied before the
-enforcer runs. Witnesses show those values unchanged across a real await, and
-show that a denial reaches neither the responder nor the resource dependency.
-The tested shape, its rejected alternatives, and its limits are recorded in
+`Send + Sync`, dyn-compatible resource answers `policy(method)` with the
+immutable `Policy` for the frozen method, which is `Public`, `Authenticated`,
+or a non-empty scope set; an empty set is a typed rejection.
+`ResourceRunner::register` calls it once for the method being registered and
+captures the result, so later admissions read the captured policy rather than
+asking the resource again. Registration also retains the resource handle, and
+it rejects a policy that requires enforcement when the runner has no enforcer
+installed. The enforcer is one erased async trait object supplied at the
+composition root. Admission receives the retained handle, its declared
+observation, the frozen method, the captured policy, the request path, and an
+optional identity; an anonymous protected request is denied before the enforcer
+runs. Witnesses show those values unchanged across a real await, and show that
+a denial reaches neither the responder nor the resource dependency. The tested
+shape, its rejected alternatives, and its limits are recorded in
 [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) and the
 [evidence ledger](resource-policy-ownership-spike.md#v-identity-identity-and-admission-witnesses).
 Q3 acceptance, tenant or object-level context, revocation, and production

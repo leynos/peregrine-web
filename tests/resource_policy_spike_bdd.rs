@@ -136,7 +136,7 @@ async fn invoke_selected(
     let reaches_hook = view.identity().is_some();
     match world.enforcer.as_ref() {
         Some(enforcer) if reaches_hook => {
-            invoke_with_rendezvous(
+            let (outcome, entry) = invoke_with_rendezvous(
                 enforcer,
                 InvocationSubject {
                     runner,
@@ -145,7 +145,12 @@ async fn invoke_selected(
                     body,
                 },
             )
-            .await
+            .await;
+            assert!(
+                entry.entered(),
+                "a scenario that presents an identity must reach the enforcer hook"
+            );
+            outcome
         }
         _ => runner.invoke(registered, view, body).await,
     }
@@ -287,6 +292,9 @@ fn denied_for_missing_identity(world: &SpikeWorld) {
     );
 }
 
+/// Runs the scenario asserting that a public resource with an injected
+/// dependency answers directly, supplying the response body without consulting
+/// an enforcer.
 #[scenario(
     path = "tests/features/resource_policy_spike.feature",
     name = "Public resource permits direct invocation"
@@ -294,6 +302,8 @@ fn denied_for_missing_identity(world: &SpikeWorld) {
 #[tokio::test(flavor = "current_thread")]
 async fn public_resource_permits_direct_invocation(world: SpikeWorld) { let _ = world; }
 
+/// Runs the scenario asserting that an enforcer denial leaves the protected
+/// resource unchanged, so neither its responder nor its dependency is consulted.
 #[scenario(
     path = "tests/features/resource_policy_spike.feature",
     name = "Protected policy denies before invocation"
@@ -301,12 +311,17 @@ async fn public_resource_permits_direct_invocation(world: SpikeWorld) { let _ = 
 #[tokio::test(flavor = "current_thread")]
 async fn protected_policy_denies_before_invocation(world: SpikeWorld) { let _ = world; }
 
+/// Runs the scenario asserting that a protected resource cannot register
+/// without an enforcer, failing with the typed missing-enforcer error.
 #[scenario(
     path = "tests/features/resource_policy_spike.feature",
     name = "Protected registration requires enforcement"
 )]
 fn protected_registration_requires_enforcement(world: SpikeWorld) { let _ = world; }
 
+/// Runs the scenario asserting that a protected request presenting an identity
+/// crosses the awaited hook, runs the responder once, and returns the injected
+/// dependency's response.
 #[scenario(
     path = "tests/features/resource_policy_spike.feature",
     name = "Present identity permits a protected invocation"
@@ -314,6 +329,8 @@ fn protected_registration_requires_enforcement(world: SpikeWorld) { let _ = worl
 #[tokio::test(flavor = "current_thread")]
 async fn present_identity_permits_protected_invocation(world: SpikeWorld) { let _ = world; }
 
+/// Runs the scenario asserting that a protected request without an identity is
+/// denied for the missing identity, leaving every responder idle.
 #[scenario(
     path = "tests/features/resource_policy_spike.feature",
     name = "Absent identity is denied before the hook"

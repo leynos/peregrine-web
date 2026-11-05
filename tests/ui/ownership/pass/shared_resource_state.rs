@@ -19,8 +19,10 @@ struct Catalogue {
 
 #[async_trait]
 impl Resource for Catalogue {
+    /// Declares the shared resource public.
     fn policy(&self, _method: Method) -> &Policy { &self.policy }
 
+    /// Reports the shared allocation as both resource and dependency.
     fn observation(&self) -> ResourceObservation {
         ResourceObservation {
             resource: AllocationId::of(&self.state),
@@ -29,6 +31,7 @@ impl Resource for Catalogue {
         }
     }
 
+    /// Returns an empty response; the witness is about the retained allocation.
     async fn get(
         &self,
         _view: RequestView<'_>,
@@ -38,6 +41,7 @@ impl Resource for Catalogue {
     }
 }
 
+/// Registers one allocation twice and checks both keep the same identity.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let resource = Arc::new(Catalogue {
         policy: Policy::Public,

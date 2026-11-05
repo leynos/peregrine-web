@@ -19,8 +19,10 @@ struct Catalogue {
 
 #[async_trait]
 impl Resource for Catalogue {
+    /// Declares the catalogue resource public.
     fn policy(&self, _method: Method) -> &Policy { &self.policy }
 
+    /// Reports the allocation identity the erased interface observes.
     fn observation(&self) -> ResourceObservation {
         ResourceObservation {
             resource: AllocationId::of(&self.state),
@@ -29,6 +31,7 @@ impl Resource for Catalogue {
         }
     }
 
+    /// Returns the catalogue body.
     async fn get(
         &self,
         _view: RequestView<'_>,
@@ -48,8 +51,10 @@ struct Billing {
 
 #[async_trait]
 impl Resource for Billing {
+    /// Declares the billing resource public.
     fn policy(&self, _method: Method) -> &Policy { &self.policy }
 
+    /// Reports the allocation identity the erased interface observes.
     fn observation(&self) -> ResourceObservation {
         ResourceObservation {
             resource: AllocationId::of(&self.state),
@@ -58,6 +63,7 @@ impl Resource for Billing {
         }
     }
 
+    /// Returns the billing body.
     async fn get(
         &self,
         _view: RequestView<'_>,
@@ -67,6 +73,7 @@ impl Resource for Billing {
     }
 }
 
+/// Registers two different concrete resources through one erased interface.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let runner = ResourceRunner::new();
     let resources: Vec<Arc<dyn Resource>> = vec![

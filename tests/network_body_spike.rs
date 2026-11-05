@@ -45,6 +45,10 @@ use spike_network::{
 };
 use spike_synthetic::{FrameStep, SyntheticBody};
 
+/// Checks that a synthetic body and a real network request share one path.
+///
+/// Both invocations reach the same injected dependency, and the responder and
+/// dependency call counts show that neither route takes a private shortcut.
 #[tokio::test]
 async fn synthetic_and_network_requests_share_one_invocation_path() -> Result<(), Box<dyn Error>> {
     let (resource, runner, registered) = fixture()?;
@@ -117,6 +121,10 @@ async fn synthetic_and_network_requests_share_one_invocation_path() -> Result<()
     Ok(())
 }
 
+/// Checks that chunked request trailers reach the resource unchanged.
+///
+/// The decoded body arrives byte for byte, and the single trailer pair
+/// survives adaptation while the responder still runs exactly once.
 #[tokio::test]
 async fn chunked_request_trailers_reach_the_resource() -> Result<(), Box<dyn Error>> {
     let (resource, runner, registered) = fixture()?;
@@ -159,6 +167,10 @@ async fn chunked_request_trailers_reach_the_resource() -> Result<(), Box<dyn Err
     Ok(())
 }
 
+/// Checks that a truncated content-length body surfaces as a body failure.
+///
+/// The invocation fails before consulting the dependency, although the
+/// responder has already started, so the error is attributed to the body.
 #[tokio::test]
 async fn truncated_content_length_surfaces_the_body_error() -> Result<(), Box<dyn Error>> {
     let (resource, runner, registered) = fixture()?;

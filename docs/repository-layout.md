@@ -128,8 +128,8 @@ compact and omits build output such as `target/`.
 - `src/lib.rs`: Contains the library crate root and exported public API
   surface.
 - `src/spike/`: Holds the roadmap 1.1.3 experimental specimen exported as
-  `peregrine_web::spike`. It is compile and runtime evidence, not a framework
-  API; see the [evidence ledger](resource-policy-ownership-spike.md).
+  `peregrine_web::spike`. It contains compile-time and runtime evidence, not a
+  framework API; see the [evidence ledger](resource-policy-ownership-spike.md).
 - `examples/resource_policy_spike.rs`: Runnable demonstration of the specimen.
   It checks its outcomes programmatically and exits non-zero on a missing
   observation.

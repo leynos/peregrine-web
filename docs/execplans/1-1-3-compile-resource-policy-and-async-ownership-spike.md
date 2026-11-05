@@ -124,7 +124,7 @@ the required design/ADR change; obtain explicit approval for deviations.
     document. Log:
     `/tmp/green3-ownership-1-1-3-compile-resource-policy-and-async-ownership-spike.out`.
 - [x] M2: exercise identity, policy admission, and body adapters.
-  - [x] (2026-11-01) Added four integration targets:
+  - [x] (2026-11-01) Added five integration targets:
     `tests/resource_policy_spike.rs` and `tests/resource_policy_cancellation.rs`
     (8 and 3 cases covering public and protected admission, identity across a
     real suspension, unselected resources, scope rejection, and cancellation or

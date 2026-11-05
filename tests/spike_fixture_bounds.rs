@@ -17,6 +17,7 @@ use std::{
 
 use http::{HeaderMap, HeaderName, HeaderValue};
 use peregrine_web::spike::{ErasedBody, ResourceError, adapt_body};
+use rstest::rstest;
 use spike_frames::{MAX_TRAILER_PAIRS, drain_body};
 use spike_synthetic::{FrameStep, SyntheticBody};
 
@@ -95,52 +96,68 @@ async fn reject(body: &mut ErasedBody) -> Result<(), Box<dyn Error>> {
     }
 }
 
-#[tokio::test]
-async fn exactly_four_distinct_trailer_pairs_are_accepted() -> Result<(), Box<dyn Error>> {
-    let mut body = body_with(vec![FrameStep::Trailers(distinct_trailers(
-        MAX_TRAILER_PAIRS,
-    )?)]);
-    accept(&mut body, MAX_TRAILER_PAIRS).await
+/// One trailer arrangement whose draining the bound must decide.
+///
+/// The cases name what they exercise rather than how they are built, so the
+/// parameterised tests below read as the boundary table they pin.
+#[derive(Clone, Copy, Debug)]
+enum TrailerCase {
+    /// `count` distinct names carried in a single frame.
+    Distinct(usize),
+    /// Two frames of distinct names, with the given sizes.
+    Split(usize, usize),
+    /// One name repeated `count` times in a single frame.
+    Repeated(usize),
 }
 
-#[tokio::test]
-async fn five_distinct_trailer_pairs_are_rejected() -> Result<(), Box<dyn Error>> {
-    let mut body = body_with(vec![FrameStep::Trailers(distinct_trailers(
-        MAX_TRAILER_PAIRS + 1,
-    )?)]);
-    reject(&mut body).await
+impl TrailerCase {
+    /// Builds the scripted frames this case describes.
+    fn frames(self) -> Result<Vec<FrameStep>, Box<dyn Error>> {
+        match self {
+            Self::Distinct(count) => Ok(vec![FrameStep::Trailers(distinct_trailers(count)?)]),
+            Self::Split(first, second) => Ok(vec![
+                FrameStep::Trailers(distinct_trailers(first)?),
+                FrameStep::Trailers(distinct_trailers(second)?),
+            ]),
+            Self::Repeated(count) => Ok(vec![FrameStep::Trailers(repeated_trailers(count))]),
+        }
+    }
 }
 
+/// Checks that trailer sets at the bound are accepted: four distinct pairs,
+/// four pairs split across frames, and four repetitions of one trailer name.
+#[rstest]
+#[case::exactly_four_distinct_trailer_pairs_are_accepted(
+    TrailerCase::Distinct(MAX_TRAILER_PAIRS),
+    MAX_TRAILER_PAIRS
+)]
+#[case::four_pairs_split_across_frames_are_accepted(TrailerCase::Split(2, 2), MAX_TRAILER_PAIRS)]
+#[case::a_repeated_trailer_name_counts_individual_values(
+    TrailerCase::Repeated(MAX_TRAILER_PAIRS),
+    MAX_TRAILER_PAIRS
+)]
 #[tokio::test]
-async fn four_pairs_split_across_frames_are_accepted() -> Result<(), Box<dyn Error>> {
-    let mut body = body_with(vec![
-        FrameStep::Trailers(distinct_trailers(2)?),
-        FrameStep::Trailers(distinct_trailers(2)?),
-    ]);
-    accept(&mut body, MAX_TRAILER_PAIRS).await
+async fn trailer_pairs_within_the_bound_are_accepted(
+    #[case] case: TrailerCase,
+    #[case] expected: usize,
+) -> Result<(), Box<dyn Error>> {
+    let mut body = body_with(case.frames()?);
+    accept(&mut body, expected).await
 }
 
+/// Checks that a trailer set over the bound is rejected before accumulation,
+/// whether the excess arrives as distinct names, across frames, or as one
+/// repeated name.
+#[rstest]
+#[case::five_distinct_trailer_pairs_are_rejected(TrailerCase::Distinct(MAX_TRAILER_PAIRS + 1))]
+#[case::trailer_pairs_accumulate_across_frames_before_rejection(TrailerCase::Split(3, 2))]
+#[case::a_repeated_trailer_name_beyond_the_bound_is_rejected(
+    TrailerCase::Repeated(MAX_TRAILER_PAIRS + 1)
+)]
 #[tokio::test]
-async fn trailer_pairs_accumulate_across_frames_before_rejection() -> Result<(), Box<dyn Error>> {
-    let mut body = body_with(vec![
-        FrameStep::Trailers(distinct_trailers(3)?),
-        FrameStep::Trailers(distinct_trailers(2)?),
-    ]);
-    reject(&mut body).await
-}
-
-#[tokio::test]
-async fn a_repeated_trailer_name_counts_individual_values() -> Result<(), Box<dyn Error>> {
-    let mut body = body_with(vec![FrameStep::Trailers(repeated_trailers(
-        MAX_TRAILER_PAIRS,
-    ))]);
-    accept(&mut body, MAX_TRAILER_PAIRS).await
-}
-
-#[tokio::test]
-async fn a_repeated_trailer_name_beyond_the_bound_is_rejected() -> Result<(), Box<dyn Error>> {
-    let mut body = body_with(vec![FrameStep::Trailers(repeated_trailers(
-        MAX_TRAILER_PAIRS + 1,
-    ))]);
+async fn trailer_pairs_beyond_the_bound_are_rejected(
+    #[case] case: TrailerCase,
+) -> Result<(), Box<dyn Error>> {
+    let mut body = body_with(case.frames()?);
     reject(&mut body).await
 }

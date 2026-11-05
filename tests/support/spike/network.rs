@@ -6,16 +6,9 @@
 //! joined through [`Harness::shutdown`], whose result the tests propagate, so a
 //! shutdown timeout or a panicked server cannot hide behind a passing test.
 //!
-//! # Lint scope
-//!
-//! Each integration binary includes a different subset of the fixture modules,
-//! so an item used only by a sibling binary looks unused here. The allowance is
-//! confined to this fixture module rather than the whole test crate.
-
-#![allow(
-    dead_code,
-    reason = "each integration binary includes a different subset of these fixtures"
-)]
+//! This module has one consumer, `network_body_spike`, which uses every item,
+//! so it needs no `dead_code` allowance. The other fixture modules are included
+//! by several binaries and carry one; see `docs/developers-guide.md`.
 
 use std::{
     convert::Infallible,
@@ -53,6 +46,9 @@ use crate::{
 
 /// Deadline for one loopback exchange or shutdown; a bound, not a timing claim.
 pub const EXCHANGE_DEADLINE: Duration = Duration::from_secs(15);
+
+/// Reported when the fixture server was still running at its deadline.
+const STOPPED_AT_DEADLINE: &str = "the fixture server overran its deadline and was stopped";
 
 /// The outcome of the most recent request handled by the fixture server.
 #[derive(Default)]
@@ -121,16 +117,22 @@ impl Harness {
             Ok(Err(failure)) => Err(format!("the fixture server task failed: {failure}").into()),
             Err(_) => {
                 task.abort();
-                let reason = match task.await {
-                    Err(failure) if failure.is_cancelled() => {
-                        "the fixture server overran its deadline and was stopped".to_owned()
-                    }
-                    Err(failure) => format!("the aborted fixture server task failed: {failure}"),
-                    Ok(()) => "the fixture server overran its deadline and was stopped".to_owned(),
-                };
-                Err(reason.into())
+                Err(stopped_outcome(task.await).into())
             }
         }
+    }
+}
+
+/// Describes what stopping the fixture server at its deadline left behind.
+///
+/// Aborting a task that finishes anyway is still a deadline overrun, so the
+/// cancelled and completed arms report the same reason. Only an abort that
+/// surfaces a different panic adds detail.
+fn stopped_outcome(joined: Result<(), tokio::task::JoinError>) -> String {
+    match joined {
+        Err(failure) if failure.is_cancelled() => STOPPED_AT_DEADLINE.to_owned(),
+        Err(failure) => format!("the aborted fixture server task failed: {failure}"),
+        Ok(()) => STOPPED_AT_DEADLINE.to_owned(),
     }
 }
 
@@ -305,7 +307,11 @@ pub fn fixture() -> Result<FixtureParts, Box<dyn Error>> {
     Ok((resource, runner, registered))
 }
 
-/// Returns the rendered response, rejecting non-UTF-8 fixture output.
+/// Returns the rendered response, replacing invalid UTF-8 lossily.
+///
+/// The conversion substitutes U+FFFD for invalid byte sequences rather than
+/// rejecting them, so a witness that asserts on the rendered text also proves
+/// the fixture produced valid UTF-8 where it matters.
 pub fn render(response: &[u8]) -> String { String::from_utf8_lossy(response).into_owned() }
 
 /// Turns a failed expectation into the error a `Result`-returning test returns.
