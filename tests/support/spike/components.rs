@@ -45,6 +45,17 @@ use peregrine_web::spike::{
 
 use crate::spike_frames::drain_body;
 
+/// Reported when a fixture mutex was poisoned by a panicking thread.
+///
+/// These fixtures are test-only, so a poisoned lock means a responder panicked
+/// while holding it. Recovering the guard with `PoisonError::into_inner` would
+/// turn that failure into a successful read and let a witness compare state the
+/// panicking thread may have left half-written. Propagating the error keeps the
+/// original panic visible at the test boundary instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("a fixture mutex was poisoned by a panicking thread")]
+pub struct FixtureStateError;
+
 /// An injected dependency owned by a fixture resource.
 pub struct DependencyState {
     /// A label owned by this allocation.
@@ -132,48 +143,63 @@ impl ResourceState {
     fn record_responder_call(&self) { self.responder_calls.fetch_add(1, Ordering::SeqCst); }
 
     /// Returns the trailer pairs the responder has received.
-    pub fn trailers(&self) -> Vec<(String, Vec<u8>)> {
-        match self.received_trailers.lock() {
-            Ok(guard) => guard.clone(),
-            Err(poisoned) => poisoned.into_inner().clone(),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixtureStateError`] if a panicking responder poisoned the
+    /// trailer mutex, rather than reading whatever it left behind.
+    pub fn trailers(&self) -> Result<Vec<(String, Vec<u8>)>, FixtureStateError> {
+        self.received_trailers
+            .lock()
+            .map(|guard| guard.clone())
+            .map_err(|_poisoned| FixtureStateError)
     }
 
     /// Returns the request-body bytes the responder most recently drained.
     ///
     /// The network witnesses compare these bytes with the fixture request, so a
     /// same-length payload substitution cannot pass as byte preservation.
-    pub fn last_request_body(&self) -> Vec<u8> {
-        match self.last_request_body.lock() {
-            Ok(guard) => guard.clone(),
-            Err(poisoned) => poisoned.into_inner().clone(),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixtureStateError`] if a panicking responder poisoned the body
+    /// mutex, rather than comparing against a partially written body.
+    pub fn last_request_body(&self) -> Result<Vec<u8>, FixtureStateError> {
+        self.last_request_body
+            .lock()
+            .map(|guard| guard.clone())
+            .map_err(|_poisoned| FixtureStateError)
     }
 
     /// Records the request-body bytes one responder drained.
     ///
     /// Each drain replaces the previous body, so every witness compares its own
     /// request rather than an accumulation across invocations.
-    fn record_request_body(&self, data: &[u8]) {
-        match self.last_request_body.lock() {
-            Ok(mut guard) => {
-                guard.clear();
-                guard.extend_from_slice(data);
-            }
-            Err(poisoned) => {
-                let mut guard = poisoned.into_inner();
-                guard.clear();
-                guard.extend_from_slice(data);
-            }
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixtureStateError`] if the body mutex is poisoned.
+    fn record_request_body(&self, data: &[u8]) -> Result<(), FixtureStateError> {
+        let mut guard = self
+            .last_request_body
+            .lock()
+            .map_err(|_poisoned| FixtureStateError)?;
+        guard.clear();
+        guard.extend_from_slice(data);
+        Ok(())
     }
 
     /// Records the trailer pairs one request body carried.
-    fn record_trailers(&self, trailers: Vec<(String, Vec<u8>)>) {
-        match self.received_trailers.lock() {
-            Ok(mut guard) => guard.extend(trailers),
-            Err(poisoned) => poisoned.into_inner().extend(trailers),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixtureStateError`] if the trailer mutex is poisoned.
+    fn record_trailers(&self, trailers: Vec<(String, Vec<u8>)>) -> Result<(), FixtureStateError> {
+        self.received_trailers
+            .lock()
+            .map_err(|_poisoned| FixtureStateError)?
+            .extend(trailers);
+        Ok(())
     }
 }
 
@@ -268,6 +294,17 @@ macro_rules! impl_fixture_resource {
 impl_fixture_resource!(CatalogueResource);
 impl_fixture_resource!(BillingResource);
 
+/// Converts a poisoned fixture state error into a resource failure.
+///
+/// The responder already returns [`ResourceError`], so a poisoned fixture lock
+/// surfaces through the same path as any other responder failure rather than
+/// being written over a half-updated body and read back as success.
+fn fixture_failure(error: FixtureStateError) -> ResourceError {
+    ResourceError::Failed {
+        message: error.to_string(),
+    }
+}
+
 /// Runs one fixture responder, consuming the request body and consulting the
 /// injected dependency.
 async fn respond<T: OwnedResource>(
@@ -277,8 +314,14 @@ async fn respond<T: OwnedResource>(
 ) -> Result<ResponseDraft, ResourceError> {
     resource.state().record_responder_call();
     let drained = drain_body(body).await?;
-    resource.state().record_request_body(&drained.data);
-    resource.state().record_trailers(drained.trailers);
+    resource
+        .state()
+        .record_request_body(&drained.data)
+        .map_err(fixture_failure)?;
+    resource
+        .state()
+        .record_trailers(drained.trailers)
+        .map_err(fixture_failure)?;
     resource.dependency().record_call();
     Ok(ResponseDraft::ok(
         resource

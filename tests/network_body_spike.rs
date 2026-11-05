@@ -97,12 +97,12 @@ async fn synthetic_and_network_requests_share_one_invocation_path() -> Result<()
         format!("the network body must reach the same dependency, got: {response}")
     })?;
     let recorded = observation
-        .take()
+        .take()?
         .ok_or("the fixture server must record one outcome")?;
     require(recorded.responded().is_some(), || {
         format!("the network invocation must respond, got {recorded:?}")
     })?;
-    let received = resource.state().last_request_body();
+    let received = resource.state().last_request_body()?;
     require(received == b"hello", || {
         format!("the network request body must arrive byte for byte, got {received:?}")
     })?;
@@ -149,11 +149,11 @@ async fn chunked_request_trailers_reach_the_resource() -> Result<(), Box<dyn Err
     require(response.contains("catalogue-record /catalogue 5"), || {
         format!("the chunked body must reach the dependency, got: {response}")
     })?;
-    let received = resource.state().last_request_body();
+    let received = resource.state().last_request_body()?;
     require(received == b"hello", || {
         format!("the chunked request body must arrive byte for byte, got {received:?}")
     })?;
-    let trailers = resource.state().trailers();
+    let trailers = resource.state().trailers()?;
     require(
         trailers == vec![("x-checksum".to_owned(), b"abc123".to_vec())],
         || format!("the request trailers must survive adaptation unchanged, got {trailers:?}"),
@@ -189,7 +189,7 @@ async fn truncated_content_length_surfaces_the_body_error() -> Result<(), Box<dy
     exchange?;
 
     let recorded = observation
-        .take()
+        .take()?
         .ok_or("the fixture server must record one outcome")?;
     let InvocationOutcome::Failed(ResourceError::Body { source }) = recorded else {
         return Err(

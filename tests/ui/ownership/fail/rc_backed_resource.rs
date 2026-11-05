@@ -37,7 +37,7 @@ impl Resource for Catalogue {
         _view: RequestView<'_>,
         _body: &mut ErasedBody,
     ) -> Result<ResponseDraft, ResourceError> {
-        Ok(ResponseDraft::ok(Bytes::from(self.state.as_str())))
+        Ok(ResponseDraft::ok(Bytes::copy_from_slice(self.state.as_bytes())))
     }
 }
 
