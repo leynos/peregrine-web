@@ -446,6 +446,60 @@ Keep formatting, lint, and tests sequential; do not bypass shared compiler
 admission or remove inherited compiler wrappers. Distinguish local green gates,
 CLI review, hosted assessment, and runtime conformance evidence.
 
+## The experimental spike module
+
+`src/spike/` is the compile-time specimen roadmap task 1.1.3 left behind. It is
+not a framework API and carries no stability promise. The
+[technical design](peregrine-design.md) records the contracts it informs,
+[ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) records the
+provisional shapes and their rejected alternatives, the
+[evidence ledger](resource-policy-ownership-spike.md) states what the witnesses
+establish, and the
+[spike ExecPlan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)
+records the accepted scope.
+
+The boundary has four parts:
+
+- `Resource` is the application-owned value. It is `Send + Sync` and returns its
+  own `Policy` plus a `ResourceObservation` built from allocations it owns.
+- `Policy` is an owned value, not a borrow. `PolicyEnforcer` decides one
+  admission and reports a `Decision`; the specimen ships no provider.
+- `ResourceRunner::register` captures `resource.policy(method)` once for the
+  method being registered and stores the result with the resource. Later
+  admissions read the captured policy; they do not ask the resource again.
+- `ErasedBody` is `Send` but deliberately not `Sync`. The responder future may
+  move the body between threads, but two callers must not observe it at once. A
+  change that makes the body `Sync` weakens the bound the ownership witnesses
+  claim.
+
+The specimen is not wired into `peregrine_web::greet`, a router, or a server.
+It exists to record compiler acceptance and runtime ordering evidence.
+
+Compiling it adds runtime dependencies: `async-trait`, `bytes`, `http`,
+`http-body`, `http-body-util`, and `thiserror`. Its witnesses also use `hyper`,
+`hyper-util`, `trybuild`, `proptest`, `rstest`, and `rstest-bdd` from the
+development dependencies. The build assumptions are the repository's pinned
+nightly, the Cranelift development backend, and shared compile admission; do
+not pin a second toolchain for the spike.
+
+Focused validation:
+
+```sh
+cargo test --test ownership_contract
+cargo test --test resource_policy_spike
+cargo test --test resource_policy_identity
+cargo test --test resource_policy_cancellation
+cargo test --test resource_policy_spike_bdd
+cargo test --test body_adapter_spike
+cargo test --test body_adapter_property
+cargo test --test network_body_spike
+cargo test --test spike_fixture_bounds
+cargo test --test resource_policy_example
+cargo run --example resource_policy_spike
+```
+
+Those commands shorten the loop; they do not replace the commit gates.
+
 ## Maintain the spike fixtures
 
 Roadmap task 1.1.3 left an experimental specimen under `src/spike/` and its

@@ -204,6 +204,20 @@ the required design/ADR change; obtain explicit approval for deviations.
     reassessment: `HeaderMap::iter` visits every stored value, so the
     pre-copy bound check is about ordering, not about collapsed repeats.
     Recorded the M1 dependency review (licence, minimum compiler, features).
+  - [x] (2026-11-05) Reconciled the first hosted review (5779468946): added the
+    v0.1.0 to v0.2.0 migration guide and indexed it from `docs/contents.md`,
+    documented the crate and fixture modules, added Rustdoc to the test,
+    example, and compile-pass functions that lacked it, deleted the
+    `network.rs` `dead_code` allowance, and recorded the allowance rule in the
+    developers' guide.
+  - [x] (2026-11-05) Reconciled the follow-up review (5779832577): removed
+    first- and second-person pronouns from the migration guide, switched two
+    comment spellings to en-GB-oxendict, made the `rc_backed_resource` fixture
+    build an owned `Bytes` so its diagnostic stays focused on `Send + Sync`,
+    replaced every `PoisonError::into_inner` recovery in the fixtures with an
+    explicit `FixtureStateError` propagated to the test boundary, and added a
+    developer-guide section describing the spike boundary, its dependencies,
+    build assumptions, and focused validation commands.
 
 ## Surprises & discoveries
 

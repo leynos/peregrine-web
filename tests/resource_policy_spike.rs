@@ -340,7 +340,7 @@ async fn a_requested_method_that_differs_from_the_registration_is_rejected(
     Ok(())
 }
 
-/// Pins the wire methods the specimen recognises, and the ones it refuses.
+/// Pins the wire methods the specimen recognizes, and the ones it refuses.
 ///
 /// `Method::from_http` is the only bridge from Hyper's method type, so a
 /// missing or mis-mapped arm would silently reclassify a supported request.
@@ -372,7 +372,7 @@ fn http_methods_map_to_the_specimen_vocabulary(
         pretty_assertions::assert_eq!(
             method.as_str(),
             wire,
-            "a recognised method must render back to its wire form"
+            "a recognized method must render back to its wire form"
         );
     }
     Ok(())

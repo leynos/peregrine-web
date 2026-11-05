@@ -2,10 +2,10 @@
 
 ## Who should read this
 
-Read this guide if you depend on `peregrine-web` and are moving from v0.1.0 to
-v0.2.0. The release adds one public module, `peregrine_web::spike`, and adds
-the runtime dependencies that module needs. It removes nothing and deprecates
-nothing.
+This guide applies to projects that depend on `peregrine-web` and move from
+v0.1.0 to v0.2.0. The release adds one public module, `peregrine_web::spike`,
+and adds the runtime dependencies that module needs. It removes nothing and
+deprecates nothing.
 
 The new module is an experimental specimen, not a framework surface. It carries
 no stability promise: its names may move, change, or disappear in any later
@@ -21,7 +21,7 @@ supply-chain policy.
 | Priority          | Area                   | What to do                                                                          |
 | ----------------- | ---------------------- | ----------------------------------------------------------------------------------- |
 | Optional          | `peregrine_web::spike` | Compile against it only in experiments; expect it to change without notice.         |
-| Optional          | Dependency requirement | Raise the requirement to `0.2` only if you want the new module.                     |
+| Optional          | Dependency requirement | Raise the requirement to `0.2` only to adopt the new module.                        |
 | Review if enabled | Supply-chain policy    | Re-run `cargo deny`, `cargo vet`, or vendoring checks against the new dependencies. |
 
 _Table 1: Obligations when moving from v0.1.0 to v0.2.0._
@@ -40,9 +40,9 @@ witnesses establish and what they leave open, and
 [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) records the
 provisional shapes and the alternatives they rejected.
 
-If you want to inspect that evidence, raise the dependency requirement and keep
-the import inside a throwaway experiment. If you do not, do nothing: the v0.1.0
-surface compiles unchanged against v0.2.0.
+To inspect that evidence, raise the dependency requirement and keep the import
+inside a throwaway experiment. Otherwise, do nothing: the v0.1.0 surface
+compiles unchanged against v0.2.0.
 
 Adoption is not a commitment by the project. Resource ownership, the policy
 vocabulary, and the body-erasure boundary are all still under review, so code

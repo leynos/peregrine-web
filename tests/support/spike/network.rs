@@ -11,7 +11,6 @@
 //! by several binaries and carry one; see `docs/developers-guide.md`.
 
 use std::{
-    convert::Infallible,
     error::Error,
     future::Future,
     sync::{Arc, Mutex},
@@ -40,7 +39,7 @@ use tokio::{
 };
 
 use crate::{
-    spike_components::{CatalogueResource, DependencyState},
+    spike_components::{CatalogueResource, DependencyState, FixtureStateError},
     spike_frames::MAX_BODY_BYTES,
 };
 
@@ -59,19 +58,28 @@ pub struct Observation {
 
 impl Observation {
     /// Records the outcome of one handled request.
-    fn record(&self, outcome: InvocationOutcome) {
-        match self.outcome.lock() {
-            Ok(mut guard) => *guard = Some(outcome),
-            Err(poisoned) => *poisoned.into_inner() = Some(outcome),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixtureStateError`] if a panicking handler poisoned the
+    /// outcome mutex.
+    fn record(&self, outcome: InvocationOutcome) -> Result<(), FixtureStateError> {
+        *self.outcome.lock().map_err(|_poisoned| FixtureStateError)? = Some(outcome);
+        Ok(())
     }
 
     /// Takes the recorded outcome, leaving the slot empty.
-    pub fn take(&self) -> Option<InvocationOutcome> {
-        match self.outcome.lock() {
-            Ok(mut guard) => guard.take(),
-            Err(poisoned) => poisoned.into_inner().take(),
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FixtureStateError`] if a panicking handler poisoned the
+    /// outcome mutex, rather than reporting a partially written observation as
+    /// a completed exchange.
+    pub fn take(&self) -> Result<Option<InvocationOutcome>, FixtureStateError> {
+        self.outcome
+            .lock()
+            .map(|mut guard| guard.take())
+            .map_err(|_poisoned| FixtureStateError)
     }
 }
 
@@ -174,10 +182,10 @@ async fn serve_request(
     registered: Arc<RegisteredResource>,
     observation: Arc<Observation>,
     request: Request<Incoming>,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+) -> Result<Response<Full<Bytes>>, FixtureStateError> {
     let outcome = handle(&runner, &registered, request).await;
     let response = response_for(&outcome);
-    observation.record(outcome);
+    observation.record(outcome)?;
     Ok(response)
 }
 
