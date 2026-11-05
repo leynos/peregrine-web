@@ -486,7 +486,13 @@ rerun the focused targets it names.
   wait would never be satisfied.
 - `tests/network_body_spike.rs` binds an ephemeral loopback port and joins or
   aborts its server task. Deadlines there are failure bounds, not timing
-  assertions; do not convert them into sleeps.
+  assertions; do not convert them into sleeps. Its witnesses compare the
+  request bytes the responder recorded, so a same-length substitution fails.
+- `tests/spike_fixture_bounds.rs` pins the fixture's trailer bound.
+  `DrainedBody::record_trailers` checks `HeaderMap::len` before calling
+  `normalize_trailers`, because `HeaderMap::iter` yields each name once and a
+  repeated trailer would otherwise be copied, then silently collapsed, before
+  the bound could reject it.
 - `tests/support/spike/cases.rs` builds the frame cases that both
   `body_adapter_spike` and `body_adapter_property` use. Change a case there
   rather than in one binary, or the named witnesses and the generated property

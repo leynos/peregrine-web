@@ -191,6 +191,14 @@ the required design/ADR change; obtain explicit approval for deviations.
     `cargo test` exercises it. ADR 007 and the evidence ledger were corrected
     to describe the registration-time policy snapshot rather than a
     per-invocation read.
+  - [x] (2026-11-03) Closed the two acceptance gaps the reassessment found.
+    `DrainedBody::record_trailers` now checks `HeaderMap::len` before calling
+    `normalize_trailers`, so an over-long trailer set is rejected before it is
+    copied, and `normalize_trailers` expands repeated names instead of
+    collapsing them; `tests/spike_fixture_bounds.rs` pins the bound from below,
+    above, across frames, and for repeated names. The fixture responder now
+    records the request bytes it drained, and both network success witnesses
+    assert `b"hello"`, so a same-length payload substitution fails.
 
 ## Surprises & discoveries
 
@@ -264,6 +272,13 @@ and 101 with `-Zpolonius=off`, so the posture is `polonius-alpha`.
   mutable resource state the `Resource` contract does not permit. The
   consequence is recorded rather than hidden: a policy change after
   registration is not observed, and ADR 007's risk section now says so.
+- 2026-11-03, accepted: the fixture checks its trailer bound against
+  `HeaderMap::len`, which counts repeated values, before copying anything.
+  `HeaderMap::iter` yields each name once, so normalizing first both
+  under-counted repeated names and copied an over-long set before rejecting it;
+  the fixture now fails before the allocation. The network witnesses compare
+  the bytes a responder actually received rather than only their length, so
+  byte-preservation is evidenced rather than inferred from a matching count.
 
 ## Outcomes & retrospective
 

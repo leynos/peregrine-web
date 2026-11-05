@@ -98,6 +98,10 @@ async fn synthetic_and_network_requests_share_one_invocation_path() -> Result<()
     require(recorded.responded().is_some(), || {
         format!("the network invocation must respond, got {recorded:?}")
     })?;
+    let received = resource.state().last_request_body();
+    require(received == b"hello", || {
+        format!("the network request body must arrive byte for byte, got {received:?}")
+    })?;
     require(resource.state().responder_calls() == 2, || {
         format!(
             "one responder call per invocation path, got {}",
@@ -136,6 +140,10 @@ async fn chunked_request_trailers_reach_the_resource() -> Result<(), Box<dyn Err
 
     require(response.contains("catalogue-record /catalogue 5"), || {
         format!("the chunked body must reach the dependency, got: {response}")
+    })?;
+    let received = resource.state().last_request_body();
+    require(received == b"hello", || {
+        format!("the chunked request body must arrive byte for byte, got {received:?}")
     })?;
     let trailers = resource.state().trailers();
     require(

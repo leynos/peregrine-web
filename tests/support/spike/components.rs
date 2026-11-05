@@ -100,6 +100,8 @@ pub struct ResourceState {
     responder_calls: AtomicUsize,
     /// Trailer pairs the responder received, in arrival order.
     received_trailers: Mutex<Vec<(String, Vec<u8>)>>,
+    /// Request-body bytes the responder most recently drained.
+    last_request_body: Mutex<Vec<u8>>,
 }
 
 impl ResourceState {
@@ -110,6 +112,7 @@ impl ResourceState {
             policy,
             responder_calls: AtomicUsize::new(0),
             received_trailers: Mutex::new(Vec::new()),
+            last_request_body: Mutex::new(Vec::new()),
         })
     }
 
@@ -130,6 +133,35 @@ impl ResourceState {
         match self.received_trailers.lock() {
             Ok(guard) => guard.clone(),
             Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+
+    /// Returns the request-body bytes the responder most recently drained.
+    ///
+    /// The network witnesses compare these bytes with the fixture request, so a
+    /// same-length payload substitution cannot pass as byte preservation.
+    pub fn last_request_body(&self) -> Vec<u8> {
+        match self.last_request_body.lock() {
+            Ok(guard) => guard.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+
+    /// Records the request-body bytes one responder drained.
+    ///
+    /// Each drain replaces the previous body, so every witness compares its own
+    /// request rather than an accumulation across invocations.
+    fn record_request_body(&self, data: &[u8]) {
+        match self.last_request_body.lock() {
+            Ok(mut guard) => {
+                guard.clear();
+                guard.extend_from_slice(data);
+            }
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                guard.clear();
+                guard.extend_from_slice(data);
+            }
         }
     }
 
@@ -242,6 +274,7 @@ async fn respond<T: OwnedResource>(
 ) -> Result<ResponseDraft, ResourceError> {
     resource.state().record_responder_call();
     let drained = drain_body(body).await?;
+    resource.state().record_request_body(&drained.data);
     resource.state().record_trailers(drained.trailers);
     resource.dependency().record_call();
     Ok(ResponseDraft::ok(

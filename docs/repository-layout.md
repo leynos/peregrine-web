@@ -69,6 +69,7 @@ compact and omits build output such as `target/`.
 │   ├── resource_policy_identity.rs
 │   ├── resource_policy_spike.rs
 │   ├── resource_policy_spike_bdd.rs
+│   ├── spike_fixture_bounds.rs
 │   └── stub.rs
 ├── tools/
 │   └── mold/

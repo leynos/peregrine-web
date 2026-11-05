@@ -67,12 +67,16 @@ impl DrainedBody {
     }
 
     /// Appends one trailer frame after checking the trailer-pair bound.
+    ///
+    /// [`HeaderMap::len`] counts every stored value, including repeated names,
+    /// so the check sees what the peer actually sent rather than the number of
+    /// distinct names. Checking before [`normalize_trailers`] means an
+    /// over-long set is rejected before anything is copied.
     fn record_trailers(&mut self, headers: &HeaderMap) -> Result<(), ResourceError> {
-        let pairs = normalise_trailers(headers);
-        if self.trailers.len() + pairs.len() > MAX_TRAILER_PAIRS {
+        if self.trailers.len() + headers.len() > MAX_TRAILER_PAIRS {
             return Err(bound_exceeded("trailer pairs", MAX_TRAILER_PAIRS));
         }
-        self.trailers.extend(pairs);
+        self.trailers.extend(normalize_trailers(headers));
         Ok(())
     }
 
@@ -101,7 +105,7 @@ fn bound_exceeded(what: &str, limit: usize) -> ResourceError {
 pub enum CollectedFrame {
     /// A data frame and its bytes.
     Data(Bytes),
-    /// A trailers frame normalised to ordered name/value pairs.
+    /// A trailers frame normalized to ordered name/value pairs.
     Trailers(Vec<(String, Vec<u8>)>),
 }
 
@@ -111,7 +115,7 @@ pub async fn collect_frames(body: &mut ErasedBody) -> Result<Vec<CollectedFrame>
     while let Some(next) = body.frame().await {
         let frame = next?;
         match frame.into_trailers() {
-            Ok(headers) => frames.push(CollectedFrame::Trailers(normalise_trailers(&headers))),
+            Ok(headers) => frames.push(CollectedFrame::Trailers(normalize_trailers(&headers))),
             Err(rest) => {
                 if let Ok(data) = rest.into_data() {
                     frames.push(CollectedFrame::Data(data));
@@ -123,9 +127,17 @@ pub async fn collect_frames(body: &mut ErasedBody) -> Result<Vec<CollectedFrame>
 }
 
 /// Converts trailers into an ordered, comparable representation.
-pub fn normalise_trailers(headers: &HeaderMap) -> Vec<(String, Vec<u8>)> {
-    headers
-        .iter()
-        .map(|(name, value)| (name.as_str().to_owned(), value.as_bytes().to_vec()))
-        .collect()
+///
+/// [`HeaderMap::iter`] yields each name once even when it carries repeated
+/// values, so repeats are expanded explicitly. The fixture witness compares
+/// what a body actually carried, and silently dropping a repeated trailer would
+/// weaken that comparison.
+pub fn normalize_trailers(headers: &HeaderMap) -> Vec<(String, Vec<u8>)> {
+    let mut pairs = Vec::with_capacity(headers.len());
+    for name in headers.keys() {
+        for value in headers.get_all(name) {
+            pairs.push((name.as_str().to_owned(), value.as_bytes().to_vec()));
+        }
+    }
+    pairs
 }
