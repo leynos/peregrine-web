@@ -2,6 +2,9 @@
 
 use serde_yaml::Value;
 
+/// The mdtablefix version shared by the hosted and manual workflows.
+#[path = "act_workflow_mdtablefix.rs"]
+pub(crate) mod mdtablefix;
 /// Exact conditions, environment, and source scripts for the known CI steps.
 #[path = "act_workflow_policy.rs"]
 mod policy;
@@ -37,7 +40,7 @@ pub(super) const ACTIONS: &[ActionContract] = &[
         "leynos/shared-actions/.github/actions/install-mdtablefix@\
          4fb8eb7ad52454678a0662865d81d3cd17aa6e0e",
         "Install mdtablefix",
-        &[("version", "0.6.0")],
+        &[("version", ANY_VALUE)],
     ),
     (
         "DavidAnson/markdownlint-cli2-action@2df9e28eb87988518ef3880c34edad45d65b1668",
@@ -175,13 +178,17 @@ fn matches_hosted_action(item: &Value, expected: &ActionContract) -> bool {
 
 /// Matches scalar input values and count, retaining absent non-mapping semantics.
 fn action_inputs_match(item: &Value, expected: &[(&str, &str)]) -> bool {
-    expected
-        .iter()
-        .all(|(key, value)| action_input(item, key).as_deref() == Some(*value))
-        && at(item, &["with"])
-            .and_then(Value::as_mapping)
-            .map_or(0, serde_yaml::Mapping::len)
-            == expected.len()
+    expected.iter().all(|(key, value)| {
+        let actual = action_input(item, key);
+        if *value == ANY_VALUE {
+            actual.is_some_and(|text| !text.is_empty())
+        } else {
+            actual.as_deref() == Some(*value)
+        }
+    }) && at(item, &["with"])
+        .and_then(Value::as_mapping)
+        .map_or(0, serde_yaml::Mapping::len)
+        == expected.len()
 }
 
 /// Checks the hosted suite path, step order, guards, and failure semantics.
@@ -326,6 +333,9 @@ fn valid_manual_act_route(act: &Value) -> bool {
             .all(|item| at(item, &["continue-on-error"]).is_none())
 }
 
+/// Marks an input whose value is checked elsewhere rather than restated here.
+pub(crate) const ANY_VALUE: &str = "<any>";
+
 /// Combines static workflow clauses while preserving source parsing errors.
 pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> Read<bool> {
     let ci = document(ci_source)?;
@@ -333,7 +343,8 @@ pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> Read<bool> {
     Ok(valid_triggers(&ci, &act)
         && valid_actions(&ci)
         && valid_ci_route(&ci)
-        && valid_manual_act_route(&act))
+        && valid_manual_act_route(&act)
+        && mdtablefix::versions_agree(&ci, &act))
 }
 
 /// Pins the three provisioning actions before the manual full Act command.
@@ -348,7 +359,7 @@ fn valid_manual_action_prefix(steps: &[Value]) -> bool {
             "leynos/shared-actions/.github/actions/install-mdtablefix@\
              4fb8eb7ad52454678a0662865d81d3cd17aa6e0e",
             "version",
-            "0.6.0",
+            ANY_VALUE,
         ),
         (
             "leynos/shared-actions/.github/actions/setup-rust@\

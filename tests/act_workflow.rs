@@ -29,8 +29,20 @@ const MDTABLEFIX_ACTION: &str = "leynos/shared-actions/.github/actions/install-m
 /// Invalid floating installer reference used by a mutation test.
 const UNPINNED_MDTABLEFIX_ACTION: &str =
     "leynos/shared-actions/.github/actions/install-mdtablefix@main";
-/// Approved mdtablefix version for the Act route.
-const MDTABLEFIX_VERSION: &str = "0.6.0";
+/// A version no release carries, for the mutation test.
+const OTHER_MDTABLEFIX_VERSION: &str = "0.0.0-mutation";
+
+/// The mdtablefix version the hosted CI workflow installs: the Act route must match it.
+fn mdtablefix_version() -> String {
+    let ci = match contract::document(CI_WORKFLOW) {
+        Ok(ci) => ci,
+        Err(error) => panic!("the CI workflow must parse: {error}"),
+    };
+    let Some(version) = contract::mdtablefix::version(&ci, "build-test") else {
+        panic!("the CI workflow must install mdtablefix");
+    };
+    version
+}
 
 /// The ACT values relevant to hosted coverage and its local test fallback.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -55,7 +67,8 @@ fn installs_linker_prerequisites_before_act_validation() {
     );
     assert!(
         workflow_has_mdtablefix_before_act_validation(&workflow),
-        "the pinned mdtablefix action must install version 0.6.0 before make test WITH_ACT=1"
+        "the pinned mdtablefix action must install the version CI installs before make test \
+         WITH_ACT=1"
     );
 }
 
@@ -75,30 +88,32 @@ fn rejects_workflow_without_linker_bootstrap() {
 /// Rejects missing, unpinned, or misordered formatter installation.
 #[test]
 fn rejects_invalid_mdtablefix_provisioning() {
+    let installed = mdtablefix_version();
+    let version = installed.as_str();
     let fixtures = [
-        ("missing installation", None, MDTABLEFIX_VERSION, true),
+        ("missing installation", None, version, true),
         (
             "wrong action revision",
             Some(UNPINNED_MDTABLEFIX_ACTION),
-            MDTABLEFIX_VERSION,
+            version,
             true,
         ),
         (
             "wrong binary version",
             Some(MDTABLEFIX_ACTION),
-            "0.5.0",
+            OTHER_MDTABLEFIX_VERSION,
             true,
         ),
         (
             "installation after tests",
             Some(MDTABLEFIX_ACTION),
-            MDTABLEFIX_VERSION,
+            version,
             false,
         ),
     ];
 
-    for (reason, action, version, installs_before_test) in fixtures {
-        let fixture = mdtablefix_workflow_fixture(action, version, installs_before_test);
+    for (reason, action, fixture_version, installs_before_test) in fixtures {
+        let fixture = mdtablefix_workflow_fixture(action, fixture_version, installs_before_test);
         assert!(
             !workflow_has_mdtablefix_before_act_validation(&parse_workflow_source(WorkflowSource(
                 &fixture
@@ -106,6 +121,48 @@ fn rejects_invalid_mdtablefix_provisioning() {
             "the workflow contract must reject {reason}"
         );
     }
+}
+
+/// The Act workflow must install the version the hosted workflow installs.
+#[test]
+fn act_and_hosted_workflows_must_install_one_mdtablefix_version() {
+    let workflow = |job: &str, version: &str| {
+        let install = if version.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "      - uses: {MDTABLEFIX_ACTION}\n        with:\n          version: \
+                 '{version}'\n"
+            )
+        };
+        let source = format!("jobs:\n  {job}:\n    steps:\n      - run: make test\n{install}");
+        match contract::document(&source) {
+            Ok(document) => document,
+            Err(error) => panic!("the fixture must parse: {error}"),
+        }
+    };
+    let agree = |hosted: &str, act: &str| {
+        contract::mdtablefix::versions_agree(
+            &workflow("build-test", hosted),
+            &workflow("act-validation", act),
+        )
+    };
+
+    assert!(agree("1.2.3", "1.2.3"), "equal versions must agree");
+    assert!(
+        agree("9.9.9", "9.9.9"),
+        "a changed version must still agree"
+    );
+    assert!(!agree("1.2.3", "1.2.4"), "a mismatch must be rejected");
+    assert!(
+        !agree("1.2.3", ""),
+        "a missing Act install must be rejected"
+    );
+    assert!(
+        !agree("", "1.2.3"),
+        "a missing hosted install must be rejected"
+    );
+    assert!(!agree("", ""), "two missing installs must be rejected");
 }
 
 /// Rejects ambiguous YAML workflow mappings.
@@ -308,6 +365,8 @@ fn workflow_has_linker_prerequisites_before_act_validation(workflow: &Workflow) 
 
 /// Determines whether the exact formatter action and binary precede the Act test.
 fn workflow_has_mdtablefix_before_act_validation(workflow: &Workflow) -> bool {
+    let installed = mdtablefix_version();
+    let version = installed.as_str();
     let Some(act_job) = workflow.jobs.get("act-validation") else {
         return false;
     };
@@ -318,8 +377,7 @@ fn workflow_has_mdtablefix_before_act_validation(workflow: &Workflow) -> bool {
     act_job.steps.get(..act_test_step).is_some_and(|steps| {
         steps.iter().any(|step| {
             step.uses.as_deref() == Some(MDTABLEFIX_ACTION)
-                && step.with.get("version").and_then(serde_yaml::Value::as_str)
-                    == Some(MDTABLEFIX_VERSION)
+                && step.with.get("version").and_then(serde_yaml::Value::as_str) == Some(version)
         })
     })
 }
