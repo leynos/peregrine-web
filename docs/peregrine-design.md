@@ -1368,8 +1368,11 @@ as runtime dependencies, plus test-only `hyper`, `hyper-util`, `tokio`,
 nightly for the witnesses recorded in the
 [evidence ledger](resource-policy-ownership-spike.md#compiler-and-build-posture).
 It is not a framework dependency decision: routing, serialization,
-instrumentation, and transport dependencies remain unselected, and every
-addition still needs licence and feature review.
+instrumentation, and transport dependencies remain unselected, and every later
+addition still needs its own licence and feature review. The review of this set
+— resolved versions, licences, declared minimum compilers, and enabled features
+— is recorded under
+[Dependency review](resource-policy-ownership-spike.md#dependency-review).
 
 The current library has no framework API to migrate. Stabilization requires
 agreement on terms-of-reference Q1–Q6, a compiled public API example, and

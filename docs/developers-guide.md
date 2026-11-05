@@ -489,10 +489,11 @@ rerun the focused targets it names.
   assertions; do not convert them into sleeps. Its witnesses compare the
   request bytes the responder recorded, so a same-length substitution fails.
 - `tests/spike_fixture_bounds.rs` pins the fixture's trailer bound.
-  `DrainedBody::record_trailers` checks `HeaderMap::len` before calling
-  `normalize_trailers`, because `HeaderMap::iter` yields each name once and a
-  repeated trailer would otherwise be copied, then silently collapsed, before
-  the bound could reject it.
+  `DrainedBody::record_trailers` checks the cumulative `HeaderMap::len`, which
+  counts every stored value, before calling `normalize_trailers`, because a
+  normalization done first would copy an over-long set before the bound could
+  reject it. `HeaderMap::iter` visits every value, so repeated names are not a
+  reason for the pre-check; ordering is.
 - `tests/support/spike/cases.rs` builds the frame cases that both
   `body_adapter_spike` and `body_adapter_property` use. Change a case there
   rather than in one binary, or the named witnesses and the generated property
