@@ -218,6 +218,10 @@ the required design/ADR change; obtain explicit approval for deviations.
     explicit `FixtureStateError` propagated to the test boundary, and added a
     developer-guide section describing the spike boundary, its dependencies,
     build assumptions, and focused validation commands.
+  - [x] (2026-11-05) Reconciled the resumed review (5784929448): reclassified
+    the dependency requirement as required in the migration guide, because a
+    `0.1` caret requirement cannot resolve v0.2.0 even after `cargo update`,
+    and named every added development dependency in the developers' guide.
 
 ## Surprises & discoveries
 
