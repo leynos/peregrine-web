@@ -12,22 +12,23 @@ no stability promise: its names may move, change, or disappear in any later
 release, including a patch release. Adopting it is optional, and no consumer is
 required to act.
 
-Consumers who never name `peregrine_web::spike` need no source change. Their
-only decision is whether the added runtime dependencies pass their own
-supply-chain policy.
+Consumers who never name `peregrine_web::spike` need no source change, though
+the dependency requirement must still move to `0.2`. Their only other decision
+is whether the added runtime dependencies pass their own supply-chain policy.
 
 ## Impact at a glance
 
 | Priority          | Area                   | What to do                                                                          |
 | ----------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| Required          | Dependency requirement | Raise the requirement to `0.2` in `Cargo.toml`; `0.1` cannot resolve v0.2.0.        |
 | Optional          | `peregrine_web::spike` | Compile against it only in experiments; expect it to change without notice.         |
-| Optional          | Dependency requirement | Raise the requirement to `0.2` only to adopt the new module.                        |
 | Review if enabled | Supply-chain policy    | Re-run `cargo deny`, `cargo vet`, or vendoring checks against the new dependencies. |
 
 _Table 1: Obligations when moving from v0.1.0 to v0.2.0._
 
-There are no required changes and no recommended changes. The numbered section
-below covers the one optional adoption decision.
+The dependency requirement is the only required change. Beyond it there is
+nothing required and nothing recommended; the numbered section below covers the
+one optional adoption decision.
 
 ## 1. Decide whether to compile against the experimental module (optional)
 
@@ -40,9 +41,9 @@ witnesses establish and what they leave open, and
 [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) records the
 provisional shapes and the alternatives they rejected.
 
-To inspect that evidence, raise the dependency requirement and keep the import
-inside a throwaway experiment. Otherwise, do nothing: the v0.1.0 surface
-compiles unchanged against v0.2.0.
+Raise the requirement to `0.2` in every case. To inspect that evidence, keep
+the import inside a throwaway experiment. Otherwise, make no source change: the
+v0.1.0 surface compiles unchanged against v0.2.0.
 
 Adoption is not a commitment by the project. Resource ownership, the policy
 vocabulary, and the body-erasure boundary are all still under review, so code
