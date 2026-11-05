@@ -38,7 +38,7 @@ fn assert_action_inputs(trace: &[Vec<String>]) {
         for (offset, (_, expected)) in inputs.iter().enumerate() {
             assert_eq!(
                 action.get(offset + 2).map(String::as_str),
-                Some(*expected),
+                Some(contract::mdtablefix::expected_input(expected).as_str()),
                 "fixture action {index} must receive the pinned input"
             );
         }

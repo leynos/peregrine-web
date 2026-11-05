@@ -38,7 +38,7 @@ fn mdtablefix_version() -> String {
         Ok(ci) => ci,
         Err(error) => panic!("the CI workflow must parse: {error}"),
     };
-    let Some(version) = contract::mdtablefix::version(&ci) else {
+    let Some(version) = contract::mdtablefix::version(&ci, "build-test") else {
         panic!("the CI workflow must install mdtablefix");
     };
     version
@@ -121,6 +121,48 @@ fn rejects_invalid_mdtablefix_provisioning() {
             "the workflow contract must reject {reason}"
         );
     }
+}
+
+/// The Act workflow must install the version the hosted workflow installs.
+#[test]
+fn act_and_hosted_workflows_must_install_one_mdtablefix_version() {
+    let workflow = |job: &str, version: &str| {
+        let install = if version.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "      - uses: {MDTABLEFIX_ACTION}\n        with:\n          version: \
+                 '{version}'\n"
+            )
+        };
+        let source = format!("jobs:\n  {job}:\n    steps:\n      - run: make test\n{install}");
+        match contract::document(&source) {
+            Ok(document) => document,
+            Err(error) => panic!("the fixture must parse: {error}"),
+        }
+    };
+    let agree = |hosted: &str, act: &str| {
+        contract::mdtablefix::versions_agree(
+            &workflow("build-test", hosted),
+            &workflow("act-validation", act),
+        )
+    };
+
+    assert!(agree("1.2.3", "1.2.3"), "equal versions must agree");
+    assert!(
+        agree("9.9.9", "9.9.9"),
+        "a changed version must still agree"
+    );
+    assert!(!agree("1.2.3", "1.2.4"), "a mismatch must be rejected");
+    assert!(
+        !agree("1.2.3", ""),
+        "a missing Act install must be rejected"
+    );
+    assert!(
+        !agree("", "1.2.3"),
+        "a missing hosted install must be rejected"
+    );
+    assert!(!agree("", ""), "two missing installs must be rejected");
 }
 
 /// Rejects ambiguous YAML workflow mappings.
