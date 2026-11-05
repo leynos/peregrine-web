@@ -70,6 +70,8 @@ The specimen is exercised by the integration tests and by a runnable example
 that builds one public and one protected resource with injected dependencies,
 checks each outcome programmatically, and exits zero when the observations hold:
 
+<!-- tested-example: resource-policy-spike-example -->
+
 ```sh
 cargo run --example resource_policy_spike
 ```

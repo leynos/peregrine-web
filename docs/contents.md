@@ -7,6 +7,8 @@ documentation set.
 
 - [User guide](users-guide.md) explains how to use the generated project and
   its public build and test commands.
+- [Migration guide: v0.1.0 to v0.2.0](v0-2-0-migration-guide.md) explains what
+  the experimental `peregrine_web::spike` surface means for existing consumers.
 - [Developer guide](developers-guide.md) explains the local workflow and
   implementation tooling for contributors.
 - [Repository layout](repository-layout.md) explains the generated project's
@@ -61,8 +63,8 @@ documentation set.
   and acceptance evidence for tasks 1.1.1 and 1.1.2.
 
 - [Resource-policy and ownership spike plan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)
-  defines the compile, body-adapter, and async ownership evidence for roadmap
-  task 1.1.3.
+  defines the compilation, body-adapter, and async ownership evidence for
+  roadmap task 1.1.3.
 - [Resource-policy and ownership spike evidence](resource-policy-ownership-spike.md)
   records the pinned compiler posture, the compile witnesses, and the limits of
   what the spike establishes.

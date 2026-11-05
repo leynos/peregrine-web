@@ -70,6 +70,10 @@ fn frame_classes() -> Vec<(&'static str, FrameCase)> {
     ]
 }
 
+/// Checks that an empty body yields no frames at all.
+///
+/// The adapter must report end of stream without manufacturing an empty data
+/// frame, which a byte-oriented oracle alone could not distinguish.
 #[test]
 fn empty_input_yields_no_frames() {
     let runtime = current_thread_runtime();
@@ -86,6 +90,10 @@ fn empty_input_yields_no_frames() {
     );
 }
 
+/// Checks that consecutive data frames keep their original boundaries.
+///
+/// The scripted sequence includes an empty data frame, so the assertion also
+/// proves that frame-level fidelity is preserved rather than only the payload.
 #[test]
 fn several_data_frames_preserve_boundaries() {
     let runtime = current_thread_runtime();
@@ -113,6 +121,10 @@ fn several_data_frames_preserve_boundaries() {
     );
 }
 
+/// Checks that a trailers frame reaches the caller with every pair intact.
+///
+/// Names and values are compared after sorting, so the test is insensitive to
+/// header ordering while still catching any dropped or rewritten trailer.
 #[test]
 fn trailers_are_forwarded_verbatim() {
     let runtime = current_thread_runtime();
@@ -151,6 +163,10 @@ fn trailers_are_forwarded_verbatim() {
     );
 }
 
+/// Checks that a body reporting pending is polled again and still yields data.
+///
+/// Polling resumes after the pending report, and the observed poll count
+/// covers the pending report, the resumed frame, and the end of stream.
 #[test]
 fn pending_then_ready_is_polled_again() {
     let (mut body, polls) = synthetic_body(
@@ -184,6 +200,10 @@ fn pending_then_ready_is_polled_again() {
     );
 }
 
+/// Checks that a terminal upstream error surfaces instead of a clean end.
+///
+/// The error is matched by variant and its text compared, so the adapter must
+/// both classify the failure and retain the upstream message.
 #[test]
 fn terminal_error_is_reported_once() {
     let runtime = current_thread_runtime();
@@ -208,6 +228,10 @@ fn terminal_error_is_reported_once() {
     }
 }
 
+/// Checks that dropping a partially consumed erased body releases it once.
+///
+/// The drop counter stays at zero while the body still owns resources and
+/// reaches one only after the body itself is dropped.
 #[test]
 fn dropping_a_partially_consumed_body_releases_it_once() {
     let runtime = current_thread_runtime();
@@ -247,6 +271,10 @@ fn dropping_a_partially_consumed_body_releases_it_once() {
     );
 }
 
+/// Checks that each documented frame class is reproduced frame by frame.
+///
+/// The classes cross body emptiness with trailer presence, so every
+/// combination has a witness rather than relying on the generated mixture.
 #[test]
 fn every_documented_frame_class_is_reproduced() {
     let runtime = current_thread_runtime();
@@ -264,6 +292,10 @@ fn every_documented_frame_class_is_reproduced() {
     }
 }
 
+/// Checks that a trailer-only body yields exactly one trailers frame.
+///
+/// The single frame must carry the scripted trailer unchanged, with no empty
+/// data frame emitted before or after it.
 #[test]
 fn empty_body_with_trailers_yields_only_the_trailers_frame() {
     let case = FrameCase {
@@ -294,6 +326,10 @@ fn empty_body_with_trailers_yields_only_the_trailers_frame() {
     }
 }
 
+/// Checks that the synthetic fixture stops pending polls at its bound.
+///
+/// Polls within the bound stay pending; the next poll returns the fixture's
+/// own upstream error and the observed count stops at the limit.
 #[test]
 fn synthetic_poll_bound_is_enforced() {
     let steps = (0..MAX_POLLS).map(|_| FrameStep::Pending).collect();

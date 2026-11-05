@@ -25,10 +25,13 @@ struct Catalogue;
 
 #[async_trait]
 impl Resource for Catalogue {
+    /// Declares the resource public so registration needs no enforcer.
     fn policy(&self, _method: Method) -> &Policy { &Policy::Public }
 
+    /// Reports allocation identities; this witness never queries them.
     fn observation(&self) -> ResourceObservation { unimplemented!("witnessed in tests") }
 
+    /// Returns an empty response; the witness is about the future's borrows.
     async fn get(
         &self,
         _view: RequestView<'_>,
@@ -53,6 +56,7 @@ struct Context {
 /// Asserts at compile time that a value is `Send`.
 fn assert_send<T: Send>(_value: &T) {}
 
+/// Proves the invocation future is `Send` while borrowing disjoint fields.
 fn main() {
     let runner = ResourceRunner::new();
     let registered = runner

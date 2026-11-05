@@ -124,6 +124,9 @@ fn assert_registration_was_retained(
     );
 }
 
+/// Checks that a permitted request reaches the enforcer and crosses its
+/// suspension with the registration's handle, method, policy, path, and
+/// principal intact, and that the responder then runs exactly once.
 #[rstest]
 #[tokio::test]
 async fn identity_and_policy_survive_the_awaited_hook(
@@ -134,7 +137,12 @@ async fn identity_and_policy_survive_the_awaited_hook(
     let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
     let mut body = adapt_body(Empty::<Bytes>::new());
 
-    let outcome = invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
+    let (outcome, entry) =
+        invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
+    assert!(
+        entry.entered(),
+        "an identified protected request must reach the enforcer hook"
+    );
 
     let (before, after) = await_admission_pair(&mut events).await?;
     assert_only_the_phase_changed(&before, &after);
@@ -147,6 +155,9 @@ async fn identity_and_policy_survive_the_awaited_hook(
     Ok(())
 }
 
+/// Checks that two successive admissions each observe the policy captured at
+/// registration, which is also the policy the resource owns, and that both
+/// requests reach the responder.
 #[rstest]
 #[tokio::test]
 async fn repeated_admissions_observe_the_frozen_policy(
@@ -160,7 +171,12 @@ async fn repeated_admissions_observe_the_frozen_policy(
 
     for admission in 0..2 {
         let mut body = adapt_body(Empty::<Bytes>::new());
-        let outcome = invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
+        let (outcome, entry) =
+            invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
+        assert!(
+            entry.entered(),
+            "admission {admission} must reach the enforcer hook"
+        );
         let (before, after) = await_admission_pair(&mut events).await?;
 
         assert_only_the_phase_changed(&before, &after);
@@ -184,6 +200,9 @@ async fn repeated_admissions_observe_the_frozen_policy(
     Ok(())
 }
 
+/// Checks that two instances of one concrete type keep distinct allocation
+/// identities, so invoking one registration leaves its unselected sibling's
+/// responder and dependency untouched.
 #[rstest]
 #[tokio::test]
 async fn same_type_instances_keep_distinct_identity(

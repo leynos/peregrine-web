@@ -16,6 +16,7 @@ async fn handler() -> usize {
     length
 }
 
+/// Proves the handler future is `Send` once the `Rc` local has ended.
 fn main() {
     let future = handler();
     assert_send(&future);

@@ -34,6 +34,7 @@ fn sequential_loans(value: &mut Vec<u8>) -> usize {
     first + value.len()
 }
 
+/// Checks each owned counterpart against the borrow the negative fixtures reject.
 fn main() {
     let body = response_body("/catalogue");
     assert_eq!(

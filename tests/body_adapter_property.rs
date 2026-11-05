@@ -26,6 +26,11 @@ use spike_frames::{CollectedFrame, collect_frames};
 proptest! {
     #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
 
+    /// Checks that generated frame partitions survive adaptation frame by frame.
+    ///
+    /// Each proptest case compares the normalised frame sequence and the
+    /// concatenated data bytes, so a dropped empty frame or a moved boundary is
+    /// still visible even when the total payload matches.
     #[test]
     fn generated_partitions_are_reproduced_frame_by_frame(case in frame_cases()) {
         let runtime = current_thread_runtime();

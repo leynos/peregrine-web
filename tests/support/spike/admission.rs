@@ -7,16 +7,19 @@
 //!
 //! # Lint scope
 //!
-//! Each integration binary includes a different subset of the fixture modules,
-//! so an item used only by a sibling binary looks unused here. The allowance is
-//! confined to this fixture module rather than the whole test crate.
+//! Several integration binaries include this module through `#[path]`, and each
+//! compiles its own copy, so an item that only a sibling binary uses looks
+//! unused here. The allowance is confined to this fixture module rather than
+//! the whole test crate; a module with a single consumer carries none.
+//! Splitting the fixtures per consumer would duplicate them, and per-item
+//! allowances would scatter the same suppression through ordinary fixture code.
 
 #![allow(
     dead_code,
     reason = "each integration binary includes a different subset of these fixtures"
 )]
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use peregrine_web::spike::{
@@ -139,22 +142,63 @@ pub struct InvocationSubject<'a> {
     pub body: &'a mut ErasedBody,
 }
 
+/// How long the rendezvous driver waits for admission to reach the hook.
+///
+/// This is a failure bound, not a timing assertion. A permitted request reaches
+/// the hook without a meaningful delay, so a driver that exhausts the bound is
+/// reporting that the invocation took a path which never suspends.
+pub const ENTRY_DEADLINE: Duration = Duration::from_secs(5);
+
+/// Whether the driver saw the invocation reach the enforcer hook.
+///
+/// Tests assert on this rather than assuming entry, because an outcome decided
+/// before admission never suspends and would otherwise be indistinguishable
+/// from one that did.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RendezvousEntry {
+    /// The invocation reached the hook, and the driver released it.
+    Entered,
+    /// The invocation never reached the hook within [`ENTRY_DEADLINE`].
+    NeverEntered,
+}
+
+impl RendezvousEntry {
+    /// Returns whether the invocation reached the enforcer hook.
+    ///
+    /// # Examples
+    ///
+    /// ```text
+    /// assert!(RendezvousEntry::Entered.entered());
+    /// assert!(!RendezvousEntry::NeverEntered.entered());
+    /// ```
+    #[must_use]
+    pub const fn entered(self) -> bool { matches!(self, Self::Entered) }
+}
+
 /// Invokes a protected registration across the enforcer's real suspension.
 ///
-/// The caller must know the request actually reaches the enforcer. An outcome
-/// decided before admission, such as a missing identity, never suspends, so the
-/// driver would wait for an entry that cannot happen.
+/// The driver waits for admission to enter the hook and releases it only after
+/// it has, so a request that never suspends cannot be released by accident. The
+/// wait is bounded by [`ENTRY_DEADLINE`]; the returned [`RendezvousEntry`] tells
+/// the caller which of the two happened, and a caller that expects a suspension
+/// must assert that entry occurred.
 pub async fn invoke_with_rendezvous(
     enforcer: &FixtureEnforcer,
     subject: InvocationSubject<'_>,
-) -> InvocationOutcome {
+) -> (InvocationOutcome, RendezvousEntry) {
     let invocation = subject
         .runner
         .invoke(subject.registered, subject.view, subject.body);
-    let driver = async {
-        enforcer.wait_until_entered().await;
-        enforcer.release();
-    };
-    let (outcome, ()) = tokio::join!(invocation, driver);
-    outcome
+    let (outcome, entry) = tokio::join!(invocation, drive_rendezvous(enforcer));
+    (outcome, entry)
+}
+
+/// Waits for admission to enter, releasing it only once it has.
+async fn drive_rendezvous(enforcer: &FixtureEnforcer) -> RendezvousEntry {
+    let reached = tokio::time::timeout(ENTRY_DEADLINE, enforcer.wait_until_entered()).await;
+    if reached.is_err() {
+        return RendezvousEntry::NeverEntered;
+    }
+    enforcer.release();
+    RendezvousEntry::Entered
 }

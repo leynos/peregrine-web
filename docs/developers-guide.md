@@ -477,10 +477,16 @@ rerun the focused targets it names.
   baseline records the pinned compiler's diagnostic; accept an update only
   after confirming the finding is a real contract change. Never run
   `TRYBUILD=overwrite` as a shortcut for a passing gate.
-- `tests/support/spike/` holds fixtures shared by several integration
-  binaries. `#[path]` inclusion means each binary compiles only the subset it
-  names, so the modules carry a narrowly scoped `dead_code` allowance with a
-  reason. Keep new shared fixtures there rather than copying them per test.
+- `tests/support/spike/` holds fixtures shared by several integration binaries.
+  `#[path]` inclusion means each binary compiles its own copy of a module, so
+  an item that only a sibling uses looks unused in that copy. A module shared
+  by more than one binary may therefore carry a module-scoped `dead_code`
+  allowance with a reason; a module with a single consumer must not carry one
+  (`network.rs` is the worked example). Do not widen an allowance to an
+  unrelated module, and do not add one to a new module that a single binary
+  needs. Keep new shared fixtures there rather than copying them per test, and
+  prefer adding a member to a module that is already shared over creating a
+  second module that would need its own allowance.
 - The enforcer fixture suspends on a `tokio::sync::Notify` rendezvous. Do not
   drive that rendezvous for a request admission denies before the hook; the
   wait would never be satisfied.

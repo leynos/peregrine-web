@@ -13,6 +13,10 @@ mod published_example;
 
 use std::error::Error;
 
+/// Checks that the published example still demonstrates its stated behaviour.
+///
+/// Loading the example as a module runs its assertions under `cargo test`, so
+/// the reader-facing demonstration cannot silently drift from the library.
 #[test]
 fn published_example_demonstrations_hold() -> Result<(), Box<dyn Error>> {
     let runtime = tokio::runtime::Builder::new_current_thread()

@@ -6,9 +6,12 @@
 //!
 //! # Lint scope
 //!
-//! Each integration binary includes a different subset of the fixture modules,
-//! so an item used only by a sibling binary looks unused here. The allowance is
-//! confined to this fixture module rather than the whole test crate.
+//! Several integration binaries include this module through `#[path]`, and each
+//! compiles its own copy, so an item that only a sibling binary uses looks
+//! unused here. The allowance is confined to this fixture module rather than
+//! the whole test crate; a module with a single consumer carries none.
+//! Splitting the fixtures per consumer would duplicate them, and per-item
+//! allowances would scatter the same suppression through ordinary fixture code.
 
 #![allow(
     dead_code,
@@ -37,7 +40,13 @@ use rstest::fixture;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{
-    spike_admission::{AdmissionEvent, FixtureEnforcer, InvocationSubject, invoke_with_rendezvous},
+    spike_admission::{
+        AdmissionEvent,
+        FixtureEnforcer,
+        InvocationSubject,
+        RendezvousEntry,
+        invoke_with_rendezvous,
+    },
     spike_components::{CatalogueResource, DependencyState},
 };
 
@@ -98,13 +107,15 @@ pub fn enforcer_with(
 /// Invokes a registration across the enforcer's real suspension.
 ///
 /// Every caller presents the same authenticated request, so the only variation
-/// a caller supplies is the registration under test.
+/// a caller supplies is the registration under test. The returned
+/// [`RendezvousEntry`] reports whether the request reached the hook; a caller
+/// that expects a suspension must assert it.
 pub async fn invoke_through_rendezvous(
     enforcer: &Arc<FixtureEnforcer>,
     runner: &ResourceRunner,
     registered: &RegisteredResource,
     body: &mut ErasedBody,
-) -> InvocationOutcome {
+) -> (InvocationOutcome, RendezvousEntry) {
     let headers = HeaderMap::new();
     let identity = Identity::new("user-42");
     let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));

@@ -54,6 +54,10 @@ fn body_with_probe() -> (ErasedBody, Arc<AtomicUsize>) {
     )
 }
 
+/// Checks that cancelling a pending invocation releases the owned body once.
+///
+/// The body outlives the pending future and is released exactly once on drop,
+/// while the cancelled invocation never reaches the responder.
 #[rstest]
 #[tokio::test]
 async fn dropping_a_pending_invocation_releases_the_owned_body_once(
@@ -97,6 +101,10 @@ async fn dropping_a_pending_invocation_releases_the_owned_body_once(
     Ok(())
 }
 
+/// Checks that cancellation releases both the body and the request guard.
+///
+/// Neither resource is dropped while the invocation is pending; dropping the
+/// future releases each exactly once without reaching the responder.
 #[rstest]
 #[tokio::test]
 async fn dropping_a_pending_invocation_releases_body_and_request_guard(
@@ -150,6 +158,10 @@ async fn dropping_a_pending_invocation_releases_body_and_request_guard(
     Ok(())
 }
 
+/// Checks that a dropped future leaves borrowed arguments with the caller.
+///
+/// A cancelled invocation must not drop the caller-owned body, which the
+/// caller then consumes and releases exactly once on its own.
 #[rstest]
 #[tokio::test]
 async fn a_dropped_future_returns_its_borrowed_arguments(
@@ -196,6 +208,10 @@ async fn a_dropped_future_returns_its_borrowed_arguments(
     Ok(())
 }
 
+/// Checks that a fully owned invocation can be moved onto a spawned task.
+///
+/// Running across two worker threads proves the seam is `Send` when the
+/// invocation owns its request, body, and registration.
 #[rstest]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_fully_owned_invocation_can_be_spawned(

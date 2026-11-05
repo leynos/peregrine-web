@@ -19,6 +19,7 @@ impl Body for Synthetic {
     type Data = Bytes;
     type Error = std::io::Error;
 
+    /// Records the poll and reports the body finished.
     fn poll_frame(
         self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
@@ -38,6 +39,7 @@ async fn consume(mut body: ErasedBody) -> usize {
     usize::from(frame.is_some())
 }
 
+/// Proves the erased body is `Send` and may cross an await.
 fn main() {
     let body = adapt_body(Synthetic { polls: Cell::new(0) });
     let future = consume(body);
