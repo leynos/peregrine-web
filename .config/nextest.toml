@@ -2,6 +2,11 @@
 #
 # Policy: no blanket retries; an intermittent failure is a defect to diagnose.
 
+# The first release that honours every setting below (including `global-timeout`).
+# `make test` checks the installed version too, because releases before 0.9.55
+# ignore this key.
+nextest-version = "0.9.100"
+
 [profile.default]
 # Warn after 60 s and terminate a test that has run for five warning periods
 # (300 s). This governs every test no override matches.
