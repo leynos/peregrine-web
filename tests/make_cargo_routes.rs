@@ -54,11 +54,11 @@ impl CargoProbe {
         directory.write(
             "probe-cargo",
             "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ \
-             \"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' 'cargo-nextest 0.9.0'; exit \
-             0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n \
-             \"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\nif [ -n \
-             \"${CARGO_ENV_LOG:-}\" ]; then printf '%s\\n' \"${RUSTFLAGS:-}\" > \
-             \"$CARGO_ENV_LOG\"; fi\nexit \"${CARGO_PROBE_STATUS:-0}\"\n",
+             \"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' \"cargo-nextest \
+             ${NEXTEST_FAKE_VERSION:-0.9.100}\"; exit 0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" \
+             >> \"$CARGO_LOG\"\nif [ -n \"${PRODUCTION_LOG:-}\" ]; then env | sort > \
+             \"$PRODUCTION_LOG\"; fi\nif [ -n \"${CARGO_ENV_LOG:-}\" ]; then printf '%s\\n' \
+             \"${RUSTFLAGS:-}\" > \"$CARGO_ENV_LOG\"; fi\nexit \"${CARGO_PROBE_STATUS:-0}\"\n",
         )?;
         directory.set_permissions("probe-cargo", Permissions::from_mode(0o700))?;
         directory.write(
@@ -321,6 +321,39 @@ fn pinned_tool_preflight_precedes_development_cargo() {
             .remove_file("cargo.log")
             .expect("reset the command log");
     }
+}
+
+/// An outdated nextest is an error: falling back to `cargo test` would lose
+/// the nextest timeouts and test groups.
+#[test]
+fn outdated_nextest_fails_make_test_instead_of_falling_back() {
+    let probe = CargoProbe::new().expect("create an isolated fake Cargo executable");
+    let output = probe
+        .make_command(
+            "test",
+            MakeOptions {
+                nextest_available: true,
+                dry_run: false,
+                with_act: false,
+                check: "true",
+            },
+        )
+        .env("NEXTEST_FAKE_VERSION", "0.9.99")
+        .output()
+        .expect("run Make with an outdated fake nextest");
+    assert!(
+        !output.status.success(),
+        "an outdated nextest must fail make test"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("0.9.99 is older than"),
+        "the failure must name the installed version: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        probe.directory.read_to_string("cargo.log").is_err(),
+        "no Cargo test command may run, nextest or otherwise"
+    );
 }
 
 #[test]

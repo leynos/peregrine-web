@@ -203,12 +203,14 @@ project:
     command. `make all` runs formatting, linting, testing, and spelling in
     order even under `make -j all`.
   - `make test` checks build prerequisites, uses `cargo-nextest` when available,
-    and falls back to `cargo test`. Both Cargo commands retain caller
+    and falls back to `cargo test` only when it is absent (a nextest older than
+    0.9.100 fails the target). Both Cargo commands retain caller
     `RUSTFLAGS` alongside the development flags; doctests also deny Rustdoc
     warnings. With `WITH_ACT=1`, Make runs Act validation after local tests:
 
     ```makefile
-    TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+    NEXTEST_PROBE := $(shell $(CARGO) nextest --version 2>/dev/null)
+    TEST_CMD := $(if $(NEXTEST_PROBE),nextest run,test)
     test: check-build-tools
         RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
           $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)

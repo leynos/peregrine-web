@@ -35,7 +35,7 @@ esac
 record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
 case "$stage" in unexpected-*) exit 64 ;; esac
 if [ "${GATE_FAIL_AT-}" = "$stage" ]; then exit 1; fi
-if [ "$stage" = nextest-version-probe ]; then printf '%s\n' 'cargo-nextest 0.9.0'; fi
+if [ "$stage" = nextest-version-probe ]; then printf '%s\n' 'cargo-nextest 0.9.100'; fi
 "#;
 
 /// Preflight fixture rejects arguments and supports controlled failure.

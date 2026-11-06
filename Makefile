@@ -51,7 +51,13 @@ RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
-TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+NEXTEST_PROBE := $(shell $(CARGO) nextest --version 2>/dev/null)
+TEST_CMD := $(if $(NEXTEST_PROBE),nextest run,test)
+# Keep in step with `nextest-version` in .config/nextest.toml. An outdated
+# nextest is an error, not a reason to fall back to `cargo test`, which would
+# lose the nextest timeouts and test groups.
+NEXTEST_MIN_VERSION := 0.9.100
+NEXTEST_VERSION := $(word 2,$(NEXTEST_PROBE))
 WITH_ACT ?= 0
 ACT ?= act
 ACT_RUNNER_IMAGE ?= catthehacker/ubuntu:act-latest
@@ -86,6 +92,9 @@ clean: ## Remove build artefacts
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
 test: check-build-tools ## Run tests with warnings treated as errors
+	@case "$(NEXTEST_VERSION)" in [0-9]*.[0-9]*.[0-9]*) \
+		if [ "$$(printf '%s\n%s\n' "$(NEXTEST_MIN_VERSION)" "$(NEXTEST_VERSION)" | sort -V | head -n1)" != "$(NEXTEST_MIN_VERSION)" ]; then \
+			echo "cargo-nextest $(NEXTEST_VERSION) is older than $(NEXTEST_MIN_VERSION); upgrade it (cargo binstall cargo-nextest)" >&2; exit 1; fi;; esac
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
