@@ -60,8 +60,14 @@ before starting it. Dylint then checks the repository from its root and
 discovers `.cargo/config.toml`; that check uses the development backend and
 linker defaults. The recipe sends warnings-as-errors to the repository check
 through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
-`cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
-available. `make check-fmt` verifies Rust formatting with
+`cargo nextest run` and falls back to `cargo test` only when cargo-nextest is
+absent. An installed nextest older than 0.9.100 (the `nextest-version` in
+`.config/nextest.toml`) fails `make test` with an upgrade message, because the
+fallback would lose the nextest timeouts and test groups. Those settings bound
+every test at 300 s, run the `build_toolchain_contract` and
+`clippy_lint_contract` binaries (which start a child Cargo) one at a time in the
+`nested-cargo-builds` group with a 600 s allowance, and bound the run at 30
+minutes. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and
