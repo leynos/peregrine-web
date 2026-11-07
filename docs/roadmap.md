@@ -3,10 +3,11 @@
 This proposed roadmap turns the [terms of reference](terms-of-reference.md) and
 [technical design](peregrine-design.md)
 into a candidate delivery sequence. It is not a release commitment and promises
-no dates. Only decision/specification tasks 1.1.1 and 1.1.2 are done. Compiler
-probes remain evidence for the proposal, not completion of the planned
-framework prototypes; implementation and proving-ground validation remain
-unfinished. [ADR 001](adr-001-resource-aware-lifecycle.md) and
+no dates. Only decision/specification tasks 1.1.1 and 1.1.2 are done, together
+with the bounded 1.1.3 compiler spike that produced evidence for the proposal.
+That spike is not a delivered framework: the remaining framework prototypes,
+final ownership and compiler-posture acceptance, and proving-ground validation
+stay unfinished. [ADR 001](adr-001-resource-aware-lifecycle.md) and
 [ADR 002](adr-002-compiler-ownership-experiment.md) remain proposed. The key
 compiler experiment in phase 2 gates the implementation direction. The
 [actix-v2a case study](actix-v2a-middleware-case-study.md) and proposed
@@ -70,7 +71,7 @@ and technical design §§1, 4, 9, and 12.
     limits have units, defaults, validation rules, and explicit opt-outs. Include
     correlation, safe error-detail, and renderer-output budgets and the
     engine/application boundaries in ADR 003.
-- [ ] 1.1.3. Compile a resource-policy and async ownership spike.
+- [x] 1.1.3. Compile a resource-policy and async ownership spike — done.
   - Requires 1.1.2.
   - See peregrine-design.md §§3–4 and 11–12; terms-of-reference.md Q3 and Q5.
   - Success: heterogeneous resource objects, typed policy, synthetic and network
