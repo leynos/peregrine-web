@@ -62,42 +62,55 @@ fn mold_pin_covers_only_the_supported_native_archive() {
     );
 }
 
+/// Assert that Cargo's `config get` output selects the *expected* backend.
+fn assert_selected_backend(output: &std::process::Output, expected: &str, label: &str) {
+    assert!(
+        output.status.success(),
+        "Cargo must expose its profile backend: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let selected = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        selected.contains(&format!("= \"{expected}\"")),
+        "Cargo must select {expected} for {label}: {selected}"
+    );
+}
+
 /// Cargo's effective profile setting changes for the measured route.
+///
+/// Each call is one chain, with `CARGO_NET_OFFLINE` set: `cargo config get`
+/// reads no network, and the estate's nested-cargo rule can see that.
 #[test]
 fn coverage_overrides_the_effective_dev_backend_to_llvm() {
-    for (override_backend, expected) in [(None, "cranelift"), (Some("llvm"), "llvm")] {
-        let mut command = Command::new("cargo");
-        command
-            .args([
-                "-Z",
-                "unstable-options",
-                "config",
-                "get",
-                "profile.dev.codegen-backend",
-            ])
-            .current_dir(env!("CARGO_MANIFEST_DIR"));
-        match override_backend {
-            Some(backend) => {
-                command.env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", backend);
-            }
-            None => {
-                command.env_remove("CARGO_PROFILE_DEV_CODEGEN_BACKEND");
-            }
-        }
-        let output = command
-            .output()
-            .expect("read Cargo's selected development backend");
-        assert!(
-            output.status.success(),
-            "Cargo must expose its profile backend: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let selected = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            selected.contains(&format!("= \"{expected}\"")),
-            "Cargo must select {expected} for override {override_backend:?}: {selected}"
-        );
-    }
+    let default_backend = Command::new("cargo")
+        .args([
+            "-Z",
+            "unstable-options",
+            "config",
+            "get",
+            "profile.dev.codegen-backend",
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env("CARGO_NET_OFFLINE", "true")
+        .env_remove("CARGO_PROFILE_DEV_CODEGEN_BACKEND")
+        .output()
+        .expect("read Cargo's selected development backend");
+    assert_selected_backend(&default_backend, "cranelift", "no override");
+
+    let llvm_override = Command::new("cargo")
+        .args([
+            "-Z",
+            "unstable-options",
+            "config",
+            "get",
+            "profile.dev.codegen-backend",
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env("CARGO_NET_OFFLINE", "true")
+        .env("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm")
+        .output()
+        .expect("read Cargo's selected development backend");
+    assert_selected_backend(&llvm_override, "llvm", "the llvm override");
 }
 
 /// Make must keep LLVM selected even when a caller sets its former override.

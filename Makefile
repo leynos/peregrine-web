@@ -95,6 +95,7 @@ test: check-build-tools ## Run tests with warnings treated as errors
 	@case "$(NEXTEST_VERSION)" in [0-9]*.[0-9]*.[0-9]*) \
 		if [ "$$(printf '%s\n%s\n' "$(NEXTEST_MIN_VERSION)" "$(NEXTEST_VERSION)" | sort -V | head -n1)" != "$(NEXTEST_MIN_VERSION)" ]; then \
 			echo "cargo-nextest $(NEXTEST_VERSION) is older than $(NEXTEST_MIN_VERSION); upgrade it (cargo binstall cargo-nextest)" >&2; exit 1; fi;; esac
+	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
