@@ -94,8 +94,9 @@ fn matrix_runner(expression: &str, job: &Value) -> Option<bool> {
     let mut cases: Vec<&Value> = matrix
         .get(key)
         .and_then(Value::as_sequence)
-        .map(|values| values.iter().collect())
-        .unwrap_or_default();
+        .into_iter()
+        .flatten()
+        .collect();
     if let Some(include) = matrix.get("include").and_then(Value::as_sequence) {
         cases.extend(include.iter().filter_map(|case| case.get(key)));
     }
