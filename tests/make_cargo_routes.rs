@@ -53,11 +53,11 @@ impl CargoProbe {
         let directory = parent.open_dir(&name)?;
         directory.write(
             "probe-cargo",
-            "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ \
-             \"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' \"cargo-nextest \
-             ${NEXTEST_FAKE_VERSION:-0.9.100}\"; exit 0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" \
-             >> \"$CARGO_LOG\"\nif [ -n \"${PRODUCTION_LOG:-}\" ]; then env | sort > \
-             \"$PRODUCTION_LOG\"; fi\nif [ -n \"${CARGO_ENV_LOG:-}\" ]; then printf '%s\\n' \
+            "#!/bin/sh\n[ \"$1\" != fetch ] || exit 0\nif [ \"$1\" = nextest ] && [ \"$2\" = \
+             --version ]; then\n  if [ \"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' \
+             \"cargo-nextest ${NEXTEST_FAKE_VERSION:-0.9.100}\"; exit 0; fi\n  exit 1\nfi\nprintf \
+             '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n \"${PRODUCTION_LOG:-}\" ]; then env | sort \
+             > \"$PRODUCTION_LOG\"; fi\nif [ -n \"${CARGO_ENV_LOG:-}\" ]; then printf '%s\\n' \
              \"${RUSTFLAGS:-}\" > \"$CARGO_ENV_LOG\"; fi\nexit \"${CARGO_PROBE_STATUS:-0}\"\n",
         )?;
         directory.set_permissions("probe-cargo", Permissions::from_mode(0o700))?;

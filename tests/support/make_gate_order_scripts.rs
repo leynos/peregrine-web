@@ -2,6 +2,8 @@
 
 /// Cargo fixture that validates supported gate commands and nextest selection.
 pub(super) const CARGO_SCRIPT: &str = r#"
+# `make test` fetches the locked dependencies first; that is not a gate stage.
+[ "${1:-}" != fetch ] || exit 0
 stage=unexpected-cargo
 case "$1" in
   fmt)

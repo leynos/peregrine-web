@@ -267,6 +267,25 @@ fn assignment(line: &str, inherited: Option<&str>) -> Read<Option<Flags>> {
     expanded(assigned_flags, inherited).map(Some)
 }
 
+/// Returns whether a dry-run line runs Cargo with a subcommand that can build.
+///
+/// `cargo fetch` resolves and downloads dependencies but compiles nothing, so it
+/// takes no `RUSTFLAGS` and is not a development command to check.
+fn runs_cargo_that_builds(line: &str) -> bool {
+    let words: Vec<&str> = line.split_whitespace().collect();
+    let Some(at) = words
+        .iter()
+        .position(|word| *word == "cargo" || word.ends_with("/cargo"))
+    else {
+        return false;
+    };
+    let subcommand = words
+        .iter()
+        .skip(at + 1)
+        .find(|word| !word.starts_with(['-', '+']));
+    subcommand != Some(&"fetch")
+}
+
 /// Returns each Cargo command's assigned flags, or `None` for Cargo's config.
 /// Whitaker is probed separately because Dylint builds its driver away from
 /// the repository but checks repository crates from the Make working directory.
@@ -277,10 +296,7 @@ pub(super) fn make_rustflags(
 ) -> Read<Vec<Option<Flags>>> {
     let commands = dry_run(target, host, inherited)?
         .lines()
-        .filter(|line| {
-            line.split_whitespace()
-                .any(|word| word == "cargo" || word.ends_with("/cargo"))
-        })
+        .filter(|line| runs_cargo_that_builds(line))
         .map(|line| assignment(line, inherited))
         .collect::<Read<Vec<_>>>()?;
     if commands.is_empty() {

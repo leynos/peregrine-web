@@ -52,6 +52,9 @@ const ACT_PATH_SHIM: &str = concat!(
 const CARGO_SCRIPT: &str = concat!(
     "#!/bin/sh\n",
     include_str!("act_make_record.sh"),
+    "# `make test` fetches the locked dependencies first; that is neither a test\n",
+    "# run nor part of the order under test, so it is neither recorded nor counted.\n",
+    "[ \"${1:-}\" != fetch ] || exit 0\n",
     "record_invocation \"$@\"\n",
     "if [ \"$#\" -eq 2 ] && [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n",
     "  if [ \"${NEXTTEST_AVAILABLE:-}\" = 1 ]; then\n",
