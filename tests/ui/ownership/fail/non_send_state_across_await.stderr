@@ -21,7 +21,6 @@ note: required by a bound in `tokio::spawn`
   --> $CARGO/tokio-$VERSION/src/task/spawn.rs
    |
    |     pub fn spawn<F>(future: F) -> JoinHandle<F::Output>
-   |            ----- required by a bound in this function
    |     where
    |         F: Future + Send + 'static,
    |                     ^^^^ required by this bound in `spawn`
