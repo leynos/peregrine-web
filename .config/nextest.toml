@@ -11,8 +11,10 @@ nextest-version = "0.9.100"
 # Warn after 60 s and terminate a test that has run for five warning periods
 # (300 s). This governs every test no override matches.
 slow-timeout = { period = "60s", terminate-after = 5 }
-# The whole run, strictly above the largest per-test allowance (600 s, below).
-global-timeout = "30m"
+# The whole run. This is a hung-run backstop, not a per-test budget: the nested
+# `trybuild` build below can legitimately wait tens of minutes for a shared
+# compile slot, and terminating it there converts normal queueing into failure.
+global-timeout = "60m"
 
 [test-groups.nested-cargo-builds]
 # Tests that start a child cargo or rustc contend for the package-cache lock
@@ -24,3 +26,14 @@ max-threads = 1
 filter = 'binary(=build_toolchain_contract) | binary(=clippy_lint_contract)'
 test-group = "nested-cargo-builds"
 slow-timeout = { period = "60s", terminate-after = 10 }
+
+[[profile.default.overrides]]
+# `trybuild` compiles every fixture with its own `cargo --offline` build, so this
+# test queues for compile admission exactly like a workspace build. Terminating
+# it at a fixed allowance turns normal shared-queue waiting into a failure, which
+# is why it warns every 60 s without terminating and relies on `global-timeout`
+# instead. It shares the group so its nested builds never stack with the other
+# nested-cargo tests.
+filter = 'binary(=ownership_contract)'
+test-group = "nested-cargo-builds"
+slow-timeout = { period = "60s" }

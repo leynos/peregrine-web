@@ -64,10 +64,15 @@ through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
 absent. An installed nextest older than 0.9.100 (the `nextest-version` in
 `.config/nextest.toml`) fails `make test` with an upgrade message, because the
 fallback would lose the nextest timeouts and test groups. Those settings bound
-every test at 300 s, run the `build_toolchain_contract` and
-`clippy_lint_contract` binaries (which start a child Cargo) one at a time in the
-`nested-cargo-builds` group with a 600 s allowance, and bound the run at 30
-minutes. `make check-fmt` verifies Rust formatting with
+every test at 300 s, run the `build_toolchain_contract`,
+`clippy_lint_contract`, and `ownership_contract` binaries (which start a child
+Cargo) one at a time in the `nested-cargo-builds` group, and bound the run at
+60 minutes. The first two keep a 600 s allowance. `ownership_contract` runs
+`trybuild`, whose per-fixture `cargo --offline` builds queue behind shared
+compile admission, so it warns every 60 s without terminating and is bounded
+only by the run's 60-minute limit; a build waiting for a compile slot is
+queued, not hung. The run limit is a backstop for a hung suite, not a budget
+for a queued build. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and
@@ -460,10 +465,12 @@ can wait on another build for many minutes, or reach the network in the middle
 of a test. `make test` therefore runs `cargo fetch --locked` first, for the
 effective test target (`CARGO_BUILD_TARGET` when set, otherwise the host), and
 a failed fetch stops the run before any test starts. Nested cargo calls in
-tests then run offline. Prepare a direct `cargo test` or `cargo nextest` run
-with the same fetch first. The estate lint rule `nested-cargo-offline-tests`
-checks both halves. No Cargo configuration file here sets `build.target`; if
-one ever does, the fetch must name that target too.
+tests then run offline: the contract tests pass `--offline` or set
+`CARGO_NET_OFFLINE`, and `trybuild` always passes `--offline` to the cargo it
+starts. Prepare a direct `cargo test` or `cargo nextest` run with the same
+fetch first. The estate lint rule `nested-cargo-offline-tests` checks both
+halves. No Cargo configuration file here sets `build.target`; if one ever does,
+the fetch must name that target too.
 
 ## The experimental spike module
 
