@@ -336,14 +336,14 @@ fn synthetic_poll_bound_is_enforced() {
     let (mut body, polls) = synthetic_body(steps, None);
 
     for index in 0..MAX_POLLS {
-        let mut frame = Box::pin(body.frame());
+        let mut frame = std::pin::pin!(body.frame());
         assert!(
             poll_once(frame.as_mut()).is_pending(),
             "poll {index} is within the synthetic bound and must stay pending"
         );
     }
 
-    let mut beyond = Box::pin(body.frame());
+    let mut beyond = std::pin::pin!(body.frame());
     match poll_once(beyond.as_mut()) {
         Poll::Ready(Some(Err(BodyError::Upstream { source }))) => assert_eq!(
             source.to_string(),

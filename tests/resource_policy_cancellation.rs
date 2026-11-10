@@ -176,7 +176,7 @@ async fn a_dropped_future_returns_its_borrowed_arguments(
     let (mut body, drops) = body_with_probe();
 
     {
-        let mut invocation = Box::pin(runner.invoke(&registered, view, &mut body));
+        let mut invocation = std::pin::pin!(runner.invoke(&registered, view, &mut body));
         assert!(
             poll_once(invocation.as_mut()).is_pending(),
             "the fixture enforcer suspends, so the invocation must stay pending"
