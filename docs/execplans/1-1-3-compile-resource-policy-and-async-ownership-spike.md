@@ -236,6 +236,16 @@ the required design/ADR change; obtain explicit approval for deviations.
     check its documented exit status and silence; and the cancellation witness
     for a dropped future now seeds a frame so it can tell an untouched body
     from a drained one.
+  - [x] (2026-11-11) Closed the three gaps the review's reconciliation reply
+    found in that work. The public-resource witness now uses a counting,
+    non-suspending denying enforcer, because the shared rendezvous fixture
+    suspends until released and would have turned a regression into a hang
+    rather than a failed assertion. The executable witness now builds the
+    example, reads its path from Cargo's JSON artefact stream, and runs it
+    directly, so the example's own standard error is asserted empty without
+    Cargo's status and lock-wait messages in the way. The user guide now
+    qualifies the missing-identity denial as applying to protected
+    registrations, which is what `ResourceRunner::admit` implements.
 
 ## Surprises & discoveries
 

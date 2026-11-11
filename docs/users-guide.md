@@ -83,12 +83,13 @@ witness establishes and what the experiment does not prove.
 
 The specimen freezes a resource's method and policy when you register it.
 Registration fails with a typed error when a protected policy has no enforcer
-configured. At invocation, a request without an identity is denied before the
-enforcer runs, an enforcer denial withholds the request from the responder, and
-a public registration never consults the enforcer. Only `GET` reaches a
-responder; any other frozen method is refused with the method it names, and a
-request whose method differs from the registration reports both methods. Every
-outcome is returned as a typed value rather than a status code.
+configured. At invocation, a protected registration refuses a request that
+carries no identity before the enforcer runs, an enforcer denial withholds the
+request from the responder, and a public registration never consults the
+enforcer. Only `GET` reaches a responder; any other frozen method is refused
+with the method it names, and a request whose method differs from the
+registration reports both methods. Every outcome is returned as a typed value
+rather than a status code.
 
 ## Review the proposed Mornington contracts
 

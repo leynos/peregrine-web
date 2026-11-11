@@ -16,7 +16,13 @@ mod spike_fixtures;
 #[path = "support/spike/frames.rs"]
 mod spike_frames;
 
-use std::{error::Error, sync::Arc};
+use std::{
+    error::Error,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -24,6 +30,7 @@ use googletest::prelude::{eq, matches_pattern, verify_that};
 use http::HeaderMap;
 use http_body_util::Empty;
 use peregrine_web::spike::{
+    AdmissionRequest,
     AllocationId,
     Decision,
     DenialReason,
@@ -31,6 +38,7 @@ use peregrine_web::spike::{
     Identity,
     Method,
     Policy,
+    PolicyEnforcer,
     RegistrationError,
     RequestView,
     Resource,
@@ -43,7 +51,6 @@ use peregrine_web::spike::{
 use rstest::rstest;
 use spike_components::{CatalogueResource, OwnedResource};
 use spike_fixtures::{as_enforcer, enforcer_with, protected_catalogue, public_catalogue, verified};
-use tokio::sync::mpsc::error::TryRecvError;
 
 /// A resource whose policy depends on the method it is registered for.
 ///
@@ -141,6 +148,32 @@ fn registration_without_an_enforcer_accepts_only_public_methods() -> Result<(), 
     Ok(())
 }
 
+/// A denying enforcer that counts its consultations and never suspends.
+///
+/// The shared `spike_admission::FixtureEnforcer` suspends until its driver
+/// releases it, which would turn a regression that consults the enforcer for a
+/// public resource into a hang rather than a failed assertion. This double
+/// returns immediately and counts calls, so the witness fails promptly with the
+/// count it observed.
+#[derive(Debug, Default)]
+struct CountingDenier {
+    /// How many admissions the enforcer was asked to decide.
+    consultations: AtomicUsize,
+}
+
+impl CountingDenier {
+    /// Returns the number of admissions asked for so far.
+    fn consultations(&self) -> usize { self.consultations.load(Ordering::SeqCst) }
+}
+
+#[async_trait]
+impl PolicyEnforcer for CountingDenier {
+    async fn admit(&self, _request: AdmissionRequest<'_>) -> Decision {
+        self.consultations.fetch_add(1, Ordering::SeqCst);
+        Decision::Deny(DenialReason::EnforcerDenied)
+    }
+}
+
 /// Checks that a public resource answers without consulting a denying enforcer.
 ///
 /// The enforcer is configured to deny everything, so a response can only mean
@@ -151,8 +184,9 @@ fn registration_without_an_enforcer_accepts_only_public_methods() -> Result<(), 
 async fn a_public_resource_never_reaches_a_denying_enforcer(
     public_catalogue: Arc<CatalogueResource>,
 ) -> Result<(), Box<dyn Error>> {
-    let (enforcer, mut events) = enforcer_with(Decision::Deny(DenialReason::EnforcerDenied));
-    let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
+    let enforcer = Arc::new(CountingDenier::default());
+    let hook: Arc<dyn PolicyEnforcer> = Arc::clone(&enforcer) as Arc<dyn PolicyEnforcer>;
+    let runner = ResourceRunner::with_enforcer(hook);
     let registered = runner.register(public_catalogue.clone(), Method::Get)?;
     let headers = HeaderMap::new();
     let view = RequestView::new(Method::Get, "/catalogue", &headers, None);
@@ -165,8 +199,9 @@ async fn a_public_resource_never_reaches_a_denying_enforcer(
         public_catalogue.state().responder_calls(),
         eq(1)
     ))?;
-    assert!(
-        matches!(events.try_recv(), Err(TryRecvError::Empty)),
+    pretty_assertions::assert_eq!(
+        enforcer.consultations(),
+        0,
         "a public registration must never reach the enforcer"
     );
     Ok(())
