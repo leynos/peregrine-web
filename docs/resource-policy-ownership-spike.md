@@ -66,6 +66,12 @@ place. No compiler invocation bypassed admission.
 Snapshots of the full `rustc -Vv` text and the gate logs are kept on the
 recording host under `/tmp`.
 
+The table records the M1 evidence run. The repository's pinned nightly has
+since moved, so the compiler-dependent observations were re-recorded rather
+than inferred; see
+[Re-recording on the pinned nightly](#re-recording-on-the-pinned-nightly). The
+M1 rows are retained unchanged so the original evidence stays traceable.
+
 ### Borrow-checker posture
 
 The toolchain, Cargo configuration, and Makefile select no `-Zpolonius` value,
@@ -90,6 +96,31 @@ commit; the source above, the two commands, and the recorded exit statuses are
 the retained evidence. Logs are in `/tmp/canary-1-1-3-*.out` on the recording
 host. This experiment makes no compiler commitment, and the default posture
 could change with a future nightly.
+
+### Re-recording on the pinned nightly
+
+`rust-toolchain.toml` moved from `nightly-2026-08-27` to `nightly-2026-11-06`
+after the M1 evidence was recorded. The compiler-dependent observations were
+therefore re-taken on that pin instead of being carried over from the earlier
+run.
+
+Table: Compiler identity and borrow-checker posture re-recorded on the pin
+
+| Item                                                      | Re-recorded value                                           |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| `rust-toolchain.toml`                                     | `nightly-2026-11-06`                                        |
+| `rustc -Vv`                                               | `rustc 1.101.0-nightly (249c1e4e3 2026-11-05)`, LLVM 23.1.5 |
+| `cargo --version`                                         | `cargo 1.101.0-nightly (3c747ea3e 2026-11-03)`              |
+| `cargo rustc --example polonius_canary`                   | exited 0                                                    |
+| `cargo rustc --example polonius_canary -- -Zpolonius=off` | exited 101 with E0499                                       |
+
+The canary source above produced both results, so the posture observed on the
+pinned nightly is still `polonius-alpha`; it is not inferred from the channel
+name. The compile-fail baselines under `tests/ui/ownership/fail/` were
+regenerated on this pin as well. Their differences were diagnostic rendering
+only: one removed note, two re-anchored labels, and one added lifetime label.
+The fixtures still fail on the same errors, so the contract they pin is
+unchanged.
 
 ### Dependency review
 

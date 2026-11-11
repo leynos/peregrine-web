@@ -41,15 +41,15 @@ use peregrine_web::spike::{
 use rstest::rstest;
 use spike_components::{CatalogueResource, OwnedResource};
 use spike_fixtures::{as_enforcer, enforcer_with, protected_catalogue, public_catalogue, verified};
-use spike_frames::collect_frames;
-use spike_synthetic::{SyntheticBody, drop_counter, poll_once};
+use spike_frames::{CollectedFrame, collect_frames};
+use spike_synthetic::{FrameStep, SyntheticBody, drop_counter, poll_once};
 
-/// Builds a body whose drop is observable through a shared counter.
-fn body_with_probe() -> (ErasedBody, Arc<AtomicUsize>) {
+/// Builds a body carrying `steps` whose drop is observable through a counter.
+fn body_with_probe(steps: Vec<FrameStep>) -> (ErasedBody, Arc<AtomicUsize>) {
     let (probe, drops) = drop_counter();
     let polls = Arc::new(AtomicUsize::new(0));
     (
-        adapt_body(SyntheticBody::new(Vec::new(), Some(probe), polls)),
+        adapt_body(SyntheticBody::new(steps, Some(probe), polls)),
         drops,
     )
 }
@@ -68,7 +68,7 @@ async fn dropping_a_pending_invocation_releases_the_owned_body_once(
     let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
     let headers = HeaderMap::new();
     let identity = Identity::new("user-42");
-    let (owned_body, drops) = body_with_probe();
+    let (owned_body, drops) = body_with_probe(Vec::new());
 
     let invocation = async move {
         let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
@@ -115,7 +115,7 @@ async fn dropping_a_pending_invocation_releases_body_and_request_guard(
     let registered = runner.register(protected_catalogue.clone(), Method::Get)?;
     let headers = HeaderMap::new();
     let identity = Identity::new("user-42");
-    let (owned_body, body_drops) = body_with_probe();
+    let (owned_body, body_drops) = body_with_probe(Vec::new());
     let (guard, guard_drops) = drop_counter();
 
     let invocation = async move {
@@ -161,7 +161,9 @@ async fn dropping_a_pending_invocation_releases_body_and_request_guard(
 /// Checks that a dropped future leaves borrowed arguments with the caller.
 ///
 /// A cancelled invocation must not drop the caller-owned body, which the
-/// caller then consumes and releases exactly once on its own.
+/// caller then consumes and releases exactly once on its own. The body is
+/// seeded with a frame so the assertion can tell an untouched body from one
+/// the cancelled invocation drained before it suspended.
 #[rstest]
 #[tokio::test]
 async fn a_dropped_future_returns_its_borrowed_arguments(
@@ -173,7 +175,8 @@ async fn a_dropped_future_returns_its_borrowed_arguments(
     let headers = HeaderMap::new();
     let identity = Identity::new("user-42");
     let view = RequestView::new(Method::Get, "/catalogue", &headers, Some(&identity));
-    let (mut body, drops) = body_with_probe();
+    let (mut body, drops) =
+        body_with_probe(vec![FrameStep::Data(Bytes::from_static(b"caller body"))]);
 
     {
         let mut invocation = std::pin::pin!(runner.invoke(&registered, view, &mut body));
@@ -191,8 +194,8 @@ async fn a_dropped_future_returns_its_borrowed_arguments(
     let frames = collect_frames(&mut body).await?;
     pretty_assertions::assert_eq!(
         frames,
-        Vec::new(),
-        "the caller must be able to consume the returned body"
+        vec![CollectedFrame::Data(Bytes::from_static(b"caller body"))],
+        "the caller must receive the frame the cancelled invocation never consumed"
     );
     drop(body);
     pretty_assertions::assert_eq!(

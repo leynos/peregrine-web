@@ -64,20 +64,20 @@ through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
 absent. An installed nextest older than 0.9.100 (the `nextest-version` in
 `.config/nextest.toml`) fails `make test` with an upgrade message, because the
 fallback would lose the nextest timeouts and test groups. Those settings bound
-every test at 300 s, run the `build_toolchain_contract`,
-`clippy_lint_contract`, and `ownership_contract` binaries (which start a child
-Cargo) one at a time in the `nested-cargo-builds` group, and bound the run at
-60 minutes. The first two keep a 600 s allowance. `ownership_contract` runs
-`trybuild`, whose per-fixture `cargo --offline` builds queue behind shared
-compile admission, so it warns every 60 s without terminating and is bounded
-only by the run's 60-minute limit; a build waiting for a compile slot is
-queued, not hung. The run limit is a backstop for a hung suite, not a budget
-for a queued build. `make check-fmt` verifies Rust formatting with
-`cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
-using the configured selection and formatting rules. `make fmt` formats Rust
-with the pinned `rustfmt`, then applies the Markdown formatter and
-`markdownlint-cli2 --fix`. `make typecheck` type-checks without building via
-`cargo check`. `make audit` derives the Rust workspace root with
+every test at 300 s, run the `build_toolchain_contract`, `clippy_lint_contract`,
+`resource_policy_example_executable`, and `ownership_contract` binaries (which
+start a child Cargo) one at a time in the `nested-cargo-builds` group, and
+bound the run at 60 minutes. The first three keep a 600 s allowance.
+`ownership_contract` runs `trybuild`, whose per-fixture `cargo --offline`
+builds queue behind shared compile admission, so it warns every 60 s without
+terminating and is bounded only by the run's 60-minute limit; a build waiting
+for a compile slot is queued, not hung. The run limit is a backstop for a hung
+suite, not a budget for a queued build. `make check-fmt` verifies Rust
+formatting with `cargo fmt --all -- --check` and Markdown formatting via
+`mdtablefix --check` using the configured selection and formatting rules.
+`make fmt` formats Rust with the pinned `rustfmt`, then applies the Markdown
+formatter and `markdownlint-cli2 --fix`. `make typecheck` type-checks without
+building via `cargo check`. `make audit` derives the Rust workspace root with
 `cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
 from the workspace root. PR CI skips `make audit` and the audit-only setup when
 `github.actor` is `dependabot[bot]`; that keeps whole-lockfile advisories from
@@ -516,6 +516,7 @@ Focused validation:
 cargo test --test ownership_contract
 cargo test --test resource_policy_spike
 cargo test --test resource_policy_identity
+cargo test --test resource_policy_registration
 cargo test --test resource_policy_cancellation
 cargo test --test resource_policy_spike_bdd
 cargo test --test body_adapter_spike
@@ -523,6 +524,7 @@ cargo test --test body_adapter_property
 cargo test --test network_body_spike
 cargo test --test spike_fixture_bounds
 cargo test --test resource_policy_example
+cargo test --test resource_policy_example_executable
 cargo run --example resource_policy_spike
 ```
 

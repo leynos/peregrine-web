@@ -23,7 +23,11 @@ global-timeout = "60m"
 max-threads = 1
 
 [[profile.default.overrides]]
-filter = 'binary(=build_toolchain_contract) | binary(=clippy_lint_contract)'
+# All three start a child Cargo: the first two build the toolchain contracts,
+# and the last runs the published example to check its documented exit status.
+# Each waits for the package-cache lock and compile admission, so a cold or busy
+# host can leave them queued for longer than a plain test.
+filter = '''binary(=build_toolchain_contract) | binary(=clippy_lint_contract) | binary(=resource_policy_example_executable)'''
 test-group = "nested-cargo-builds"
 slow-timeout = { period = "60s", terminate-after = 10 }
 

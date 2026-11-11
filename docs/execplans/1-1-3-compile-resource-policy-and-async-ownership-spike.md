@@ -222,6 +222,20 @@ the required design/ADR change; obtain explicit approval for deviations.
     the dependency requirement as required in the migration guide, because a
     `0.1` caret requirement cannot resolve v0.2.0 even after `cargo update`,
     and named every added development dependency in the developers' guide.
+  - [x] (2026-11-10) Re-recorded the compiler-dependent evidence on the
+    repository's current pin, `nightly-2026-11-06` (`rustc 1.101.0-nightly
+    (249c1e4e3 2026-11-05)`). The borrow-checker canary still exits 0 by
+    default and 101 with `-Zpolonius=off`, so the posture remains
+    `polonius-alpha`; the three compile-fail baselines that changed were
+    diagnostic rendering only. The evidence ledger now separates the M1
+    recording from the re-recording.
+  - [x] (2026-11-10) Closed the review's coverage gaps: registration now has
+    witnesses for per-method policy selection, a public resource that never
+    reaches a denying enforcer, and a protected registration invoked through a
+    runner without one; the published example is also run as an executable to
+    check its documented exit status and silence; and the cancellation witness
+    for a dropped future now seeds a frame so it can tell an untouched body
+    from a drained one.
 
 ## Surprises & discoveries
 
@@ -259,6 +273,13 @@ and 101 with `-Zpolonius=off`, so the posture is `polonius-alpha`.
 
 ## Decision log
 
+- 2026-11-10, accepted: keep the M1 compiler rows in the evidence ledger as
+  recorded and add a separate re-recording section for the current pin, rather
+  than rewriting the original observations. The constraint naming
+  `nightly-2026-08-27` is the baseline that was approved; the toolchain moved
+  afterwards through the repository's Dependabot route, so the honest record is
+  both the original evidence and the posture re-observed on the pin that now
+  builds the branch.
 - 2026-10-20, proposed: use the current pinned nightly as the spike's tested
   floor, with exact compiler and flags recorded. A floor here means the one
   tested candidate, not a supported-platform or stable-release promise.
