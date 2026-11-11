@@ -212,6 +212,17 @@ The resolved graph contains eight duplicate crate names at different versions:
 duplicated, and pruning them would mean changing a dev-dependency rather than
 this spike's manifest.
 
+The tables above record the M1 audit as it stood when the compile evidence was
+first taken, and are left unchanged as historical evidence. One direct
+development dependency was added afterwards, for the witnesses the review asked
+for. `serde_json` `^1.0.154` resolves to 1.0.154, licensed `MIT OR Apache-2.0`,
+with `rust-version` 1.71 and its default features, under the same
+`cargo metadata --format-version 1 --locked --offline` command. It was already
+resolved transitively, so the addition changed no resolved package and the
+graph still contains 225 non-root packages. Only
+`tests/resource_policy_example_executable.rs` uses it, to read the built
+example's path from Cargo's JSON artefact messages and run it directly.
+
 ## V-OWN: compile witnesses
 
 `tests/ownership_contract.rs` runs `trybuild` over
@@ -298,6 +309,32 @@ protected denial before invocation, protected registration without enforcement,
 a present identity permitting a protected invocation, and an absent identity
 being denied before the hook.
 
+`tests/resource_policy_registration.rs` adds the registration-time boundary
+witnesses. Its resource answers `GET` publicly and every other method as
+authenticated, so the captured policy shows which method registration asked
+about. Its public-reach witness deliberately does not use the rendezvous
+fixture: it installs a denying enforcer that counts consultations and returns
+immediately, so a regression that admits a public request through the enforcer
+fails on the count instead of blocking on a suspension no driver releases.
+
+Table: Registration-time witnesses and the boundary each one establishes
+
+| Witness                          | Test                                                           | Establishes                                                                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Policy frozen per method         | `registration_captures_the_policy_for_the_frozen_method`       | A resource with a per-method policy captures the policy belonging to the method it was registered with                                                                    |
+| Registration without an enforcer | `registration_without_an_enforcer_accepts_only_public_methods` | A public method registers without an enforcer, while a protected one fails with `RegistrationError::MissingEnforcer` naming the method and policy                         |
+| Public reach                     | `a_public_resource_never_reaches_a_denying_enforcer`           | A public registration responds and its denying enforcer records zero consultations                                                                                        |
+| Invocation without an enforcer   | `a_protected_invocation_without_an_enforcer_is_denied`         | A protected registration made with an enforcer is denied with `MissingEnforcer` when invoked through a runner without one, leaving the responder and dependency untouched |
+
+`tests/resource_policy_example_executable.rs` covers the process contract the
+user guide states for the example rather than its internal assertions. It
+builds the example, reads the executable's path from Cargo's JSON artefact
+messages, and runs that executable directly, so both standard output and
+standard error are asserted empty without Cargo's own status and
+package-cache-lock messages in the way. A fault-injection run that wrote one
+line to standard error failed the witness with that text, which is the negative
+control for the assertion.
+
 ## V-BODY: adapter and network witnesses
 
 `tests/body_adapter_spike.rs` compares frames, not concatenated bytes, because
@@ -373,6 +410,7 @@ the registration's retained allocation.
 ```sh
 make test TEST_FLAGS='--test resource_policy_spike'
 make test TEST_FLAGS='--test resource_policy_identity'
+make test TEST_FLAGS='--test resource_policy_registration'
 make test TEST_FLAGS='--test resource_policy_cancellation'
 make test TEST_FLAGS='--test resource_policy_spike_bdd'
 make test TEST_FLAGS='--test body_adapter_spike'
@@ -380,14 +418,17 @@ make test TEST_FLAGS='--test body_adapter_property'
 make test TEST_FLAGS='--test network_body_spike'
 make test TEST_FLAGS='--test spike_fixture_bounds'
 make test TEST_FLAGS='--test resource_policy_example'
+make test TEST_FLAGS='--test resource_policy_example_executable'
 cargo run --example resource_policy_spike
 ```
 
-All nine targets passed after the faults were reverted, and the example exited
-zero without printing diagnostics. `resource_policy_example` loads the example
-file as a module, so the assertions the reader is invited to run are exercised
-by `cargo test` as well. The network cases bind an ephemeral loopback port and
-join their server task rather than sleeping.
+All eleven targets passed after the faults were reverted, and the example
+exited zero without writing to either stream. `resource_policy_example` loads
+the example file as a module, so the assertions the reader is invited to run
+are exercised by `cargo test` as well; `resource_policy_example_executable`
+builds the example and runs the executable directly, so the documented exit
+status and silence are checked where a reader would see them. The network cases
+bind an ephemeral loopback port and join their server task rather than sleeping.
 
 ## What the runtime evidence does not establish
 

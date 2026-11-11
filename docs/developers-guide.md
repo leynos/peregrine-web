@@ -504,11 +504,13 @@ It exists to record compiler acceptance and runtime ordering evidence.
 Compiling it adds runtime dependencies: `async-trait`, `bytes`, `http`,
 `http-body`, `http-body-util`, and `thiserror`. Its witnesses add the
 development dependencies `googletest`, `hyper`, `hyper-util`,
-`pretty_assertions`, `rstest-bdd`, `rstest-bdd-macros`, `tokio`, and
-`trybuild`, and reuse the already-present `proptest` and `rstest`. The build
-assumptions are the repository's pinned nightly, the Cranelift development
-backend, and shared compile admission; do not pin a second toolchain for the
-spike.
+`pretty_assertions`, `rstest-bdd`, `rstest-bdd-macros`, `serde_json`, `tokio`,
+and `trybuild`, and reuse the already-present `proptest` and `rstest`.
+`serde_json` parses Cargo's JSON artefact messages in
+`tests/resource_policy_example_executable.rs`, which needs the built example's
+path in order to run it directly. The build assumptions are the repository's
+pinned nightly, the Cranelift development backend, and shared compile
+admission; do not pin a second toolchain for the spike.
 
 Focused validation:
 
