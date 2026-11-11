@@ -83,18 +83,27 @@ pub fn protected_catalogue(catalogue_dependency: Arc<DependencyState>) -> Arc<Ca
     CatalogueResource::new("catalogue", Policy::Authenticated, catalogue_dependency)
 }
 
+/// Builds a catalogue resource whose policy requires the given scopes.
+///
+/// Both scoped fixtures differ only in the scopes they declare, so the
+/// construction lives here once rather than being repeated per fixture.
+fn scoped_catalogue_with(
+    scopes: impl IntoIterator<Item = ScopeName>,
+    dependency: Arc<DependencyState>,
+) -> Result<Arc<CatalogueResource>, PolicyError> {
+    Ok(CatalogueResource::new(
+        "catalogue",
+        Policy::Scopes(ScopeSet::new(scopes)?),
+        dependency,
+    ))
+}
+
 /// A catalogue resource whose policy requires one scope.
 #[fixture]
 pub fn scoped_catalogue(
     catalogue_dependency: Arc<DependencyState>,
 ) -> Result<Arc<CatalogueResource>, PolicyError> {
-    let scope = ScopeName::new("catalogue:read")?;
-    let scopes = ScopeSet::new([scope])?;
-    Ok(CatalogueResource::new(
-        "catalogue",
-        Policy::Scopes(scopes),
-        catalogue_dependency,
-    ))
+    scoped_catalogue_with([ScopeName::new("catalogue:read")?], catalogue_dependency)
 }
 
 /// A catalogue resource whose policy requires three distinct scopes.
@@ -107,16 +116,14 @@ pub fn scoped_catalogue(
 pub fn multi_scoped_catalogue(
     catalogue_dependency: Arc<DependencyState>,
 ) -> Result<Arc<CatalogueResource>, PolicyError> {
-    let scopes = ScopeSet::new([
-        ScopeName::new("catalogue:write")?,
-        ScopeName::new("catalogue:read")?,
-        ScopeName::new("catalogue:admin")?,
-    ])?;
-    Ok(CatalogueResource::new(
-        "catalogue",
-        Policy::Scopes(scopes),
+    scoped_catalogue_with(
+        [
+            ScopeName::new("catalogue:write")?,
+            ScopeName::new("catalogue:read")?,
+            ScopeName::new("catalogue:admin")?,
+        ],
         catalogue_dependency,
-    ))
+    )
 }
 
 /// Builds a suspended-at-admission enforcer and the receiver of its events.
