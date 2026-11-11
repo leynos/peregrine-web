@@ -246,6 +246,16 @@ the required design/ADR change; obtain explicit approval for deviations.
     Cargo's status and lock-wait messages in the way. The user guide now
     qualifies the missing-identity denial as applying to protected
     registrations, which is what `ResourceRunner::admit` implements.
+  - [x] (2026-11-11) Closed the multi-scope gap the next review found. Every
+    existing scoped witness used a one-scope fixture, so an implementation that
+    kept only the first scope would have passed them all.
+    `multi_scoped_catalogue` now declares three scopes out of alphabetical
+    order, and
+    `every_declared_scope_reaches_registration_and_the_enforcer` compares the
+    full ordered list in the captured policy and in both enforcer observations.
+    The `spike` module documentation now states that the specimen is the
+    inbound-adapter side of the seam and that the dedicated adapter boundary is
+    the phase-2 decision recorded in ADR 007 and tracked by issue #48.
 
 ## Surprises & discoveries
 

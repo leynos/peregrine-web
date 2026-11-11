@@ -97,6 +97,28 @@ pub fn scoped_catalogue(
     ))
 }
 
+/// A catalogue resource whose policy requires three distinct scopes.
+///
+/// The scopes are deliberately not in alphabetical order, so a witness that
+/// compares the ordered contents distinguishes declaration order from any
+/// incidental sorting. A policy that kept only the first scope would otherwise
+/// satisfy a single-scope fixture just as well.
+#[fixture]
+pub fn multi_scoped_catalogue(
+    catalogue_dependency: Arc<DependencyState>,
+) -> Result<Arc<CatalogueResource>, PolicyError> {
+    let scopes = ScopeSet::new([
+        ScopeName::new("catalogue:write")?,
+        ScopeName::new("catalogue:read")?,
+        ScopeName::new("catalogue:admin")?,
+    ])?;
+    Ok(CatalogueResource::new(
+        "catalogue",
+        Policy::Scopes(scopes),
+        catalogue_dependency,
+    ))
+}
+
 /// Builds a suspended-at-admission enforcer and the receiver of its events.
 pub fn enforcer_with(
     decision: Decision,

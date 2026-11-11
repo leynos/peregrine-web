@@ -3,9 +3,10 @@
 //! The shared fixtures declare one policy for every method, so they cannot show
 //! that registration asks the resource for the frozen method's policy, nor that
 //! a public registration never reaches an enforcer. These witnesses cover those
-//! three boundaries through the real `peregrine_web::spike` seam: per-method
-//! policy selection, a denying enforcer that a public resource never consults,
-//! and a protected registration invoked through a runner without an enforcer.
+//! boundaries through the real `peregrine_web::spike` seam: per-method policy
+//! selection, a denying enforcer that a public resource never consults, a
+//! protected registration invoked through a runner without an enforcer, and the
+//! full ordered scope list that registration and admission both observe.
 
 #[path = "support/spike/admission.rs"]
 mod spike_admission;
@@ -39,6 +40,7 @@ use peregrine_web::spike::{
     Method,
     Policy,
     PolicyEnforcer,
+    PolicyError,
     RegistrationError,
     RequestView,
     Resource,
@@ -46,11 +48,20 @@ use peregrine_web::spike::{
     ResourceObservation,
     ResourceRunner,
     ResponseDraft,
+    ScopeName,
     adapt_body,
 };
 use rstest::rstest;
 use spike_components::{CatalogueResource, OwnedResource};
-use spike_fixtures::{as_enforcer, enforcer_with, protected_catalogue, public_catalogue, verified};
+use spike_fixtures::{
+    as_enforcer,
+    enforcer_with,
+    invoke_through_rendezvous,
+    multi_scoped_catalogue,
+    protected_catalogue,
+    public_catalogue,
+    verified,
+};
 
 /// A resource whose policy depends on the method it is registered for.
 ///
@@ -243,5 +254,64 @@ async fn a_protected_invocation_without_an_enforcer_is_denied(
         0,
         "a denied request must never reach the resource dependency"
     );
+    Ok(())
+}
+
+/// The scopes the multi-scope fixture declares, in declaration order.
+///
+/// Kept here rather than in the fixture so the witness states the expectation
+/// independently of the code that builds it.
+const DECLARED_SCOPES: [&str; 3] = ["catalogue:write", "catalogue:read", "catalogue:admin"];
+
+/// Returns the scope names a policy carries, in order.
+///
+/// A policy that carries no scopes yields an empty list, which fails the
+/// ordered comparison rather than silently matching a scoped expectation.
+fn scope_names(policy: &Policy) -> Vec<&str> {
+    match policy {
+        Policy::Scopes(scopes) => scopes.as_slice().iter().map(ScopeName::as_str).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Checks that every declared scope survives registration and reaches admission.
+///
+/// A registration that kept only the first scope, or that reordered the set,
+/// would pass a single-scope witness but fail this one at both boundaries: the
+/// policy captured by registration and the policy reported to the enforcer.
+#[rstest]
+#[tokio::test]
+async fn every_declared_scope_reaches_registration_and_the_enforcer(
+    multi_scoped_catalogue: Result<Arc<CatalogueResource>, PolicyError>,
+) -> Result<(), Box<dyn Error>> {
+    let scoped = multi_scoped_catalogue?;
+    let (enforcer, mut events) = enforcer_with(Decision::Permit);
+    let runner = ResourceRunner::with_enforcer(as_enforcer(&enforcer));
+    let registered = runner.register(scoped.clone(), Method::Get)?;
+
+    pretty_assertions::assert_eq!(
+        scope_names(registered.policy()),
+        DECLARED_SCOPES,
+        "registration must retain every declared scope in declaration order"
+    );
+
+    let mut body = adapt_body(Empty::<Bytes>::new());
+    let (outcome, entry) =
+        invoke_through_rendezvous(&enforcer, &runner, &registered, &mut body).await;
+    assert!(
+        entry.entered(),
+        "a scoped request with an identity must reach the enforcer hook"
+    );
+
+    let before = events.recv().await.ok_or("a pre-await observation")?;
+    let after = events.recv().await.ok_or("a post-await observation")?;
+    for event in [&before, &after] {
+        pretty_assertions::assert_eq!(
+            scope_names(&event.policy),
+            DECLARED_SCOPES,
+            "the enforcer must observe every declared scope in declaration order"
+        );
+    }
+    verified(verify_that!(outcome.responded().is_some(), eq(true)))?;
     Ok(())
 }

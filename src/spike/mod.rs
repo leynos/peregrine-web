@@ -10,6 +10,14 @@
 //! **Nothing here is a stable framework API.** The specimen is not wired into a
 //! production router or server, and it may change or disappear once the
 //! evidence is recorded. See `docs/resource-policy-ownership-spike.md`.
+//!
+//! The specimen is deliberately the inbound-adapter side of the seam. Its
+//! transport-facing edge is [`RequestView`], [`ResponseDraft`], and
+//! [`ErasedBody`]; its domain-facing contracts are [`Resource`], [`Policy`], and
+//! [`PolicyEnforcer`]. Translating between the two at a dedicated adapter
+//! boundary, and giving that boundary its own namespace, is the phase-2
+//! decision recorded in ADR 007 and tracked by issue #48. This specimen exists
+//! to compile the seam as it stands, not to settle that boundary.
 
 mod body;
 mod invoke;

@@ -317,6 +317,14 @@ fixture: it installs a denying enforcer that counts consultations and returns
 immediately, so a regression that admits a public request through the enforcer
 fails on the count instead of blocking on a suspension no driver releases.
 
+A single-scope fixture cannot show that a multi-scope policy survives
+registration intact, because an implementation that kept only the first scope
+would satisfy every one-scope witness. `multi_scoped_catalogue` therefore
+declares three scopes out of alphabetical order, and
+`every_declared_scope_reaches_registration_and_the_enforcer` compares the full
+ordered list both in the policy captured by registration and in the pre- and
+post-suspension observations the enforcer records.
+
 Table: Registration-time witnesses and the boundary each one establishes
 
 | Witness                          | Test                                                           | Establishes                                                                                                                                                               |
@@ -325,6 +333,7 @@ Table: Registration-time witnesses and the boundary each one establishes
 | Registration without an enforcer | `registration_without_an_enforcer_accepts_only_public_methods` | A public method registers without an enforcer, while a protected one fails with `RegistrationError::MissingEnforcer` naming the method and policy                         |
 | Public reach                     | `a_public_resource_never_reaches_a_denying_enforcer`           | A public registration responds and its denying enforcer records zero consultations                                                                                        |
 | Invocation without an enforcer   | `a_protected_invocation_without_an_enforcer_is_denied`         | A protected registration made with an enforcer is denied with `MissingEnforcer` when invoked through a runner without one, leaving the responder and dependency untouched |
+| Full scope retention             | `every_declared_scope_reaches_registration_and_the_enforcer`   | A three-scope policy keeps every scope in declaration order at registration and in both enforcer observations                                                             |
 
 `tests/resource_policy_example_executable.rs` covers the process contract the
 user guide states for the example rather than its internal assertions. It
