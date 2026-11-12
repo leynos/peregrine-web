@@ -1,10 +1,14 @@
 //! Experimental request-body erasure shared by the spike's resources.
 //!
-//! The adapter erases a concrete body exactly once and keeps the result
-//! `Send`-but-not-`Sync`. That bound is the interesting one: a request body may
-//! cross an await inside a `Send` future, yet it must not be shared between
-//! threads. The specimen uses [`UnsyncBoxBody`] to preserve that asymmetry
-//! while giving Hyper one uniform response type.
+//! Hyper hands the specimen a concrete inbound request body. [`adapt_body`]
+//! erases that body exactly once into an [`ErasedBody`], and
+//! [`crate::spike::ResourceRunner::invoke`] passes it to the selected resource
+//! as `&mut ErasedBody`, so a resource never names Hyper's own type. The erased
+//! type stays `Send`-but-not-`Sync`: a request body may cross an await inside a
+//! `Send` future, yet it must not be shared between threads. The specimen uses
+//! [`UnsyncBoxBody`] to preserve that asymmetry. Response bodies are not erased
+//! here; a resource returns a `ResponseDraft` and the responder builds whatever
+//! body type it needs.
 
 use std::error::Error;
 

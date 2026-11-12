@@ -132,9 +132,11 @@ the required design/ADR change; obtain explicit approval for deviations.
     oversized test in the combined file),
     `tests/resource_policy_spike_bdd.rs` (five `rstest-bdd` scenarios from
     `tests/features/resource_policy_spike.feature`),
-    `tests/body_adapter_spike.rs` (seven cases, including a 64-case generated
-    frame-partition property), and `tests/network_body_spike.rs` (three cases
-    driving a real Hyper `Incoming` body through the same seam). Split the
+    `tests/body_adapter_spike.rs` (seven cases; the 64-case generated
+    frame-partition property described here was later moved to
+    `tests/body_adapter_property.rs`, see the 2026-11-12 entry), and
+    `tests/network_body_spike.rs` (three cases driving a real Hyper `Incoming`
+    body through the same seam). Split the
     shared fixtures into `tests/support/spike/{frames,components,admission,
     synthetic}.rs` after the single fixture file exceeded the 400-line limit;
     each module carries a scoped `#![allow(dead_code)]` because Cargo compiles a
@@ -256,6 +258,19 @@ the required design/ADR change; obtain explicit approval for deviations.
     The `spike` module documentation now states that the specimen is the
     inbound-adapter side of the seam and that the dedicated adapter boundary is
     the phase-2 decision recorded in ADR 007 and tracked by issue #48.
+  - [x] (2026-11-12) Reconciled the plan with the tree the review inspected. The
+    generated frame-partition property is attributed to
+    `tests/body_adapter_property.rs`, which is where it has lived since the
+    split; the focused command list now names every spike target, including
+    `body_adapter_property`, and matches the evidence ledger's reproduction
+    commands. `src/spike/body.rs` now describes erasing Hyper's inbound request
+    body for `ResourceRunner`, rather than claiming a uniform Hyper response
+    type. `README.md` carries a signpost to the experimental specimen and
+    states that the test summary includes its witnesses. The Make contract
+    suites now share `tests/support/make_cargo_probe.rs`, and the new
+    `tests/make_fetch_contract.rs` pins `cargo fetch --locked`, the default and
+    configured target, the fetch's position before either test runner, and that
+    a failed fetch stops the run.
 
 ## Surprises & discoveries
 
@@ -856,11 +871,23 @@ Focused red/green commands, used separately and sequentially, are:
 ```bash
 make test TEST_FLAGS='--test ownership_contract'
 make test TEST_FLAGS='--test resource_policy_spike'
+make test TEST_FLAGS='--test resource_policy_identity'
+make test TEST_FLAGS='--test resource_policy_registration'
+make test TEST_FLAGS='--test resource_policy_cancellation'
 make test TEST_FLAGS='--test resource_policy_spike_bdd'
 make test TEST_FLAGS='--test body_adapter_spike'
+make test TEST_FLAGS='--test body_adapter_property'
 make test TEST_FLAGS='--test network_body_spike'
+make test TEST_FLAGS='--test spike_fixture_bounds'
+make test TEST_FLAGS='--test resource_policy_example'
+make test TEST_FLAGS='--test resource_policy_example_executable'
 cargo run --example resource_policy_spike
 ```
+
+The list above is the current target set and matches the reproduction commands
+in the evidence ledger. Earlier dated runs in this plan name the targets that
+existed at the time and are historical records for those candidates, not
+descriptions of the present tree.
 
 Log each with `tee` and `pipefail` as above. No Make example target currently
 exists, so the direct Cargo command preserves the repository defaults. A
