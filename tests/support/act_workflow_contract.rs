@@ -58,8 +58,7 @@ pub(super) const ACTIONS: &[ActionContract] = &[
         &[("python-version", "3.x")],
     ),
     (
-        "leynos/shared-actions/.github/actions/install-whitaker@\
-         5a99aed78ce68dcebd3052b75c31e6f173162b1e",
+        "leynos/shared-actions/.github/actions/install-whitaker@<full commit SHA>",
         "Install Whitaker",
         &[("cranelift", "true")],
     ),
@@ -171,9 +170,29 @@ pub(super) fn valid_actions(ci: &Value) -> bool {
 /// Matches one hosted action revision, its name exception, and consumed inputs.
 fn matches_hosted_action(item: &Value, expected: &ActionContract) -> bool {
     let (revision, name, inputs) = expected;
-    text(item, &["uses"]) == Some(*revision)
+    revision_matches(text(item, &["uses"]), revision)
         && (*name == "checkout" || text(item, &["name"]) == Some(*name))
         && action_inputs_match(item, inputs)
+}
+
+/// Marks an action revision whose commit is checked for shape, not restated.
+const ANY_COMMIT: &str = "<full commit SHA>";
+
+/// Matches one `uses` value against an exact revision, or against an action
+/// whose revision is the [`ANY_COMMIT`] placeholder and may carry any full
+/// lowercase commit SHA.
+fn revision_matches(actual: Option<&str>, expected: &str) -> bool {
+    let Some(prefix) = expected.strip_suffix(ANY_COMMIT) else {
+        return actual == Some(expected);
+    };
+    actual
+        .and_then(|uses| uses.strip_prefix(prefix))
+        .is_some_and(|pin| {
+            pin.len() == 40
+                && pin
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        })
 }
 
 /// Matches scalar input values and count, retaining absent non-mapping semantics.

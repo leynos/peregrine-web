@@ -3,16 +3,38 @@
 use serde_yaml::Value;
 
 const CI: &str = include_str!("../.github/workflows/ci.yml");
-// This revision contains shared-actions #522. The approved pin is a policy
-// boundary: earlier revisions can build the rolling suite from source.
-const INSTALL_ACTION: &str = concat!(
-    "leynos/shared-actions/.github/actions/install-whitaker@",
-    "5a99aed78ce68dcebd3052b75c31e6f173162b1e",
-);
+// The pin is held to its shape, a full commit SHA on the shared action. Which
+// revisions are acceptable (those that cannot build the rolling suite from
+// source) is concordat's QG-002 rule, so a pin bump needs no edit here.
+const INSTALL_ACTION_PREFIX: &str = "leynos/shared-actions/.github/actions/install-whitaker@";
+const SHA_LENGTH: usize = 40;
+
+/// Reports whether a `uses` value is the shared action at a full lowercase SHA.
+fn is_pinned_install_action(uses: &str) -> bool {
+    uses.strip_prefix(INSTALL_ACTION_PREFIX).is_some_and(|pin| {
+        pin.len() == SHA_LENGTH
+            && pin
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    })
+}
+
+/// The action reference the committed workflow carries, for building fixtures.
+fn current_install_action() -> &'static str {
+    let start = CI
+        .find(INSTALL_ACTION_PREFIX)
+        .expect("ci.yml should reference the shared install-whitaker action");
+    CI.get(start..start + INSTALL_ACTION_PREFIX.len() + SHA_LENGTH)
+        .expect("the install-whitaker reference should carry a full commit SHA")
+}
 
 fn check_install_step(step: &Value) -> Result<(), String> {
-    if step.get("uses").and_then(Value::as_str) != Some(INSTALL_ACTION) {
-        return Err("Whitaker action does not use the approved #522 pin".into());
+    if !step
+        .get("uses")
+        .and_then(Value::as_str)
+        .is_some_and(is_pinned_install_action)
+    {
+        return Err("Whitaker action is not pinned to a full commit SHA".into());
     }
     if step.get("if").is_some() || step.get("continue-on-error").is_some() {
         return Err("Whitaker installation can be skipped or softened".into());
@@ -144,10 +166,17 @@ fn ci_installs_approved_whitaker_before_lint() {
 fn weakened_whitaker_provisioning_is_rejected() {
     let cases = [
         (
-            INSTALL_ACTION,
+            current_install_action(),
             concat!(
                 "leynos/shared-actions/.github/actions/install-whitaker@",
-                "8193dca5c1d1411e14108ec8654d4f43e7d06a30",
+                "main",
+            ),
+        ),
+        (
+            current_install_action(),
+            concat!(
+                "leynos/shared-actions/.github/actions/install-whitaker@",
+                "8193dca",
             ),
         ),
         ("cranelift: 'true'", "cranelift: 'false'"),
@@ -195,7 +224,7 @@ fn missing_or_late_whitaker_installer_is_rejected() {
             "        with:\n",
             "          cranelift: 'true'\n",
         ),
-        INSTALL_ACTION
+        current_install_action()
     );
     let removed = CI.replacen(&install_step, "", 1);
     assert_ne!(removed, CI, "the installer step fixture must exist");

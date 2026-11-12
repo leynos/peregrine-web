@@ -14,6 +14,18 @@ use rstest::rstest;
 
 use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, contracts_hold};
 
+/// The commit the committed workflow pins `install-whitaker` at.
+fn install_whitaker_commit() -> &'static str {
+    const PREFIX: &str = "leynos/shared-actions/.github/actions/install-whitaker@";
+    let start = CI_WORKFLOW
+        .find(PREFIX)
+        .expect("ci.yml should reference the shared install-whitaker action")
+        + PREFIX.len();
+    CI_WORKFLOW
+        .get(start..start + 40)
+        .expect("the install-whitaker reference should carry a full commit SHA")
+}
+
 #[test]
 fn hosted_gate_and_manual_act_have_distinct_routes() {
     assert!(
@@ -67,7 +79,7 @@ fn workflow_mutations_break_the_contract() {
         ),
         (
             "changed Whitaker action",
-            CI_WORKFLOW.replace("5a99aed78ce68dcebd3052b75c31e6f173162b1e", "main"),
+            CI_WORKFLOW.replace(install_whitaker_commit(), "main"),
         ),
         (
             "changed Whitaker input",
