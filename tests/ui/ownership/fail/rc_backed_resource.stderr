@@ -1,0 +1,53 @@
+error[E0277]: `Rc<String>` cannot be shared between threads safely
+  --> tests/ui/ownership/fail/rc_backed_resource.rs:24:19
+   |
+24 | impl Resource for Catalogue {
+   |                   ^^^^^^^^^ `Rc<String>` cannot be shared between threads safely
+   |
+   = help: within `Catalogue`, the trait `Sync` is not implemented for `Rc<String>`
+note: required because it appears within the type `Catalogue`
+  --> tests/ui/ownership/fail/rc_backed_resource.rs:18:5
+   |
+14 | struct Catalogue {
+...
+18 |     state: Rc<String>,
+   |     ^^^^^^^^^^^^^^^^^ required by this field
+note: required by a bound in `Resource`
+  --> src/spike/resource.rs
+   |
+   | pub trait Resource: Send + Sync {
+   |                            ^^^^ required by this bound in `Resource`
+
+error[E0277]: `Rc<String>` cannot be sent between threads safely
+  --> tests/ui/ownership/fail/rc_backed_resource.rs:24:19
+   |
+24 | impl Resource for Catalogue {
+   |                   ^^^^^^^^^ `Rc<String>` cannot be sent between threads safely
+   |
+   = help: within `Catalogue`, the trait `Send` is not implemented for `Rc<String>`
+note: required because it appears within the type `Catalogue`
+  --> tests/ui/ownership/fail/rc_backed_resource.rs:18:5
+   |
+14 | struct Catalogue {
+...
+18 |     state: Rc<String>,
+   |     ^^^^^^^^^^^^^^^^^ required by this field
+note: required by a bound in `Resource`
+  --> src/spike/resource.rs
+   |
+   | pub trait Resource: Send + Sync {
+   |                     ^^^^ required by this bound in `Resource`
+
+error: future cannot be sent between threads safely
+  --> tests/ui/ownership/fail/rc_backed_resource.rs:35:5
+   |
+35 |     async fn get(
+   |     ^^^^^ future created by async block is not `Send`
+   |
+   = help: within `Catalogue`, the trait `Sync` is not implemented for `Rc<String>`
+note: captured value is not `Send` because `&` references cannot be sent unless their referent is `Sync`
+  --> tests/ui/ownership/fail/rc_backed_resource.rs:36:10
+   |
+36 |         &self,
+   |          ^^^^ has type `&Catalogue` which is not `Send`, because `Catalogue` is not `Sync`
+   = note: required for the cast from `Pin<Box<{async block@$DIR/tests/ui/ownership/fail/rc_backed_resource.rs:35:5: 35:10}>>` to `Pin<Box<dyn Future<Output = Result<ResponseDraft, ResourceError>> + Send>>`

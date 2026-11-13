@@ -64,15 +64,20 @@ through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
 absent. An installed nextest older than 0.9.100 (the `nextest-version` in
 `.config/nextest.toml`) fails `make test` with an upgrade message, because the
 fallback would lose the nextest timeouts and test groups. Those settings bound
-every test at 300 s, run the `build_toolchain_contract` and
-`clippy_lint_contract` binaries (which start a child Cargo) one at a time in the
-`nested-cargo-builds` group with a 600 s allowance, and bound the run at 30
-minutes. `make check-fmt` verifies Rust formatting with
-`cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
-using the configured selection and formatting rules. `make fmt` formats Rust
-with the pinned `rustfmt`, then applies the Markdown formatter and
-`markdownlint-cli2 --fix`. `make typecheck` type-checks without building via
-`cargo check`. `make audit` derives the Rust workspace root with
+every test at 300 s, run the `build_toolchain_contract`, `clippy_lint_contract`,
+`resource_policy_example_executable`, and `ownership_contract` binaries (which
+start a child Cargo) one at a time in the `nested-cargo-builds` group, and
+bound the run at 60 minutes. The first three keep a 600 s allowance.
+`ownership_contract` runs `trybuild`, whose per-fixture `cargo --offline`
+builds queue behind shared compile admission, so it warns every 60 s without
+terminating and is bounded only by the run's 60-minute limit; a build waiting
+for a compile slot is queued, not hung. The run limit is a backstop for a hung
+suite, not a budget for a queued build. `make check-fmt` verifies Rust
+formatting with `cargo fmt --all -- --check` and Markdown formatting via
+`mdtablefix --check` using the configured selection and formatting rules.
+`make fmt` formats Rust with the pinned `rustfmt`, then applies the Markdown
+formatter and `markdownlint-cli2 --fix`. `make typecheck` type-checks without
+building via `cargo check`. `make audit` derives the Rust workspace root with
 `cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
 from the workspace root. PR CI skips `make audit` and the audit-only setup when
 `github.actor` is `dependabot[bot]`; that keeps whole-lockfile advisories from
@@ -460,10 +465,123 @@ can wait on another build for many minutes, or reach the network in the middle
 of a test. `make test` therefore runs `cargo fetch --locked` first, for the
 effective test target (`CARGO_BUILD_TARGET` when set, otherwise the host), and
 a failed fetch stops the run before any test starts. Nested cargo calls in
-tests then run offline. Prepare a direct `cargo test` or `cargo nextest` run
-with the same fetch first. The estate lint rule `nested-cargo-offline-tests`
-checks both halves. No Cargo configuration file here sets `build.target`; if
-one ever does, the fetch must name that target too.
+tests then run offline: the contract tests pass `--offline` or set
+`CARGO_NET_OFFLINE`, and `trybuild` always passes `--offline` to the cargo it
+starts. Prepare a direct `cargo test` or `cargo nextest` run with the same
+fetch first. The estate lint rule `nested-cargo-offline-tests` checks both
+halves. No Cargo configuration file here sets `build.target`; if one ever does,
+the fetch must name that target too.
+
+## The experimental spike module
+
+`src/spike/` is the compile-time specimen roadmap task 1.1.3 left behind. It is
+not a framework API and carries no stability promise. The
+[technical design](peregrine-design.md) records the contracts it informs,
+[ADR 007](adrs/adr-0007-resource-policy-and-body-erasure-boundary.md) records
+the provisional shapes and their rejected alternatives, the
+[evidence ledger](resource-policy-ownership-spike.md) states what the witnesses
+establish, and the
+[spike ExecPlan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)
+records the accepted scope.
+
+The boundary has four parts:
+
+- `Resource` is the application-owned value. It is `Send + Sync` and returns its
+  own `Policy` plus a `ResourceObservation` built from allocations it owns.
+- `Policy` is an owned value, not a borrow. `PolicyEnforcer` decides one
+  admission and reports a `Decision`; the specimen ships no provider.
+- `ResourceRunner::register` captures `resource.policy(method)` once for the
+  method being registered and stores the result with the resource. Later
+  admissions read the captured policy; they do not ask the resource again.
+- `ErasedBody` is `Send` but deliberately not `Sync`. The responder future may
+  move the body between threads, but two callers must not observe it at once. A
+  change that makes the body `Sync` weakens the bound the ownership witnesses
+  claim.
+
+The specimen is not wired into `peregrine_web::greet`, a router, or a server.
+It exists to record compiler acceptance and runtime ordering evidence.
+
+Compiling it adds runtime dependencies: `async-trait`, `bytes`, `http`,
+`http-body`, `http-body-util`, and `thiserror`. Its witnesses add the
+development dependencies `googletest`, `hyper`, `hyper-util`,
+`pretty_assertions`, `rstest-bdd`, `rstest-bdd-macros`, `serde_json`, `tokio`,
+and `trybuild`, and reuse the already-present `proptest` and `rstest`.
+`serde_json` parses Cargo's JSON artefact messages in
+`tests/resource_policy_example_executable.rs`, which needs the built example's
+path in order to run it directly. The build assumptions are the repository's
+pinned nightly, the Cranelift development backend, and shared compile
+admission; do not pin a second toolchain for the spike.
+
+Focused validation:
+
+```sh
+cargo test --test ownership_contract
+cargo test --test resource_policy_spike
+cargo test --test resource_policy_identity
+cargo test --test resource_policy_registration
+cargo test --test resource_policy_cancellation
+cargo test --test resource_policy_spike_bdd
+cargo test --test body_adapter_spike
+cargo test --test body_adapter_property
+cargo test --test network_body_spike
+cargo test --test spike_fixture_bounds
+cargo test --test resource_policy_example
+cargo test --test resource_policy_example_executable
+cargo run --example resource_policy_spike
+```
+
+Those commands shorten the loop; they do not replace the commit gates.
+
+## Maintain the spike fixtures
+
+Roadmap task 1.1.3 left an experimental specimen under `src/spike/` and its
+evidence under `tests/`. Neither is a framework API. Treat a change to them as
+an experiment change: update the
+[evidence ledger](resource-policy-ownership-spike.md) in the same commit and
+rerun the focused targets it names.
+
+- `tests/ui/ownership/` holds `trybuild` fixtures. A reviewed `.stderr`
+  baseline records the pinned compiler's diagnostic; accept an update only
+  after confirming the finding is a real contract change. Never run
+  `TRYBUILD=overwrite` as a shortcut for a passing gate.
+- `tests/support/spike/` holds fixtures shared by several integration binaries.
+  `#[path]` inclusion means each binary compiles its own copy of a module, so
+  an item that only a sibling uses looks unused in that copy. A module shared
+  by more than one binary may therefore carry a module-scoped `dead_code`
+  allowance with a reason; a module with a single consumer must not carry one
+  (`network.rs` is the worked example). Do not widen an allowance to an
+  unrelated module, and do not add one to a new module that a single binary
+  needs. Keep new shared fixtures there rather than copying them per test, and
+  prefer adding a member to a module that is already shared over creating a
+  second module that would need its own allowance.
+- The enforcer fixture suspends on a `tokio::sync::Notify` rendezvous. Do not
+  drive that rendezvous for a request admission denies before the hook; the
+  wait would never be satisfied.
+- `tests/network_body_spike.rs` binds an ephemeral loopback port and joins or
+  aborts its server task. Deadlines there are failure bounds, not timing
+  assertions; do not convert them into sleeps. Its witnesses compare the
+  request bytes the responder recorded, so a same-length substitution fails.
+- `tests/spike_fixture_bounds.rs` pins the fixture's trailer bound.
+  `DrainedBody::record_trailers` checks the cumulative `HeaderMap::len`, which
+  counts every stored value, before calling `normalize_trailers`, because a
+  normalization done first would copy an over-long set before the bound could
+  reject it. `HeaderMap::iter` visits every value, so repeated names are not a
+  reason for the pre-check; ordering is.
+- `tests/support/spike/cases.rs` builds the frame cases that both
+  `body_adapter_spike` and `body_adapter_property` use. Change a case there
+  rather than in one binary, or the named witnesses and the generated property
+  will describe different frame classes.
+- `tests/resource_policy_example.rs` loads `examples/resource_policy_spike.rs`
+  as a module so `cargo test` exercises the example's own assertions. Keep the
+  example's `demonstrate` function public and free of printing.
+- The synthetic body is `Send` but not `Sync` by design. A change that makes
+  it `Sync` silently weakens the bound the body witnesses claim.
+
+Record compiler identity with the evidence. The specimen's ledger states the
+pinned nightly, the observed borrow-checker posture, and the canary command
+that produced it. Re-record the posture when the nightly moves rather than
+inferring it from the channel name, and keep compiler acceptance separate from
+application-level claims.
 
 ## Toolchain updates
 

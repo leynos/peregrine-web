@@ -1,0 +1,17 @@
+error[E0597]: `headers` does not live long enough
+ --> tests/ui/ownership/fail/spawn_borrows_request.rs:7:78
+  |
+6 |     let headers = http::HeaderMap::new();
+  |         ------- binding `headers` declared here
+7 |     let view = RequestView::new(peregrine_web::spike::Method::Get, "/items", &headers, None);
+  |                                                                              ^^^^^^^^ borrowed value does not live long enough
+8 |     let _handle = tokio::spawn(async move { view.path().to_owned() });
+  |                   --------------------------------------------------- argument requires that `headers` is borrowed for `'static`
+9 | }
+  | - `headers` dropped here while still borrowed
+  |
+note: requirement that the value outlives `'static` introduced here
+ --> $CARGO/tokio-$VERSION/src/task/spawn.rs
+  |
+  |         F: Future + Send + 'static,
+  |                            ^^^^^^^

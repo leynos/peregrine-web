@@ -58,6 +58,39 @@ projects render `src/lib.rs`. Application projects render `src/main.rs`,
 `src/lib.rs`, release automation, and `[package.metadata.binstall]` metadata
 for binary installation.
 
+## Run the experimental resource-policy spike
+
+Roadmap task 1.1.3 added a specimen under `peregrine_web::spike` to test
+resource-owned policy, admission ordering, erased request bodies, and
+cancellation. It is **not** a usable framework: there is no router, server,
+authentication, or authorization provider, and the exported names carry no
+stability promise. Use it to inspect the evidence, not to build an application.
+
+The specimen is exercised by the integration tests and by a runnable example
+that builds one public and one protected resource with injected dependencies,
+checks each outcome programmatically, and exits zero when the observations hold:
+
+<!-- tested-example: resource-policy-spike-example -->
+
+```sh
+cargo run --example resource_policy_spike
+```
+
+The example prints nothing on success and returns a diagnostic error when an
+expected outcome is missing. The
+[spike evidence ledger](resource-policy-ownership-spike.md) records what each
+witness establishes and what the experiment does not prove.
+
+The specimen freezes a resource's method and policy when you register it.
+Registration fails with a typed error when a protected policy has no enforcer
+configured. At invocation, a protected registration refuses a request that
+carries no identity before the enforcer runs, an enforcer denial withholds the
+request from the responder, and a public registration never consults the
+enforcer. Only `GET` reaches a responder; any other frozen method is refused
+with the method it names, and a request whose method differs from the
+registration reports both methods. Every outcome is returned as a typed value
+rather than a status code.
+
 ## Review the proposed Mornington contracts
 
 Peregrine currently exports scaffolding, not a runnable HTTP framework. The

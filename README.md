@@ -8,9 +8,11 @@ about. Peregrine proposes bringing that architecture to Rust, with explicit
 ownership and a request lifecycle you can follow without a séance.
 
 **Status: design and experiments.** The repository currently contains a library
-scaffold, a greeting function, and the workflow and Makefile contract tests
-that guard the generated tooling. The framework APIs below are proposed; there
-is no HTTP server to run yet.
+scaffold, a greeting function, the workflow and Makefile contract tests that
+guard the generated tooling, and an experimental resource-policy and
+async-ownership specimen in the [`spike` module](src/spike/mod.rs). The
+framework APIs below are proposed; there is no HTTP server to run yet, and the
+specimen is evidence for a design decision rather than a stable API.
 
 ______________________________________________________________________
 
@@ -62,9 +64,10 @@ commands, prerequisites, and host limits; the
 [developers' guide](docs/developers-guide.md) explains their compiler and
 linker routes in detail.
 
-The test run currently covers the scaffold placeholder and the workflow and
-Makefile contracts that guard the generated tooling. It does not test the
-proposed HTTP contracts.
+The test run currently covers the scaffold placeholder, the workflow and
+Makefile contracts that guard the generated tooling, and the experimental
+spike's compile-time, behavioural, generated-frame, and network witnesses. It
+does not test the proposed HTTP contracts.
 
 ### Explore the current library
 
@@ -76,6 +79,12 @@ Open `target/doc/peregrine_web/index.html` to inspect the current library API.
 The [technical design](docs/peregrine-design.md) contains the proposed resource
 and middleware examples; the [roadmap](docs/roadmap.md) tracks the work needed
 to make them runnable.
+
+The resource-policy and async-ownership specimen is recorded in the
+[evidence ledger](docs/resource-policy-ownership-spike.md) and summarized in
+the [users' guide](docs/users-guide.md); `examples/resource_policy_spike.rs`
+drives the same seam. It is experimental, carries no stability promise, and is
+not wired into a router or server.
 
 ______________________________________________________________________
 
