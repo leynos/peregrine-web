@@ -5,17 +5,17 @@
 - Audience: library implementers, API reviewers, and service maintainers.
 - Scope: a resource-oriented HTTP framework with an explicit middleware engine.
 - Authority: [terms of reference](terms-of-reference.md) establishes goals;
-  [ADR 001](adr-001-resource-aware-lifecycle.md) records the proposed core
-  choice.
+  [ADR 001](adrs/adr-0001-resource-aware-lifecycle.md) records the proposed
+  core choice.
 - Delivery: [potential GIST roadmap](roadmap.md), including the key
   [compiler/ownership experiment](polonius-ownership-experiment.md) and
-  [ADR 002](adr-002-compiler-ownership-experiment.md).
+  [ADR 002](adrs/adr-0002-compiler-ownership-experiment.md).
 
 Extension-interface stabilization is governed by
-[ADR 006](adr-006-extension-interface-stabilization.md): separate delivery of
-`peregrine-correlate` and Pachislot, an independent WebSocket adapter, and
-removal, substitution, composition, and failure-symmetry evidence are
-mandatory. Roadmap tasks 7.3.4 and 7.4.1–7.4.3 deliver and evaluate these
+[ADR 006](adrs/adr-0006-extension-interface-stabilization.md): separate
+delivery of `peregrine-correlate` and Pachislot, an independent WebSocket
+adapter, and removal, substitution, composition, and failure-symmetry evidence
+are mandatory. Roadmap tasks 7.3.4 and 7.4.1–7.4.3 deliver and evaluate these
 consumers.
 
 ## 1. Problem, evidence, and design boundaries
@@ -110,7 +110,7 @@ Application ports need no Peregrine, HTTP, or serialization types. Application
 roots may import concrete adapters; ordinary inbound adapters depend on
 application contracts rather than outbound implementations. See the
 [hexagonal case study](hexagonal-application-case-study.md) and proposed
-[ADR 004](adr-004-application-port-boundaries.md).
+[ADR 004](adrs/adr-0004-application-port-boundaries.md).
 
 The pipeline borrows resources and middleware from immutable application state.
 The baseline owns one context, passed sequentially as `&mut Context`. The
@@ -164,10 +164,10 @@ only when an independently useful boundary has been demonstrated.
 
 The [actix-v2a case study](actix-v2a-middleware-case-study.md) tests these
 boundaries against existing extensions and proposed mutation contracts.
-[ADR 003](adr-003-http-integration-boundaries.md) records the resulting HTTP
-integration refinements: typed helpers for inputs, engine-owned presentation,
-and application-owned durable effects. Its examples are proposed contracts, not
-evidence that the runtime already exists.
+[ADR 003](adrs/adr-0003-http-integration-boundaries.md) records the resulting
+HTTP integration refinements: typed helpers for inputs, engine-owned
+presentation, and application-owned durable effects. Its examples are proposed
+contracts, not evidence that the runtime already exists.
 
 ## 3. Application and context contracts
 
@@ -211,7 +211,7 @@ sacrificing entity-first ergonomics. [Roadmap phase 2](roadmap.md) tests this
 before later slices commit to a public ownership model. The detailed
 [experiment specification](polonius-ownership-experiment.md) contains paired
 code examples, measured compiler results, attribution controls, and acceptance
-criteria. [ADR 002](adr-002-compiler-ownership-experiment.md) records the
+criteria. [ADR 002](adrs/adr-0002-compiler-ownership-experiment.md) records the
 proposed compiler posture; adoption remains undecided.
 
 The exclusive candidate targets a pinned compiler with
@@ -290,7 +290,7 @@ propagate owned snapshots and preserve carrier-specific override rules. An
 upgraded connection receives its own immutable facts; message correlation is
 separate from handshake correlation. See the
 [extension design](pachislot-extension-design.md) §3 and
-[ADR 005](adr-005-extension-and-upgrade-boundaries.md).
+[ADR 005](adrs/adr-0005-extension-and-upgrade-boundaries.md).
 
 ## 4. Resources, method metadata, and policy
 

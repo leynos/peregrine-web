@@ -4,7 +4,8 @@
 - Date: 2026-09-20.
 - Audience: framework, middleware, and application-service authors.
 - Companions: [technical design](peregrine-design.md),
-  [ADR 003](adr-003-http-integration-boundaries.md), and [roadmap](roadmap.md).
+  [ADR 003](adrs/adr-0003-http-integration-boundaries.md), and
+  [roadmap](roadmap.md).
 
 ## 1. Finding and evidence boundary
 
@@ -279,7 +280,7 @@ Peregrine integration plan.[^10]
 
 ## 6. Resulting architecture and API refinements
 
-[ADR 003](adr-003-http-integration-boundaries.md) records these proposed
+[ADR 003](adrs/adr-0003-http-integration-boundaries.md) records these proposed
 choices. The repository sweep found existing design concepts for phase views,
 private failure state, typed extensions, finalization, and owned streaming
 bodies, but no implemented framework helpers beyond the library stub. Refine

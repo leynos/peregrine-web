@@ -4,13 +4,13 @@
   here.
 - Date: 2026-09-21.
 - Audience: Peregrine and Pachislot implementers and application authors.
-- Decision: [ADR 005](adr-005-extension-and-upgrade-boundaries.md).
+- Decision: [ADR 005](adrs/adr-0005-extension-and-upgrade-boundaries.md).
 
 Extension-interface stabilization is governed by
-[ADR 006](adr-006-extension-interface-stabilization.md): separate delivery of
-`peregrine-correlate` and Pachislot, an independent WebSocket adapter, and
-removal, substitution, composition, and failure-symmetry evidence are
-mandatory. Roadmap tasks 7.3.4 and 7.4.1–7.4.3 deliver and evaluate these
+[ADR 006](adrs/adr-0006-extension-interface-stabilization.md): separate
+delivery of `peregrine-correlate` and Pachislot, an independent WebSocket
+adapter, and removal, substitution, composition, and failure-symmetry evidence
+are mandatory. Roadmap tasks 7.3.4 and 7.4.1–7.4.3 deliver and evaluate these
 consumers.
 
 ## 1. Direction and evidence

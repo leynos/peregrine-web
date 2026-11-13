@@ -10,7 +10,7 @@ Its strongest contribution is local dependency and operation-policy visibility.
 It cannot supply application boundaries merely by changing the borrow checker
 or moving orchestration into middleware. The recommendations refine the
 [technical design](peregrine-design.md), [roadmap](roadmap.md), and proposed
-[ADR 004](adr-004-application-port-boundaries.md).
+[ADR 004](adrs/adr-0004-application-port-boundaries.md).
 
 ## 1. Evidence and limits
 

@@ -15,8 +15,8 @@ Peregrine's defining requirement is that middleware inspect the resource
 selected by routing before its responder executes. The supplied papers also
 require mutable request-scoped state and response processing after intentional
 early completion or recoverable failure. See the
-[terms of reference](terms-of-reference.md) §§5–7 and
-[technical design](peregrine-design.md) §§1–7.
+[terms of reference](../terms-of-reference.md) §§5–7 and
+[technical design](../peregrine-design.md) §§1–7.
 
 A service wrapper alone does not specify where routing becomes visible, which
 response hooks run after a short circuit, or how hook failures interact. Those
@@ -56,12 +56,12 @@ an asynchronous cleanup guarantee.
 Keep Hyper and Tokio at the serving boundary. Preserve an outer adapter point
 for Tower; such an adapter must not replace resource-aware processing. Use boxed
 `Send` futures as the dynamic-dispatch baseline, measuring their cost.
-[ADR 002](adr-002-compiler-ownership-experiment.md) compares narrower phase
+[ADR 002](adr-0002-compiler-ownership-experiment.md) compares narrower phase
 views and typed endpoint composition before selecting the public ownership and
 compiler contract. Both variants retain these lifecycle rules. The canonical
-[ordinary-exit and interruption tables](peregrine-design.md#61-ordinary-exit-contract)
+[ordinary-exit and interruption tables](../peregrine-design.md#61-ordinary-exit-contract)
 in design §§6.1–6.2 and
-[failure-selection table](peregrine-design.md#72-failure-selection-and-bounded-presentation)
+[failure-selection table](../peregrine-design.md#72-failure-selection-and-bounded-presentation)
 in §7.2 make these proposed contracts explicit. They are specification
 evidence, not implemented lifecycle traces.
 

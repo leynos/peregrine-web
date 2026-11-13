@@ -11,7 +11,7 @@ not introduce runtime dependencies or require consumer migrations.
 
 ## Context and problem statement
 
-The [hexagonal application case study](hexagonal-application-case-study.md)
+The [hexagonal application case study](../hexagonal-application-case-study.md)
 examines Corbusier's typed tenant context and service façades, Wildside's
 command/query injection and architecture checks, and Episodic's Falcon
 resources, unit-of-work helpers, and separate runtime roots. Constructor

@@ -80,7 +80,7 @@ failed startup and shutdown cleanup as well as successful operation.
 ### Gate C: Validate ownership, compatibility, and operations
 
 Run the full X1–X5 matrix in the
-[extension design](pachislot-extension-design.md#7-compatibility-and-experimental-gates),
+[extension design](../pachislot-extension-design.md#7-compatibility-and-experimental-gates),
 including compile-fail HTTP-borrow escape cases and native-socket evidence.
 Retain explicit budgets for connections, messages, queues, and shutdown, plus
 observed bounds under stalled peers and fan-out failures. Preserve the existing

@@ -332,14 +332,15 @@ Read these sources before M1 and revisit their affected sections after M2:
 - [Pachislot extension design](../pachislot-extension-design.md), including
   correlation, HTTP/session ownership, and compatibility experiments X1–X5.
 - [Compiler experiment](../polonius-ownership-experiment.md) and
-  [ADR 002](../adr-002-compiler-ownership-experiment.md): experimental compiler
-  benefits remain a separate decision.
-- [ADR 001](../adr-001-resource-aware-lifecycle.md): lifecycle ownership.
-- [ADR 003](../adr-003-http-integration-boundaries.md): HTTP integration.
-- [ADR 004](../adr-004-application-port-boundaries.md): application ports.
-- [ADR 005](../adr-005-extension-and-upgrade-boundaries.md): session ownership.
-- [ADR 006](../adr-006-extension-interface-stabilization.md): stabilization
-  gates.
+  [ADR 002](../adrs/adr-0002-compiler-ownership-experiment.md): experimental
+  compiler benefits remain a separate decision.
+- [ADR 001](../adrs/adr-0001-resource-aware-lifecycle.md): lifecycle ownership.
+- [ADR 003](../adrs/adr-0003-http-integration-boundaries.md): HTTP integration.
+- [ADR 004](../adrs/adr-0004-application-port-boundaries.md): application ports.
+- [ADR 005](../adrs/adr-0005-extension-and-upgrade-boundaries.md): session
+  ownership.
+- [ADR 006](../adrs/adr-0006-extension-interface-stabilization.md):
+  stabilization gates.
 - [Developer guide](../developers-guide.md) and
   [documentation style guide](../documentation-style-guide.md).
 - [Dependency-injection testing guide](../reliable-testing-in-rust-via-dependency-injection.md):

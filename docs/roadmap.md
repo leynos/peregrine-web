@@ -6,19 +6,21 @@ into a candidate delivery sequence. It is not a release commitment and promises
 no dates. Only decision/specification tasks 1.1.1 and 1.1.2 are done. Compiler
 probes remain evidence for the proposal, not completion of the planned
 framework prototypes; implementation and proving-ground validation remain
-unfinished. [ADR 001](adr-001-resource-aware-lifecycle.md) and
-[ADR 002](adr-002-compiler-ownership-experiment.md) remain proposed. The key
-compiler experiment in phase 2 gates the implementation direction. The
+unfinished. [ADR 001](adrs/adr-0001-resource-aware-lifecycle.md) and
+[ADR 002](adrs/adr-0002-compiler-ownership-experiment.md) remain proposed. The
+key compiler experiment in phase 2 gates the implementation direction. The
 [actix-v2a case study](actix-v2a-middleware-case-study.md) and proposed
-[ADR 003](adr-003-http-integration-boundaries.md) refine input, finalization,
-and application-service boundaries in the existing delivery tasks. The
+[ADR 003](adrs/adr-0003-http-integration-boundaries.md) refine input,
+finalization, and application-service boundaries in the existing delivery
+tasks. The
 [hexagonal application case study](hexagonal-application-case-study.md) and
-[ADR 004](adr-004-application-port-boundaries.md) add independent architecture
-experiments E1–E5, with explicit axioms, assumptions, and rejection criteria.
-The [Pachislot extension design](pachislot-extension-design.md) and proposed
-[ADR 005](adr-005-extension-and-upgrade-boundaries.md) add correlation and
-upgrade experiments X1–X5 for a named WebSocket consumer.
-[ADR 006](adr-006-extension-interface-stabilization.md) makes companion
+[ADR 004](adrs/adr-0004-application-port-boundaries.md) add independent
+architecture experiments E1–E5, with explicit axioms, assumptions, and
+rejection criteria. The
+[Pachislot extension design](pachislot-extension-design.md) and proposed
+[ADR 005](adrs/adr-0005-extension-and-upgrade-boundaries.md) add correlation
+and upgrade experiments X1–X5 for a named WebSocket consumer.
+[ADR 006](adrs/adr-0006-extension-interface-stabilization.md) makes companion
 delivery and independent generality evidence prerequisites for interface
 stabilization.
 
@@ -64,7 +66,8 @@ and technical design §§1, 4, 9, and 12.
 - [x] 1.1.2. Specify lifecycle, error precedence, and operational configuration
       — done.
   - Requires 1.1.1.
-  - See peregrine-design.md §§3 and 5–9; adr-001-resource-aware-lifecycle.md.
+  - See peregrine-design.md §§3 and 5–9;
+    adrs/adr-0001-resource-aware-lifecycle.md.
   - Success: contract tables cover every ordinary exit and cancellation
     boundary;
     limits have units, defaults, validation rules, and explicit opt-outs. Include
@@ -191,7 +194,7 @@ Can a downstream application build, diagnose, and maintain the prototype, and
 are the measured benefits worth that requirement? The result selects one
 production direction before the following delivery phases. See
 polonius-ownership-experiment.md §§5–6 and
-adr-002-compiler-ownership-experiment.md.
+adrs/adr-0002-compiler-ownership-experiment.md.
 
 - [ ] 2.2.1. Measure ergonomics, runtime cost, and compilation cost separately.
   - Requires step 2.1.
@@ -211,7 +214,7 @@ adr-002-compiler-ownership-experiment.md.
 - [ ] 2.2.3. Record an adoption, revision, or rejection decision.
   - Requires 2.2.1 and 2.2.2.
   - See polonius-ownership-experiment.md §§5–6;
-    adr-002-compiler-ownership-experiment.md.
+    adrs/adr-0002-compiler-ownership-experiment.md.
   - Success: evidence attributes each benefit, addresses all review conditions,
     and chooses one maintained implementation; absent solver-specific benefit
     is recorded explicitly rather than reported as a compiler necessity. Justify
@@ -471,7 +474,8 @@ technical design §§1 and 12.
     Pachislot's named WebSocket requirement is tracked separately in step 7.3.
 - [ ] 7.1.2. Prototype an outer Tower compatibility adapter.
   - Requires phase 6.
-  - See peregrine-design.md §§1–2 and 12; adr-001-resource-aware-lifecycle.md.
+  - See peregrine-design.md §§1–2 and 12;
+    adrs/adr-0001-resource-aware-lifecycle.md.
   - Success: readiness and backpressure are defined; a representative layer
     composes without changing inner ordering or losing resource visibility.
 
