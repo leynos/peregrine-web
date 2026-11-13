@@ -7,12 +7,16 @@
 //!
 //! # Environment isolation
 //!
-//! The probe clears the inherited `TEST_FLAGS`, `MAKEFLAGS` and `MFLAGS`
-//! variables. A targeted run such as `make test TEST_FLAGS='--test suite'`
-//! exports its flags, and Make forwards command-line variables through
-//! `MAKEFLAGS`, so a nested `make -n test` would otherwise be describing the
-//! outer invocation rather than the repository defaults. Each contract binary
-//! therefore passes both on its own and inside the full `make test` route.
+//! The probe clears the inherited `TEST_FLAGS`, `MAKEFLAGS`, `MFLAGS` and
+//! `CARGO_BUILD_TARGET` variables. A targeted run such as
+//! `make test TEST_FLAGS='--test suite'` exports its flags, and Make forwards
+//! command-line variables through `MAKEFLAGS`, so a nested `make -n test` would
+//! otherwise describe the outer invocation rather than the repository defaults.
+//! `CARGO_BUILD_TARGET` would likewise turn the unconfigured case into a
+//! configured one on any host that exports it. A test that wants a configured
+//! target sets it explicitly after `make_command` returns. Each contract binary
+//! therefore passes on its own, inside the full `make test` route, and
+//! regardless of the ambient build environment.
 //!
 //! # Lint scope
 //!
@@ -120,11 +124,14 @@ impl CargoProbe {
             // Make forwards command-line variables through MAKEFLAGS, so the
             // nested `make -n test` would otherwise rewrite its own flags and
             // the assertions would describe the outer run instead of the
-            // repository defaults. Clearing them keeps each contract binary
-            // runnable on its own.
+            // repository defaults. `CARGO_BUILD_TARGET` would silently turn
+            // every default-target assertion into a configured-target one on
+            // a host that exports it. Clearing them keeps each contract binary
+            // runnable on its own and independent of the ambient environment.
             .env_remove("TEST_FLAGS")
             .env_remove("MAKEFLAGS")
             .env_remove("MFLAGS")
+            .env_remove("CARGO_BUILD_TARGET")
             .env(
                 "NEXTEST_AVAILABLE",
                 if options.nextest_available { "0" } else { "1" },
