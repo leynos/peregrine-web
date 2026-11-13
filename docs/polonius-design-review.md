@@ -2,7 +2,7 @@
 
 - Date: 2026-09-20.
 - Scope: [ownership experiment](polonius-ownership-experiment.md),
-  [technical design §3.1](peregrine-design.md), [ADR 002](adr-002-compiler-ownership-experiment.md),
+  [technical design §3.1](peregrine-design.md), [ADR 002](adrs/adr-0002-compiler-ownership-experiment.md),
   and [roadmap phase 2](roadmap.md).
 - Method: three independent reviewing agents, each covering two Logisphere
   perspectives; findings synthesized and incorporated into the proposal.

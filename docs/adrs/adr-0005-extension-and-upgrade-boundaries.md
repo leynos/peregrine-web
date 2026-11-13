@@ -16,7 +16,7 @@ inside a Peregrine service, with named AsyncAPI channels, typed messages, and
 operation traits. falcon-correlate supplies a second concrete extension model:
 request correlation, logging, and downstream propagation.
 
-The [extension design](pachislot-extension-design.md) inspects pinned source
+The [extension design](../pachislot-extension-design.md) inspects pinned source
 revisions and primary protocol documentation. Peregrine already proposes
 immutable request facts, finalization, application-owned services, and shutdown
 tracking, but explicitly defers upgrades and rejects informational statuses as
@@ -94,7 +94,7 @@ design names experiments X1–X5, including negative ownership cases and
 differential client traces. Native sockets remain necessary to establish
 handshake and close behaviour; simulators alone are insufficient.
 
-[ADR 006](adr-006-extension-interface-stabilization.md) defines mandatory
+[ADR 006](adr-0006-extension-interface-stabilization.md) defines mandatory
 consumer delivery, generality, and stabilization gates. Task 7.3.4 explicitly
 delivers Pachislot; tasks 7.4.1–7.4.3 deliver the correlation companion, test
 an independent adapter, and require the combined evidence before stabilization.

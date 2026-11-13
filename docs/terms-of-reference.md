@@ -7,7 +7,7 @@
   reviewers.
 - Companions: [technical design](peregrine-design.md),
   [potential roadmap](roadmap.md), and
-  [proposed architecture decision](adr-001-resource-aware-lifecycle.md).
+  [proposed architecture decision](adrs/adr-0001-resource-aware-lifecycle.md).
 
 ## 1. Background and evidence
 
@@ -193,7 +193,7 @@ The current package uses Rust edition 2024. The architectural paper's phrase
   new-solver implementation with a compatible control without committing to two
   supported products. If exclusivity adds no material benefit, retain the
   compatible ownership design. See
-  [ADR 002](adr-002-compiler-ownership-experiment.md).
+  [ADR 002](adrs/adr-0002-compiler-ownership-experiment.md).
 - Dynamic dispatch and future allocation are acceptable costs. If measurements
   contradict this, optimize the implementation or reconsider the API before
   claiming readiness.
@@ -235,8 +235,8 @@ _Table 4: Open decisions and evidence required to close them._
 
 The evidence is sufficient for a draft design and potential roadmap. API
 stabilization depends on Q3 and Q5; release commitments depend on Q1, Q2, Q4,
-and Q6. The [proposed ADR](adr-001-resource-aware-lifecycle.md) records the
-principal architectural choice for review, without implying acceptance.
+and Q6. The [proposed ADR](adrs/adr-0001-resource-aware-lifecycle.md) records
+the principal architectural choice for review, without implying acceptance.
 
 ### 9.1. Mornington pilot and comparative review
 

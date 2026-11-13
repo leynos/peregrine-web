@@ -4,7 +4,7 @@
 - Date: 2026-09-20.
 - Audience: framework authors, middleware authors, and prospective consumers.
 - Companions: [technical design](peregrine-design.md),
-  [roadmap](roadmap.md), [ADR 002](adr-002-compiler-ownership-experiment.md),
+  [roadmap](roadmap.md), [ADR 002](adrs/adr-0002-compiler-ownership-experiment.md),
   and [six-perspective review](polonius-design-review.md).
 
 ## 1. The GIST idea and its scope
@@ -347,9 +347,10 @@ required analyser affects release readiness. No required gate may be silently
 removed to make the experimental branch green.
 
 The [roadmap](roadmap.md) puts this experiment before production delivery
-slices. [ADR 002](adr-002-compiler-ownership-experiment.md) remains proposed
-until the adoption task records evidence and a decision. Existing goals and
-HTTP/lifecycle invariants remain in force whichever candidate is selected.
+slices. [ADR 002](adrs/adr-0002-compiler-ownership-experiment.md) remains
+proposed until the adoption task records evidence and a decision. Existing
+goals and HTTP/lifecycle invariants remain in force whichever candidate is
+selected.
 
 ## 7. References
 

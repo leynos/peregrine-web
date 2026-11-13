@@ -20,9 +20,9 @@ borrowing patterns rejected by NLL; the new solver's separate value needs
 demonstration.
 
 The
-[technical design §3.1](peregrine-design.md#31-experimental-compiler-and-ownership-direction)
-and [experiment specification](polonius-ownership-experiment.md) define the
-comparison. [ADR 001](adr-001-resource-aware-lifecycle.md) still governs the
+[technical design §3.1](../peregrine-design.md#31-experimental-compiler-and-ownership-direction)
+and [experiment specification](../polonius-ownership-experiment.md) define the
+comparison. [ADR 001](adr-0001-resource-aware-lifecycle.md) still governs the
 proposed lifecycle semantics, subject to acceptance.
 
 ## Decision drivers
@@ -48,7 +48,7 @@ _Table 1: Compiler-posture alternatives._
 ## Proposed direction
 
 Conduct the
-[roadmap phase 2](roadmap.md#2-test-a-pure-polonius-and-new-solver-implementation)
+[roadmap phase 2](../roadmap.md#2-test-a-pure-polonius-and-new-solver-implementation)
 experiment before selecting a production ownership model. Build comparable
 resource and middleware prototypes; use a four-way flag matrix to separate
 compiler mechanisms. Candidate B has no compatibility fallback. Standard entry
@@ -68,7 +68,7 @@ compile time and binary size. Request-local borrows cannot escape through a
 response stream or detached task without transferring suitable ownership. The
 new solver has no demonstrated unique benefit in the current probe set.
 
-The [six-perspective review](polonius-design-review.md) supports a bounded
+The [six-perspective review](../polonius-design-review.md) supports a bounded
 experiment with conditions. Its findings are incorporated in the specification
 and phase 2 acceptance criteria; prototype evidence remains outstanding.
 

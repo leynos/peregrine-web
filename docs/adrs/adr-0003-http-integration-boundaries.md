@@ -11,7 +11,7 @@ adopt actix-v2a, change compiler requirements, or publish runtime APIs.
 
 ## Context and problem statement
 
-The [actix-v2a case study](actix-v2a-middleware-case-study.md) compares
+The [actix-v2a case study](../actix-v2a-middleware-case-study.md) compares
 existing error, key, pagination, SSE, and schema helpers with proposed shared
 mutation contracts. It finds an advantage in resource-aware policy and
 consistent HTTP presentation, but no justification for moving durable mutations
@@ -123,7 +123,7 @@ requires them. No runtime performance or compiler-specific benefit is inferred.
 
 The owner accepted Mornington as the proving ground and the HTTP/1.1/Traefik
 boundary on 2026-10-13;
-[ToR §9.1](terms-of-reference.md#91-mornington-pilot-and-comparative-review)
+[ToR §9.1](../terms-of-reference.md#91-mornington-pilot-and-comparative-review)
 records that evidence. This acceptance does not promote this whole ADR or the
 uncompiled ownership API to Accepted. ADR 001 still requires its spike/traces;
 ADR 006 still requires separate consumers and independent extension evidence.
@@ -146,7 +146,7 @@ their workload rationale. This accepts CFG01–CFG33 for the exercise only, not
 for 1.0; each row requires evidence-backed review afterwards before 1.0
 parameter acceptance. Mornington's hexagonal ports provide direct-domain and
 paired driving-adapter validation, as recorded in
-[ToR §9.2](terms-of-reference.md#92-proving-ground-approval-and-validation-boundaries).
+[ToR §9.2](../terms-of-reference.md#92-proving-ground-approval-and-validation-boundaries).
 Application ports remain HTTP-independent under ADR 004. Choose finite limits
 over implicit unlimited settings, explicit stream opt-out over sentinel zero,
 and static fallback over re-entering custom code during cancellation. Request
