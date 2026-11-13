@@ -372,7 +372,7 @@ and 101 with `-Zpolonius=off`, so the posture is `polonius-alpha`.
   matching count.
 - 2026-11-05, accepted: the dependency review required before adding these
   crates is recorded in
-  [Dependency review](resource-policy-ownership-spike.md#dependency-review)
+  [Dependency review](../resource-policy-ownership-spike.md#dependency-review)
   rather than only asserted here. It was taken from the committed `Cargo.lock`
   with `cargo metadata --format-version 1 --locked --offline`, so the licence,
   `rust-version`, and feature declarations are the resolved ones and the
@@ -460,15 +460,15 @@ before starting implementation and record any changed requirements.
   This advances Q3 evidence without closing the question or completing phase 4.
 - Design §§11–12 and ADR 002 map to M1's compiler ledger and M3's phase 2
   handoff. Adoption remains task 2.2.3.
-- [ADR 001](../adr-001-resource-aware-lifecycle.md) and
-  [ADR 003](../adr-003-http-integration-boundaries.md) constrain the resource
-  and invocation seam. Full lifecycle I1/I2 and HTTP finalization I5 remain
-  tasks 1.2.2, 2.1.3, and phase 3 rather than spike acceptance claims.
-- [ADR 004](../adr-004-application-port-boundaries.md) and the
+- [ADR 001](../adrs/adr-0001-resource-aware-lifecycle.md) and
+  [ADR 003](../adrs/adr-0003-http-integration-boundaries.md) constrain the
+  resource and invocation seam. Full lifecycle I1/I2 and HTTP finalization I5
+  remain tasks 1.2.2, 2.1.3, and phase 3 rather than spike acceptance claims.
+- [ADR 004](../adrs/adr-0004-application-port-boundaries.md) and the
   [hexagonal case study](../hexagonal-application-case-study.md) constrain
   dependency ownership. E1–E5 comparisons remain tasks 1.3 and later phases.
-- [ADR 005](../adr-005-extension-and-upgrade-boundaries.md),
-  [ADR 006](../adr-006-extension-interface-stabilization.md), and the
+- [ADR 005](../adrs/adr-0005-extension-and-upgrade-boundaries.md),
+  [ADR 006](../adrs/adr-0006-extension-interface-stabilization.md), and the
   [Pachislot design](../pachislot-extension-design.md) constrain owned handoff.
   Borrow-escape fixtures give early evidence, not upgrade or stabilization
   evidence. ADRs 001–005 remain proposed; ADR 006's stabilization policy
@@ -753,10 +753,10 @@ only the server, HTTP/1, I/O, runtime, synchronization, and time features
 actually exercised. Check exact release compatibility, minimum compiler
 declarations, licences, and lockfile resolution during M1; the result is
 recorded under
-[Dependency review](resource-policy-ownership-spike.md#dependency-review). Do
-not add `matchit`, a database, an identity provider, a serialization framework,
-or global tracing/metrics subscribers. Task 1.2.1 still owns the maintained
-dependency and feature baseline.
+[Dependency review](../resource-policy-ownership-spike.md#dependency-review).
+Do not add `matchit`, a database, an identity provider, a serialization
+framework, or global tracing/metrics subscribers. Task 1.2.1 still owns the
+maintained dependency and feature baseline.
 
 An explicit boxed-future trait could satisfy the same bounds but adds manual
 lifetime/boxing machinery without improving this baseline experiment. Generic
