@@ -195,7 +195,7 @@ forwards trailers unchanged. That choice records what compiles and passes the
 body witnesses; it is a provisional candidate, not an accepted public alias.
 See the
 [spike evidence](resource-policy-ownership-spike.md#v-body-adapter-and-network-witnesses)
-and [ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md).
+and [ADR 007](adrs/adr-0007-resource-policy-and-body-erasure-boundary.md).
 
 Context exposes request metadata for inspection, route parameters for reading,
 mutable response operations, and typed extensions. Framework-owned lifecycle,
@@ -367,7 +367,7 @@ optional identity; an anonymous protected request is denied before the enforcer
 runs. Witnesses show those values unchanged across a real await, and show that
 a denial reaches neither the responder nor the resource dependency. The tested
 shape, its rejected alternatives, and its limits are recorded in
-[ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) and the
+[ADR 007](adrs/adr-0007-resource-policy-and-body-erasure-boundary.md) and the
 [evidence ledger](resource-policy-ownership-spike.md#v-identity-identity-and-admission-witnesses).
 Q3 acceptance, tenant or object-level context, revocation, and production
 enforcement remain open.

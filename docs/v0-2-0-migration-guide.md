@@ -38,8 +38,8 @@ cancellation. It is deliberately incomplete: there is no router, server,
 authentication, or authorization provider. The
 [spike evidence ledger](resource-policy-ownership-spike.md) states what the
 witnesses establish and what they leave open, and
-[ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) records the
-provisional shapes and the alternatives they rejected.
+[ADR 007](adrs/adr-0007-resource-policy-and-body-erasure-boundary.md) records
+the provisional shapes and the alternatives they rejected.
 
 Raise the requirement to `0.2` in every case. To inspect that evidence, keep
 the import inside a throwaway experiment. Otherwise, make no source change: the

@@ -15,21 +15,22 @@ is a stable public API or an implemented framework.
 ## Context and problem statement
 
 The
-[technical design §§3–4](peregrine-design.md#3-application-and-context-contracts)
+[technical design §§3–4](../peregrine-design.md#3-application-and-context-contracts)
 propose a resource-first contract in which a resource owns its policy and its
 dependencies, registration freezes the effective method and policy, and a
 single conditional invocation replaces route-policy tables. The design named
 the policy vocabulary and enforcement registration API as unaccepted until the
 Q3 spike, and it deferred the erased body type to
-"[selected and compile-tested in the first spike](peregrine-design.md#3-application-and-context-contracts)".
+"[selected and compile-tested in the first spike](../peregrine-design.md#3-application-and-context-contracts)".
 
-[Roadmap task 1.1.3](roadmap.md) asked four bounded questions: can a resource
-own its policy and dependencies; can registration freeze policy before
+[Roadmap task 1.1.3](../roadmap.md) asked four bounded questions: can a
+resource own its policy and dependencies; can registration freeze policy before
 admission; can an erased body stay `Send` but not `Sync` across a real await;
 and can one conditional invocation be expressed without service locators or
 shared mutable application state. The
-[spike evidence ledger](resource-policy-ownership-spike.md) records the tested
-answers. This ADR preserves their outcome so later slices do not rediscover it.
+[spike evidence ledger](../resource-policy-ownership-spike.md) records the
+tested answers. This ADR preserves their outcome so later slices do not
+rediscover it.
 
 ## Decision drivers
 
@@ -120,7 +121,7 @@ The compile witnesses are `trybuild` fixtures tied to the pinned nightly; a
 compiler change can alter a reviewed `.stderr` baseline even when acceptance is
 unchanged. The cancellation witnesses drop a future at one known suspension
 point and do not explore cancellation at every await or under load. The
-[evidence ledger](resource-policy-ownership-spike.md) lists the limits per
+[evidence ledger](../resource-policy-ownership-spike.md) lists the limits per
 witness.
 
 ## Outstanding decisions
@@ -129,7 +130,7 @@ Terms-of-reference Q3 and Q5 must still accept or revise the policy vocabulary
 and enforcement registration surface; this ADR does not accept them by
 recording how they compile. Roadmap task 2.2.3 must select the compiler and
 ownership direction before the invocation boundary stabilizes, and
-[ADR 002](adr-002-compiler-ownership-experiment.md) remains proposed. Open
+[ADR 002](adr-0002-compiler-ownership-experiment.md) remains proposed. Open
 questions for acceptance:
 
 - Whether `Resource` stays dyn-compatible after the phase 2 comparison, or

@@ -477,8 +477,8 @@ the fetch must name that target too.
 `src/spike/` is the compile-time specimen roadmap task 1.1.3 left behind. It is
 not a framework API and carries no stability promise. The
 [technical design](peregrine-design.md) records the contracts it informs,
-[ADR 007](adr-007-resource-policy-and-body-erasure-boundary.md) records the
-provisional shapes and their rejected alternatives, the
+[ADR 007](adrs/adr-0007-resource-policy-and-body-erasure-boundary.md) records
+the provisional shapes and their rejected alternatives, the
 [evidence ledger](resource-policy-ownership-spike.md) states what the witnesses
 establish, and the
 [spike ExecPlan](execplans/1-1-3-compile-resource-policy-and-async-ownership-spike.md)

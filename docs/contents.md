@@ -68,7 +68,7 @@ documentation set.
 - [Resource-policy and ownership spike evidence](resource-policy-ownership-spike.md)
   records the pinned compiler posture, the compile witnesses, and the limits of
   what the spike establishes.
-- [ADR 007: Resource-policy and body-erasure boundary](adr-007-resource-policy-and-body-erasure-boundary.md)
+- [ADR 007: Resource-policy and body-erasure boundary](adrs/adr-0007-resource-policy-and-body-erasure-boundary.md)
   records the tested provisional shapes and their rejected alternatives,
   without accepting the policy vocabulary or a public API.
 

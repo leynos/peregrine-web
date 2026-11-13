@@ -168,7 +168,7 @@ the required design/ADR change; obtain explicit approval for deviations.
     enforcement surface, §11 connects the witnesses to I3 and I6, and §12
     records the dependency subset the spike added.
   - [x] (2026-11-01) Wrote
-    `docs/adr-007-resource-policy-and-body-erasure-boundary.md` (Proposed),
+    `docs/adrs/adr-0007-resource-policy-and-body-erasure-boundary.md` (Proposed),
     linked it from the design and `docs/contents.md`, and added the
     design-traceability table to the evidence ledger.
   - [x] (2026-11-01) Updated `docs/users-guide.md` with the experimental
