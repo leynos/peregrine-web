@@ -1,8 +1,8 @@
-//! Fake Cargo executable shared by the Make command-contract suites.
+//! Fake Cargo executable for the Make Cargo command-contract suite.
 //!
 //! The probe records what Make actually executes, so a test can assert the
 //! selected executable, the argument vector, and the order of the steps without
-//! running a real build. It also fails on demand, which is how the suites prove
+//! running a real build. It also fails on demand, which is how the suite proves
 //! that a failed step stops the ones after it.
 //!
 //! # Environment isolation
@@ -18,18 +18,14 @@
 //! therefore passes on its own, inside the full `make test` route, and
 //! regardless of the ambient build environment.
 //!
-//! # Lint scope
+//! # Single consumer
 //!
-//! `make_cargo_routes` and `make_fetch_contract` each include this module
-//! through `#[path]`, and Cargo compiles a separate copy into every test
-//! binary. An item that only one of those binaries uses therefore looks unused
-//! here. The allowance covers that duplication; it is not a place to leave
-//! genuinely stale helpers.
-
-#![allow(
-    dead_code,
-    reason = "each Make contract binary includes a different subset of these helpers"
-)]
+//! `make_cargo_routes` includes this module through `#[path]`, and it is the
+//! only test binary that does. Cargo compiles a separate copy into every test
+//! binary that includes a path module, so a second consumer would make whichever
+//! helpers it does not use look dead here. Keep this module and its fetch and
+//! route contracts in one binary so no lint suppression is needed; genuinely
+//! stale helpers must be deleted rather than tolerated.
 
 use std::{
     error::Error,

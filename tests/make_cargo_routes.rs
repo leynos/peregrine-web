@@ -1,7 +1,10 @@
-//! Behavioural contracts for Make's Cargo substitution and build preflight.
+//! Behavioural contracts for Make's Cargo substitution, locked fetch, and
+//! build preflight.
 
 #[path = "support/make_act_contract_smoke_tests.rs"]
 mod act_contract_smoke;
+#[path = "support/make_fetch_contract_tests.rs"]
+mod fetch_contract;
 #[path = "support/make_cargo_probe.rs"]
 mod probe_support;
 #[path = "support/make_target_option_tests.rs"]

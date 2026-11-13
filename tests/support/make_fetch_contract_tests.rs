@@ -5,13 +5,15 @@
 //! named step rather than inside a nested build. These witnesses pin the
 //! `--locked` flag, the selected target, the position of the step, and what
 //! happens when the fetch fails.
-
-#[path = "support/make_cargo_probe.rs"]
-mod probe_support;
+//!
+//! The module is a child of `make_cargo_routes`, which owns the shared
+//! `CargoProbe` fixture. Keeping the fetch contracts in the same binary lets
+//! the fixture keep one definition with no lint suppression: every helper is
+//! reachable from at least one test in that binary.
 
 use std::process::Output;
 
-use probe_support::{CargoProbe, MakeOptions};
+use super::{CargoProbe, MakeOptions};
 
 /// The target Make names when `CARGO_BUILD_TARGET` is unset.
 const DEFAULT_TARGET: &str = "host-tuple";

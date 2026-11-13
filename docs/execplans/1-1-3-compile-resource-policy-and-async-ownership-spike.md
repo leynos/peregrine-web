@@ -267,10 +267,18 @@ the required design/ADR change; obtain explicit approval for deviations.
     body for `ResourceRunner`, rather than claiming a uniform Hyper response
     type. `README.md` carries a signpost to the experimental specimen and
     states that the test summary includes its witnesses. The Make contract
-    suites now share `tests/support/make_cargo_probe.rs`, and the new
-    `tests/make_fetch_contract.rs` pins `cargo fetch --locked`, the default and
-    configured target, the fetch's position before either test runner, and that
-    a failed fetch stops the run.
+    suite now uses the shared `tests/support/make_cargo_probe.rs` fixture, and
+    `tests/support/make_fetch_contract_tests.rs` pins `cargo fetch --locked`,
+    the default and configured target, the fetch's position before either test
+    runner, and that a failed fetch stops the run.
+  - [x] (2026-11-13) Folded the fetch contracts into the route binary so the
+    shared probe needs no lint suppression. Cargo compiles a separate copy of a
+    `#[path]` module into every test binary that includes it, so the probe's
+    route-only helpers looked dead in the fetch binary and the module-wide
+    `dead_code` allowance that hid it was a blanket suppression. The fetch
+    contracts are now `mod fetch_contract` inside
+    `tests/make_cargo_routes.rs`, every helper is reachable from that binary,
+    and the allowance is gone.
 
 ## Surprises & discoveries
 
