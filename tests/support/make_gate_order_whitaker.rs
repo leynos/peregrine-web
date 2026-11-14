@@ -111,8 +111,8 @@ pub(super) fn assert_repository_route(
 fn assert_repository_config(config_invocations: &[Invocation], run_count: usize) {
     let expected = [
         (
-            "profile.dev.codegen-backend",
-            "profile.dev.codegen-backend = \"cranelift\"",
+            "unstable.codegen-backend",
+            "unstable.codegen-backend = true",
         ),
         ("build.rustflags", "build.rustflags = [\"-Zthreads=8\"]"),
         (

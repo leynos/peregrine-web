@@ -95,7 +95,18 @@ fn coverage_overrides_the_effective_dev_backend_to_llvm() {
         .env_remove("CARGO_PROFILE_DEV_CODEGEN_BACKEND")
         .output()
         .expect("read Cargo's selected development backend");
-    assert_selected_backend(&default_backend, "cranelift", "no override");
+    // The Cranelift selection is disabled, so no backend is configured and Cargo
+    // defaults to LLVM. Uncommenting it is a persistent opt-in that needs this
+    // contract updated.
+    if default_backend.status.success() {
+        assert_selected_backend(&default_backend, "llvm", "no override");
+    } else {
+        let stderr = String::from_utf8_lossy(&default_backend.stderr);
+        assert!(
+            stderr.contains("is not set"),
+            "Cargo must report the development backend as unset, not fail otherwise: {stderr}"
+        );
+    }
 
     let llvm_override = Command::new("cargo")
         .args([

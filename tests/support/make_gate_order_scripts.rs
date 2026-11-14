@@ -116,7 +116,7 @@ record_repository_config() {
   output=$(cargo -Z unstable-options config get "$query") || return 1
   record_invocation "$WHITAKER_ENV_LOG" repository-config cargo none value "$output" -Z unstable-options config get "$query"
 }
-record_repository_config profile.dev.codegen-backend || exit 1
+record_repository_config unstable.codegen-backend || exit 1
 record_repository_config build.rustflags || exit 1
 record_repository_config target.x86_64-unknown-linux-gnu.linker || exit 1
 record_repository_config target.x86_64-unknown-linux-gnu.rustflags || exit 1

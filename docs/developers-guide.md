@@ -188,7 +188,14 @@ publishes nothing until a dispatch from `main` or the next push.
 
 ## Tooling
 
-Development builds use Cranelift for debug code generation. Every `rustflags`
+The estate standard is LLVM, which is the default backend here; review is due
+14 May 2027 under the
+[estate ADR](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
+The `[profile.dev] codegen-backend = "cranelift"` selection in
+`.cargo/config.toml` is commented out. Uncommenting it is a persistent opt-in
+that also needs the tests that assert the LLVM default updated; Cranelift does
+not unwind, so no test may rely on a caught panic under it. The
+`[unstable] codegen-backend` key and the component stay. Every `rustflags`
 source in `.cargo/config.toml` enables the parallel `rustc` frontend with
 `-Zthreads=8`. On native x86_64 GNU Linux, Cargo selects
 `scripts/native-clang-linker.sh` and `-fuse-ld=mold`. The wrapper gives Clang
@@ -212,7 +219,7 @@ expects LLVM-compatible code generation and linker behaviour.
 `tests/build_standard_contract.rs` checks the configuration sources and recipes.
 
 Figure 1 shows how Cargo and Make select compiler and linker settings for the
-main build routes. Bare Cargo and development Make builds use Cranelift and the
+main build routes. Bare Cargo and development Make builds use LLVM and the
 parallel frontend; supported native x86_64 GNU Linux builds use the Clang
 wrapper and pinned `mold`. Coverage uses LLVM and `lld`; release and package
 builds use LLVM and the platform linker. This diagram excludes the separate
@@ -225,7 +232,7 @@ flowchart TD
     Route -->|Development Make| Compose[Compose inherited flags with DEV_RUST_FLAGS]
     Route -->|Coverage| Coverage[Use COVERAGE_RUST_FLAGS and LLVM]
     Route -->|Release or package| Release[Use RELEASE_RUST_FLAGS and LLVM]
-    Config --> Dev[Cranelift and parallel rustc frontend with -Zthreads=8]
+    Config --> Dev[LLVM and parallel rustc frontend with -Zthreads=8]
     Compose --> Dev
     Dev --> Linux{Supported native x86_64 GNU Linux?}
     Linux -->|Yes| Mold[Clang wrapper selects pinned mold]
@@ -239,7 +246,7 @@ driver outside the repository and receives no application `RUSTFLAGS`, encoded
 flags, backend override, target, or linker override. The repository check runs
 from the repository root, where Cargo reads the defaults above; Dylint adds
 `-D warnings` and the configured Polonius flags only to that check through
-`DYLINT_RUSTFLAGS`. This preserves Cranelift, `-Zthreads=8`, and the native
+`DYLINT_RUSTFLAGS`. This preserves LLVM, `-Zthreads=8`, and the native
 wrapper/mold route for lint while leaving the coverage route on LLVM and `lld`.
 The clean driver boundary also removes target-specific Rust flags, which Cargo
 would otherwise append after the configured mold linker argument. The native
@@ -287,8 +294,8 @@ tests. The measured coverage command and release build still use their separate
 linker flags. The supported `mold` configuration is native x86_64 GNU Linux;
 x86_64 Linux musl and cross-target builds do not select this route. Make
 preflight rejects cross targets and encoded Rust flags that could bypass the
-selected linker or flags. It also rejects a non-Cranelift development backend
-override; coverage explicitly selects LLVM after its coverage-specific
+selected linker or flags. It accepts an unset, LLVM or Cranelift development
+backend; coverage explicitly selects LLVM after its coverage-specific
 preflight. An explicit native target linker must remain the repository's Clang
 wrapper so its search directory and the `mold` link argument apply together.
 
@@ -509,7 +516,7 @@ and `trybuild`, and reuse the already-present `proptest` and `rstest`.
 `serde_json` parses Cargo's JSON artefact messages in
 `tests/resource_policy_example_executable.rs`, which needs the built example's
 path in order to run it directly. The build assumptions are the repository's
-pinned nightly, the Cranelift development backend, and shared compile
+pinned nightly, the default LLVM development backend, and shared compile
 admission; do not pin a second toolchain for the spike.
 
 Focused validation:
