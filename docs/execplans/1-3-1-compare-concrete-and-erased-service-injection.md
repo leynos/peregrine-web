@@ -273,7 +273,11 @@ similar margin.
   confirms this before the `missing_dependency_*` fixtures rely on it.
 - 2026-11-14 (panel): `mapsplice` cannot mark 1.3.1 done, because 1.3.2 and
   2.1.2 declare it as a dependency; the 1.1.3 plan hit the same
-  `dangling_dependency` refusal. The roadmap edit is manual (see `EP-M4`).
+  `dangling_dependency` refusal. A scratch roadmap reproduced it: `replace`
+  fails even when the fragment is identical to the existing item. This is a
+  `mapsplice` defect, reported as
+  [leynos/mapsplice#228](https://github.com/leynos/mapsplice/issues/228); see
+  `EP-M4` for the closure procedure.
 
 ## Decision log
 
@@ -1078,8 +1082,10 @@ Update these documents:
   and the ledger; also correct its stale `docs/adr-*.md` path to `docs/adrs/`.
 - `docs/roadmap.md`: change the 1.3.1 line to
   `- [x] 1.3.1. Compare concrete and erased service injection — done.` and
-  update the opening paragraph's list of completed tasks. Edit manually, because
-  `mapsplice` refuses items with dependants.
+  update the opening paragraph's list of completed tasks. If
+  [leynos/mapsplice#228](https://github.com/leynos/mapsplice/issues/228) is
+  fixed in the installed release, use `mapsplice replace` with a preview diff
+  first; otherwise edit the line manually and note the issue in the commit.
 
 Search for stale claims with
 `rg -n 'H1, not a measured|E1.*(planned|remain)' docs --glob '!docs/execplans/**'`
@@ -1325,3 +1331,6 @@ dependency. Reuse `async-trait`, `thiserror`, `rstest`, `rstest-bdd`,
   contents, layout, and roadmap updates, the 2.1.2 hand-off, exact counting
   commands, and raised the code and documentation budgets to cover the third
   arm. Milestone order is unchanged; scope grows by one arm and two fixtures.
+- 2026-11-14: reported the `mapsplice` refusal to edit depended-upon tasks as
+  leynos/mapsplice#228, and made `EP-M4` use `mapsplice` once the fix is
+  released. No scope, obligation, or milestone change.
