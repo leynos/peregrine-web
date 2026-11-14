@@ -273,12 +273,13 @@ project:
     Documentation warnings, Clippy warnings, and Whitaker findings fail the
     command. `make all` runs formatting, linting, testing, and spelling in
     order even under `make -j all`.
-  - `make test` checks build prerequisites, runs `cargo fetch --locked`, uses
-    `cargo-nextest` when available, and falls back to `cargo test` only when it
-    is absent (a nextest older than 0.9.100 fails the target). Both Cargo
-    commands retain caller `RUSTFLAGS` alongside the development flags; doctests
-    also deny Rustdoc warnings. With `WITH_ACT=1`, Make runs Act validation
-    after local tests:
+  - `make test` checks build prerequisites, runs `cargo fetch --locked`, and
+    uses `cargo-nextest` when its version probe prints a version. It falls back
+    to `cargo test` when that probe writes nothing to stdout, which covers an
+    absent or unusable nextest. A nextest older than 0.9.100 fails the target.
+    Both Cargo commands retain caller `RUSTFLAGS` alongside the development
+    flags; doctests also deny Rustdoc warnings. With `WITH_ACT=1`, Make runs Act
+    validation after local tests:
 
     ```makefile
     NEXTEST_PROBE := $(shell $(CARGO) nextest --version 2>/dev/null)
@@ -295,18 +296,20 @@ project:
     Use `make fmt` to apply Rust and Markdown formatting fixes.
 
   The hosted `build-test` job is the authoritative repository gate. Every PR
-  runs workflow-structure and command-contract tests through `make test`.
-  `.github/workflows/act-validation.yml` is manual-dispatch only; its full Act
-  run checks local runner compatibility and does not prove parity with hosted
-  GitHub Actions. `make test WITH_ACT=1` remains available for that local
-  integration check. Keep the cold Whitaker driver integration check: the
-  contract stubs verify command wiring, while the hosted lint route constructs
-  the real driver and checks the repository. `make act-contract-smoke` runs the
-  focused Act test against a derived CI workflow with fixture actions and
-  controlled executors. Use `make whitaker-driver-integration` to run real
-  `make lint-whitaker` checks with a private cold driver cache and then the
-  same warm cache; hosted CI also forces a cold driver directory for each lint
-  job.
+  runs the workflow-structure and command-contract tests there through the
+  pinned coverage action, with default features and without doctests; that job
+  does not run `make test`. `.github/workflows/act-validation.yml` is
+  manual-dispatch only; its full Act run checks local runner compatibility and
+  does not prove parity with hosted GitHub Actions. Under Act, the coverage
+  step is skipped and `make test` runs instead. `make test WITH_ACT=1` remains
+  available for that local integration check. Keep the cold Whitaker driver
+  integration check: the contract stubs verify command wiring, while the hosted
+  lint route constructs the real driver and checks the repository.
+  `make act-contract-smoke` runs the focused Act test against a derived CI
+  workflow with fixture actions and controlled executors. Use
+  `make whitaker-driver-integration` to run real `make lint-whitaker` checks
+  with a private cold driver cache and then the same warm cache; hosted CI also
+  forces a cold driver directory for each lint job.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.
