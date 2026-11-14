@@ -292,7 +292,7 @@ the register (about 220), ADR 008 (about 130), and updates to five live guides
   change a contract pinned by three test files and require `cargo-deny` for
   every lint run although it compiles nothing. Enabling `cargo-deny` advisories
   would duplicate `cargo audit` and need network access. The rejected
-  alternative, a hand-written SPDX evaluator inside `make test`, would
+  alternative, a handwritten SPDX evaluator inside `make test`, would
   re-implement a maintained tool and add an `spdx` dependency. Date/Author:
   2026-11-14, planning agent.
 - D4. Decision: `deny.toml` allows exactly the licences the graph needs today:
@@ -492,7 +492,7 @@ nothing was compiled.
 - `docs/hexagonal-application-case-study.md`,
   `docs/pachislot-extension-design.md`, and
   `docs/polonius-ownership-experiment.md` only to confirm that no planned
-  dependency of theirs is pre-empted here (none is).
+  dependency of theirs is decided early here (none is).
 
 ### Skills to load
 
