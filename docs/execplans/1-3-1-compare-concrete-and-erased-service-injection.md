@@ -67,7 +67,7 @@ Existing behaviour of `src/spike/` is preserved unchanged.
   Only the composition root (`examples/service_injection/main.rs`) may see
   every layer. Inbound adapter files must not import outbound adapter files.
 - Application ports carry explicit `Send` bounds in their signatures. The
-  erased port uses a hand-written boxed future type, not a macro that hides the
+  erased port uses a handwritten boxed future type, not a macro that hides the
   bound. The generic arm's port uses a return-position `impl Future + Send`. No
   `?Send` relaxation, `Rc`, thread-local state, `Arc<Mutex<_>>` workaround, or
   `unsafe` code.
@@ -213,7 +213,7 @@ dominated by the lockfile entries `insta` pulls in.
   1.3.2.
 - 2026-11-14: Native `async fn` in traits is still not dyn-compatible on
   stable Rust. `async-trait` and `dynosaur` (0.3.1, MIT or Apache-2.0) remain
-  the common erasure routes; a hand-written boxed future is the dependency-free
+  the common erasure routes; a handwritten boxed future is the dependency-free
   option.
 
 ## Decision log
@@ -228,7 +228,7 @@ dominated by the lockfile entries `insta` pulls in.
   `Arc<dyn DynTaskQueries>`, a dyn-compatible port with an explicit boxed
   `Send` future. Arm G gets its best case (no allocation, static dispatch) so
   that "no benefit" cannot be an artefact of the experiment.
-- 2026-11-14, proposed: erase the port with a hand-written
+- 2026-11-14, proposed: erase the port with a handwritten
   `Pin<Box<dyn Future<Output = T> + Send + 'a>>` alias owned by the
   application. Rejected alternatives: `async-trait` on the port (hides the
   `Send` bound in a macro, and the roadmap asks for explicit bounds);
