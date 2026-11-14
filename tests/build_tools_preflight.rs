@@ -307,21 +307,6 @@ fn preflight_rejects_cross_target_and_encoded_flag_overrides() {
             "overrides the development flags",
         ),
         (
-            "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-            "llvm",
-            "overrides Cranelift",
-        ),
-        (
-            "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-            "other",
-            "overrides Cranelift",
-        ),
-        (
-            "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-            "",
-            "overrides Cranelift",
-        ),
-        (
             "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
             "ld",
             "bypasses the pinned Clang linker wrapper",
@@ -355,7 +340,7 @@ fn preflight_rejects_cross_target_and_encoded_flag_overrides() {
 #[test]
 fn preflight_allows_explicit_development_and_coverage_backends() {
     let fixture = ToolFixture::new().expect("create fake build tools");
-    for (coverage, backend) in [(false, "cranelift"), (true, "llvm")] {
+    for (coverage, backend) in [(false, "cranelift"), (false, "llvm"), (true, "llvm")] {
         let output = fixture
             .check(
                 coverage,

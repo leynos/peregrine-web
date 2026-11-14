@@ -64,7 +64,7 @@ fn measured_coverage_problem(steps: &[Value]) -> Option<&'static str> {
         string(step, &["run"]) == Some("make test")
             && path(step, &["env", "CARGO_PROFILE_DEV_CODEGEN_BACKEND"]).is_some()
     }) {
-        return Some("ordinary tests must retain Cranelift");
+        return Some("ordinary tests must not override the development backend");
     }
     None
 }
@@ -132,7 +132,7 @@ fn hosted_coverage_rejects_inherited_dev_flags() {
 }
 
 #[test]
-fn act_setup_preserves_cranelift_defaults() {
+fn act_setup_preserves_cargo_defaults() {
     let document = parse_workflow(ACT).expect("parse Act workflow with unique keys");
     let steps = path(&document, &["jobs", "act-validation", "steps"])
         .and_then(Value::as_sequence)

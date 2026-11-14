@@ -101,8 +101,6 @@ const PREFLIGHT_SCRIPT: &str = concat!(
     "record_invocation \"$@\"\n",
     "[ \"$#\" -eq 0 ] || exit 64\n",
     "[ \"${FAIL_PREFLIGHT:-}\" != 1 ] || exit 32\n",
-    "if [ \"${CARGO_PROFILE_DEV_CODEGEN_BACKEND+x}\" = x ] && \\\n",
-    "       [ \"$CARGO_PROFILE_DEV_CODEGEN_BACKEND\" != cranelift ]; then exit 33; fi\n",
 );
 
 /// Minimal recorder used to prove exact NUL-delimited argument preservation.

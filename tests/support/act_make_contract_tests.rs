@@ -85,23 +85,25 @@ fn failed_preflight_stops_before_cargo_tests_and_act() {
     );
 }
 
-/// Checks a forbidden caller backend reaches preflight and is rejected there.
+/// Checks a caller backend and linker reach preflight unchanged. The backend is
+/// not itself rejected, so the failure is injected to stop the run there.
 #[test]
-fn contaminated_backend_reaches_preflight_and_fails() {
+fn caller_backend_and_linker_reach_preflight_unchanged() {
     let harness = MakeHarness::new().expect("create the Make harness");
     let output = harness
         .run_make_test(MakeOptions {
             with_act: true,
-            caller_backend: Some("llvm"),
+            failure: Some(ExecutorFailure::Preflight),
+            caller_backend: Some("cranelift"),
             caller_linker: Some("clang"),
             ..MakeOptions::default()
         })
-        .expect("run Make with a contaminated caller backend");
+        .expect("run Make with a caller backend");
     let invocations = harness.invocations().expect("read controlled invocations");
 
     assert!(
         !output.status.success(),
-        "an LLVM caller override must fail preflight"
+        "the injected preflight failure must fail make test"
     );
     assert_eq!(
         invocations
@@ -109,14 +111,14 @@ fn contaminated_backend_reaches_preflight_and_fails() {
             .map(|call| call.executable.as_str())
             .collect::<Vec<_>>(),
         vec!["cargo", "check-build-tools"],
-        "contaminated backend must not be silently removed or reach tests"
+        "the caller backend must not be silently removed or reach tests"
     );
     assert_eq!(
         invocations
             .get(1)
             .and_then(|call| call.environment.get("CARGO_PROFILE_DEV_CODEGEN_BACKEND")),
-        Some(&EnvironmentValue::Value("llvm".to_owned())),
-        "preflight must observe the inherited forbidden backend"
+        Some(&EnvironmentValue::Value("cranelift".to_owned())),
+        "preflight must observe the inherited backend"
     );
     assert_eq!(
         invocations.get(1).and_then(|call| call

@@ -98,11 +98,6 @@ check_cargo_overrides() {
     note "CARGO_BUILD_TARGET=$target is outside the supported native build; unset it before running Make gates"
     return 1
   fi
-  if [ "$coverage" = false ] && [ "${CARGO_PROFILE_DEV_CODEGEN_BACKEND+x}" = x ] \
-    && [ "$CARGO_PROFILE_DEV_CODEGEN_BACKEND" != cranelift ]; then
-    note 'CARGO_PROFILE_DEV_CODEGEN_BACKEND overrides Cranelift; unset it before development Make gates'
-    return 1
-  fi
   if [ "$coverage" = false ] && [ "$mold_target" = true ] \
     && [ "${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER+x}" = x ] \
     && [ "$CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER" != 'scripts/native-clang-linker.sh' ]; then
