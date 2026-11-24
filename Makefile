@@ -9,7 +9,7 @@ MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
 .PHONY: help all clean test act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker fmt check-fmt markdownlint spelling nixie \
-  audit rust-audit install-build-tools check-build-tools check-build-target-flags check-coverage-tools
+  audit rust-audit install-build-tools check-build-tools check-nextest-version check-build-target-flags check-coverage-tools
 
 SHELL := bash
 
@@ -91,10 +91,14 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
-test: check-build-tools ## Run tests with warnings treated as errors
+# A prerequisite of `test`, not a recipe line of it, so the first command of the
+# `test` recipe is the locked fetch that warms the cache for the tests after it.
+check-nextest-version: ## Fail when the installed cargo-nextest is older than the minimum
 	@case "$(NEXTEST_VERSION)" in [0-9]*.[0-9]*.[0-9]*) \
 		if [ "$$(printf '%s\n%s\n' "$(NEXTEST_MIN_VERSION)" "$(NEXTEST_VERSION)" | sort -V | head -n1)" != "$(NEXTEST_MIN_VERSION)" ]; then \
 			echo "cargo-nextest $(NEXTEST_VERSION) is older than $(NEXTEST_MIN_VERSION); upgrade it (cargo binstall cargo-nextest)" >&2; exit 1; fi;; esac
+
+test: check-build-tools check-nextest-version ## Run tests with warnings treated as errors
 	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
