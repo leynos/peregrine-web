@@ -7,6 +7,10 @@
 # ignore this key.
 nextest-version = "0.9.100"
 
+# Setup scripts are experimental until a later release than the minimum above;
+# newer versions accept the entry.
+experimental = ["setup-scripts"]
+
 [profile.default]
 # Warn after 60 s and terminate a test that has run for five warning periods
 # (300 s). This governs every test no override matches.
@@ -15,6 +19,30 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # `trybuild` build below can legitimately wait tens of minutes for a shared
 # compile slot, and terminating it there converts normal queueing into failure.
 global-timeout = "60m"
+
+# Nested builds are prepared before the timed tests start (Concordat NC-010).
+# `ownership_contract` compiles every UI fixture through `trybuild`, and
+# `resource_policy_example_executable` builds the published example, each inside
+# the test's own deadline. These scripts run each test's own target once before
+# any test starts, under an allowance of their own, so the timed bodies find the
+# builds done. Each takes the caller's environment (flags, `CARGO_TARGET_DIR`),
+# and every command is `--frozen` because `make test` fetches first. A failing
+# warm-up fails the script, and nextest then reports that test's own output.
+[scripts.setup.warm-ownership-contract]
+command = "cargo test --frozen --test ownership_contract"
+slow-timeout = { period = "60s", terminate-after = 60 }
+
+[scripts.setup.warm-resource-policy-example]
+command = "cargo build --frozen --example resource_policy_spike"
+slow-timeout = { period = "60s", terminate-after = 30 }
+
+[[profile.default.scripts]]
+filter = 'binary_id(=peregrine-web::ownership_contract)'
+setup = "warm-ownership-contract"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=peregrine-web::resource_policy_example_executable)'
+setup = "warm-resource-policy-example"
 
 [test-groups.nested-cargo-builds]
 # Tests that start a child cargo or rustc contend for the package-cache lock
