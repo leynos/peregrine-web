@@ -26,14 +26,9 @@ const EXAMPLE: &str = "resource_policy_spike";
 /// Builds the example and returns the executable Cargo produced.
 fn build_example() -> Result<PathBuf, Box<dyn Error>> {
     let output = Command::new(env!("CARGO"))
-        .args([
-            "build",
-            "--offline",
-            "--example",
-            EXAMPLE,
-            "--message-format",
-            "json",
-        ])
+        .args(["build", "--locked", "--offline", "--example"])
+        .arg(EXAMPLE)
+        .args(["--message-format", "json"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()?;
 
