@@ -69,7 +69,7 @@ COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) -C link-arg=$(COVERAGE_LI
 # own override so coverage runs LLVM instrumentation instead of Cranelift.
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
-TYPOS_CONFIG_BUILDER = uv tool run --from \
+TYPOS_CONFIG_BUILDER = uv tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@v0.1.3" \
 	typos-config-builder
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
