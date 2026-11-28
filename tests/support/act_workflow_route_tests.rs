@@ -232,6 +232,14 @@ fn route_rejects_broken_step_dependencies() {
         .swap(mdtablefix, format);
     rejects_changed_route(&original, &format_first, "Format before mdtablefix");
 
+    let mut spelling_first = original.clone();
+    let setup_uv = position(&original, "Setup uv");
+    let spelling = position(&original, "Check spelling");
+    route_steps_mut(&mut spelling_first)
+        .expect("the committed steps must be a sequence")
+        .swap(setup_uv, spelling);
+    rejects_changed_route(&original, &spelling_first, "spelling before uv setup");
+
     let mut lint_twice = original.clone();
     let lint = position(&original, "Lint");
     let installer = position(&original, "Install the YAML lint tools");

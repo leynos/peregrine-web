@@ -96,12 +96,14 @@ fn valid_step_env(item: &Value, name: Option<&str>) -> bool {
 }
 
 /// Steps that depend on one another, in the order they must run.
-const PROVISIONING_ORDER: [&str; 13] = [
+const PROVISIONING_ORDER: [&str; 15] = [
     "Setup Rust",
     "Install linker prerequisites",
     "Install the build standard",
     "Install mdtablefix",
     "Format",
+    "Setup uv",
+    "Check spelling",
     "Install test runner",
     "Install cargo-audit",
     "Install Whitaker",
