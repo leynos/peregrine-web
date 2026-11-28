@@ -63,6 +63,11 @@ pub(super) const ACTIONS: &[ActionContract] = &[
         &[("cranelift", "true")],
     ),
     (
+        "leynos/shared-actions/.github/actions/install-yaml-lint@<full commit SHA>",
+        "Install the YAML lint tools",
+        &[],
+    ),
+    (
         "leynos/shared-actions/.github/actions/generate-coverage@\
          dbe2e22ceaf498d85512679ccded38be9dbe7777",
         "Test and Measure Coverage",
@@ -181,7 +186,7 @@ const ANY_COMMIT: &str = "<full commit SHA>";
 /// Matches one `uses` value against an exact revision, or against an action
 /// whose revision is the [`ANY_COMMIT`] placeholder and may carry any full
 /// lowercase commit SHA.
-fn revision_matches(actual: Option<&str>, expected: &str) -> bool {
+pub(super) fn revision_matches(actual: Option<&str>, expected: &str) -> bool {
     let Some(prefix) = expected.strip_suffix(ANY_COMMIT) else {
         return actual == Some(expected);
     };
@@ -245,10 +250,8 @@ fn valid_hosted_environment(ci: &Value) -> bool {
         && text(ci, &["jobs", "build-test", "env", "BUILD_PROFILE"]) == Some("debug")
 }
 
-/// Requires every step in the fixed hosted route to satisfy its named policy.
-fn valid_hosted_steps(steps: &[Value]) -> bool {
-    steps.len() == 19 && steps.iter().all(policy::known_step)
-}
+/// Requires every step in the hosted route to satisfy its named policy.
+fn valid_hosted_steps(steps: &[Value]) -> bool { steps.iter().all(policy::known_step) }
 
 /// Pins the full manual Act step count, permission, and runner version.
 fn valid_manual_job_policy(act: &Value, steps: &[Value]) -> bool {
@@ -257,33 +260,14 @@ fn valid_manual_job_policy(act: &Value, steps: &[Value]) -> bool {
         && text(act, &["jobs", "act-validation", "env", "ACT_VERSION"]) == Some("v0.2.89")
 }
 
-/// Pins provisioning order, read-only permissions, and unsuppressed failures.
+/// Requires the checkout first and the dependent steps once each, in order, with read-only
+/// permissions and unsuppressed failures. Other steps may sit between them.
 fn valid_ci_order(ci: &Value, steps: &[Value]) -> bool {
-    let expected_order = [
-        None,
-        Some("Setup Rust"),
-        Some("Log Rust compiler configuration"),
-        Some("Install linker prerequisites"),
-        Some("Install the build standard"),
-        Some("Install mdtablefix"),
-        Some("Format"),
-        Some("Markdown lint"),
-        Some("Setup uv"),
-        Some("Check spelling"),
-        Some("Install test runner"),
-        Some("Install cargo-audit"),
-        Some("Setup Python for audit manifest extraction"),
-        Some("Install Whitaker"),
-        Some("Audit dependencies"),
-        Some("Lint"),
-        Some("Log coverage linker configuration"),
-        Some("Test and Measure Coverage"),
-        Some("Test under Act"),
-    ];
     steps
-        .iter()
-        .zip(expected_order)
-        .all(|(item, name)| text(item, &["name"]) == name)
+        .first()
+        .and_then(|first| text(first, &["uses"]))
+        .is_some_and(|uses| uses.starts_with("actions/checkout@"))
+        && policy::provisioning_in_order(steps)
         && text(ci, &["jobs", "build-test", "permissions", "contents"]) == Some("read")
         && steps
             .iter()

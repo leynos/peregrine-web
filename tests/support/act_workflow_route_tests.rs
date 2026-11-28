@@ -211,6 +211,47 @@ fn route_rejects_step_mutations() {
     rejects_changed_route(&original, &changed_command, "changed lint command");
 }
 
+/// Dependent steps must keep their order and appear once each.
+#[test]
+fn route_rejects_broken_step_dependencies() {
+    let original = committed_ci().expect("parse committed CI workflow");
+    let position = |ci: &Value, name: &str| {
+        let mut copy = ci.clone();
+        let steps = route_steps_mut(&mut copy).expect("the committed steps must be a sequence");
+        steps
+            .iter()
+            .position(|step| step.get("name").and_then(Value::as_str) == Some(name))
+            .unwrap_or_else(|| panic!("the committed workflow must contain {name}"))
+    };
+
+    let mut format_first = original.clone();
+    let format = position(&original, "Format");
+    let mdtablefix = position(&original, "Install mdtablefix");
+    route_steps_mut(&mut format_first)
+        .expect("the committed steps must be a sequence")
+        .swap(mdtablefix, format);
+    rejects_changed_route(&original, &format_first, "Format before mdtablefix");
+
+    let mut spelling_first = original.clone();
+    let setup_uv = position(&original, "Setup uv");
+    let spelling = position(&original, "Check spelling");
+    route_steps_mut(&mut spelling_first)
+        .expect("the committed steps must be a sequence")
+        .swap(setup_uv, spelling);
+    rejects_changed_route(&original, &spelling_first, "spelling before uv setup");
+
+    let mut lint_twice = original.clone();
+    let lint = position(&original, "Lint");
+    let installer = position(&original, "Install the YAML lint tools");
+    let steps = route_steps_mut(&mut lint_twice).expect("the committed steps must be a sequence");
+    let duplicate = steps
+        .get(lint)
+        .cloned()
+        .expect("the Lint step index must exist");
+    steps.insert(installer, duplicate);
+    rejects_changed_route(&original, &lint_twice, "a Lint step before the installer");
+}
+
 /// Disabled jobs, defaults, and suppressed failures remain rejected.
 #[test]
 fn route_rejects_execution_policy_mutations() {

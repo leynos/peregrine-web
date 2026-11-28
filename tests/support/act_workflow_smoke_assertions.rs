@@ -94,9 +94,8 @@ fn assert_executor_guards(trace: &[Vec<String>]) {
         "Act must evaluate the test fallback guard and prevent recursion"
     );
     assert!(
-        !trace
-            .iter()
-            .any(|event| event.first().map(String::as_str) == Some("action-7")),
+        !trace.iter().any(|event| event.first().map(String::as_str)
+            == Some(format!("action-{}", contract::ACTIONS.len() - 1).as_str())),
         "the hosted coverage action must be skipped by Act's real expression evaluation"
     );
 }

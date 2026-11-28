@@ -93,7 +93,7 @@ impl ActSmoke {
             let (expected, _, inputs) = contract::ACTIONS
                 .get(action_index)
                 .ok_or("unmapped action")?;
-            if uses != *expected {
+            if !contract::revision_matches(Some(uses), expected) {
                 return Err(format!("unmapped action: {uses}").into());
             }
             let action_path = format!(".github/actions/fixture-{action_index}");
@@ -126,19 +126,22 @@ impl ActSmoke {
             .and_then(|job| job.get_mut("steps"))
             .and_then(Value::as_sequence_mut)
             .ok_or("derived workflow lost its build-test steps")?;
-        let mut restored_index = 0;
+        let mut original_uses = original
+            .get("jobs")
+            .and_then(|jobs| jobs.get("build-test"))
+            .and_then(|job| job.get("steps"))
+            .and_then(Value::as_sequence)
+            .ok_or("the original build-test steps are missing")?
+            .iter()
+            .filter_map(|step| step.get("uses"));
         for step in restored_steps {
             if step.get("uses").is_none() {
                 continue;
             }
-            let revision = contract::ACTIONS
-                .get(restored_index)
-                .ok_or("unmapped restored action")?
-                .0;
+            let uses = original_uses.next().ok_or("unmapped restored action")?;
             step.as_mapping_mut()
                 .ok_or("restored action is not a mapping")?
-                .insert(Value::String("uses".into()), Value::String(revision.into()));
-            restored_index += 1;
+                .insert(Value::String("uses".into()), uses.clone());
         }
         if &restored != original {
             return Err("fixture rewrite changed a step field beyond uses".into());
