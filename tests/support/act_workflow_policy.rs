@@ -94,3 +94,38 @@ fn valid_step_env(item: &Value, name: Option<&str>) -> bool {
             .iter()
             .all(|(key, value)| text(item, &["env", key]) == Some(*value))
 }
+
+/// Steps that depend on one another, in the order they must run.
+const PROVISIONING_ORDER: [&str; 13] = [
+    "Setup Rust",
+    "Install linker prerequisites",
+    "Install the build standard",
+    "Install mdtablefix",
+    "Format",
+    "Install test runner",
+    "Install cargo-audit",
+    "Install Whitaker",
+    "Audit dependencies",
+    "Install the YAML lint tools",
+    "Lint",
+    "Test and Measure Coverage",
+    "Test under Act",
+];
+
+/// Requires each dependent step exactly once, in strictly increasing position.
+pub(super) fn provisioning_in_order(steps: &[Value]) -> bool {
+    let mut previous = None;
+    PROVISIONING_ORDER.iter().all(|required| {
+        let mut found = steps
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| text(item, &["name"]) == Some(*required))
+            .map(|(index, _)| index);
+        let (Some(position), None) = (found.next(), found.next()) else {
+            return false;
+        };
+        let ordered = previous.is_none_or(|before| before < position);
+        previous = Some(position);
+        ordered
+    })
+}

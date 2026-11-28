@@ -186,7 +186,7 @@ const ANY_COMMIT: &str = "<full commit SHA>";
 /// Matches one `uses` value against an exact revision, or against an action
 /// whose revision is the [`ANY_COMMIT`] placeholder and may carry any full
 /// lowercase commit SHA.
-fn revision_matches(actual: Option<&str>, expected: &str) -> bool {
+pub(super) fn revision_matches(actual: Option<&str>, expected: &str) -> bool {
     let Some(prefix) = expected.strip_suffix(ANY_COMMIT) else {
         return actual == Some(expected);
     };
@@ -260,31 +260,14 @@ fn valid_manual_job_policy(act: &Value, steps: &[Value]) -> bool {
         && text(act, &["jobs", "act-validation", "env", "ACT_VERSION"]) == Some("v0.2.89")
 }
 
-/// Requires the provisioning steps to appear in dependency order, with read-only permissions
-/// and unsuppressed failures. Other steps may sit between them.
+/// Requires the checkout first and the dependent steps once each, in order, with read-only
+/// permissions and unsuppressed failures. Other steps may sit between them.
 fn valid_ci_order(ci: &Value, steps: &[Value]) -> bool {
-    let required_order = [
-        "Setup Rust",
-        "Install linker prerequisites",
-        "Install the build standard",
-        "Install mdtablefix",
-        "Install test runner",
-        "Install cargo-audit",
-        "Install Whitaker",
-        "Audit dependencies",
-        "Install the YAML lint tools",
-        "Lint",
-        "Test and Measure Coverage",
-        "Test under Act",
-    ];
-    let mut names = steps.iter().filter_map(|item| text(item, &["name"]));
     steps
         .first()
         .and_then(|first| text(first, &["uses"]))
         .is_some_and(|uses| uses.starts_with("actions/checkout@"))
-        && required_order
-            .iter()
-            .all(|required| names.any(|name| name == *required))
+        && policy::provisioning_in_order(steps)
         && text(ci, &["jobs", "build-test", "permissions", "contents"]) == Some("read")
         && steps
             .iter()
